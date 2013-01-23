@@ -24,10 +24,12 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Persistence selection per message
 * Queue or topic browsing
 * Connection start/stop behavior
+* Probably 100 other things I've missed
 
-### Probably Not Going to Work
+### Not Going to Work Any Time Soon
 * Transactional message receiving
 * Message selectors
+* Durable subscriptions
 
 ## Examples
 
