@@ -1,5 +1,8 @@
 package org.mpilone.hazelcastmq;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.jms.*;
 
 import com.hazelcast.core.HazelcastInstance;
@@ -22,6 +25,22 @@ public class HazelcastMQConnection implements Connection {
   private String clientID;
 
   /**
+   * The flag which indicates if the connection factory has been started or not.
+   */
+  private boolean started = false;
+
+  /**
+   * The list of all open sessions created by this connection.
+   */
+  private List<HazelcastMQSession> sessions;
+
+  /**
+   * The list of all open temporary destinations created by sessions of this
+   * connection.
+   */
+  private List<Destination> temporaryDestinations;
+
+  /**
    * Constructs the connection which is a child of the given connection factory.
    * 
    * @param connectionFactory
@@ -29,6 +48,9 @@ public class HazelcastMQConnection implements Connection {
    */
   public HazelcastMQConnection(HazelcastMQConnectionFactory connectionFactory) {
     this.connectionFactory = connectionFactory;
+
+    this.sessions = new ArrayList<HazelcastMQSession>();
+    this.temporaryDestinations = new ArrayList<Destination>();
   }
 
   /*
@@ -38,7 +60,15 @@ public class HazelcastMQConnection implements Connection {
    */
   @Override
   public void close() throws JMSException {
-    // no op
+    for (HazelcastMQSession session : sessions) {
+      session.close();
+    }
+
+    List<Destination> tmpDests = new ArrayList<Destination>(
+        temporaryDestinations);
+    for (Destination destination : tmpDests) {
+      deleteTemporaryDestination(destination);
+    }
   }
 
   /*
@@ -76,7 +106,14 @@ public class HazelcastMQConnection implements Connection {
       throws JMSException {
     // acknowledgeMode isn't supported.
 
-    return new HazelcastMQSession(this, transacted);
+    HazelcastMQSession session = new HazelcastMQSession(this, transacted);
+    sessions.add(session);
+
+    if (started) {
+      session.start();
+    }
+
+    return session;
   }
 
   /*
@@ -136,7 +173,11 @@ public class HazelcastMQConnection implements Connection {
    */
   @Override
   public void start() throws JMSException {
-    // no op
+    started = true;
+
+    for (HazelcastMQSession session : sessions) {
+      session.start();
+    }
   }
 
   /*
@@ -146,11 +187,71 @@ public class HazelcastMQConnection implements Connection {
    */
   @Override
   public void stop() throws JMSException {
-    // no op
+    started = false;
+
+    for (HazelcastMQSession session : sessions) {
+      session.stop();
+    }
   }
 
-  public HazelcastInstance getHazelcast() {
+  /**
+   * Returns the flag which indicates if the connection has been started or not.
+   * 
+   * @return the started flag
+   */
+  boolean isStarted() {
+    return started;
+  }
+
+  HazelcastInstance getHazelcast() {
     return connectionFactory.getHazelcast();
+  }
+
+  HazelcastMQConfig getConfig() {
+    return connectionFactory.getConfig();
+  }
+
+  /**
+   * Indicates that the given session has been closed and no longer needs to be
+   * tracked.
+   * 
+   * @param session
+   *          the session that was closed
+   */
+  void sessionClosed(HazelcastMQSession session) {
+    sessions.remove(session);
+  }
+
+  /**
+   * Adds the given destination to the list of temporary destinations to be
+   * cleaned up when this connection closes if not deleted earlier.
+   * 
+   * @param dest
+   *          the destination to add/track
+   */
+  void addTemporaryDestination(Destination dest) {
+    temporaryDestinations.add(dest);
+  }
+
+  /**
+   * Deletes the given temporary destination (either queue or topic).
+   * 
+   * @param dest
+   *          the destination to delete
+   * @throws JMSException
+   */
+  void deleteTemporaryDestination(Destination dest) throws JMSException {
+    if (temporaryDestinations.remove(dest)) {
+      if (dest instanceof TemporaryQueue) {
+        getHazelcast().getQueue(((TemporaryQueue) dest).getQueueName())
+            .destroy();
+      }
+      else if (dest instanceof TemporaryTopic) {
+        getHazelcast().getTopic(((TemporaryTopic) dest).getTopicName())
+            .destroy();
+      }
+
+    }
   }
 
 }

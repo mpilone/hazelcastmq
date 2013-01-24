@@ -44,6 +44,7 @@ public class ProducerRequestReply {
 
       // Create a connection, session, and destinations.
       Connection connection = connectionFactory.createConnection();
+      connection.start();
       Session session = connection.createSession(false,
           Session.AUTO_ACKNOWLEDGE);
       Destination requestDest = session.createQueue("foo.bar");

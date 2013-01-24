@@ -19,6 +19,34 @@ public class HazelcastMQConnectionFactory implements ConnectionFactory {
    */
   private HazelcastInstance hazelcast;
 
+  /**
+   * The MQ layer configuration.
+   */
+  private HazelcastMQConfig config;
+
+  /**
+   * Constructs the factory with no Hazelcast instance and a default
+   * configuration. The Hazelcast instance must be set before use.
+   */
+  public HazelcastMQConnectionFactory() {
+    this(null, new HazelcastMQConfig());
+  }
+
+  /**
+   * Constructs the factory with the given Hazelcast instance and configuration.
+   * 
+   * @param hazelcast
+   *          the Hazelcast instance to use for all message passing
+   * @param config
+   *          the configuration of the MQ layer
+   */
+  public HazelcastMQConnectionFactory(HazelcastInstance hazelcast,
+      HazelcastMQConfig config) {
+    super();
+    this.hazelcast = hazelcast;
+    this.config = config;
+  }
+
   /*
    * (non-Javadoc)
    * 
@@ -58,5 +86,26 @@ public class HazelcastMQConnectionFactory implements ConnectionFactory {
    */
   public HazelcastInstance getHazelcast() {
     return hazelcast;
+  }
+
+  /**
+   * Returns the MQ layer configuration.
+   * 
+   * @return the MQ configuration
+   */
+  public HazelcastMQConfig getConfig() {
+    return config;
+  }
+
+  /**
+   * Sets the MQ layer configuration which replaces any existing configuration.
+   * The behavior is undefined if the configuration changes while there are
+   * existing connections and session from this connection factory.
+   * 
+   * @param config
+   *          the new MQ configuration
+   */
+  public void setConfig(HazelcastMQConfig config) {
+    this.config = config;
   }
 }

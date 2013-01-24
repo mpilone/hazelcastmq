@@ -2,6 +2,7 @@ package org.mpilone.hazelcastmq.example;
 
 import javax.jms.*;
 
+import org.mpilone.hazelcastmq.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,11 +36,13 @@ public class ProducerConsumerRequestReply {
 
     try {
       // Setup the connection factory.
-      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory();
-      connectionFactory.setHazelcast(hazelcast);
+      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory(
+          hazelcast, mqConfig);
 
       // Create a connection, session, and destinations.
       Connection connection = connectionFactory.createConnection();
+      connection.start();
       Session session = connection.createSession(false,
           Session.AUTO_ACKNOWLEDGE);
       Destination requestDest = session.createQueue("example.test1");

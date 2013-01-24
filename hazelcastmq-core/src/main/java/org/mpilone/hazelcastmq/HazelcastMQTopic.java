@@ -1,9 +1,6 @@
 package org.mpilone.hazelcastmq;
 
-import static java.lang.String.format;
-
 import javax.jms.JMSException;
-import javax.jms.TemporaryTopic;
 import javax.jms.Topic;
 
 /**
@@ -11,17 +8,17 @@ import javax.jms.Topic;
  * 
  * @author mpilone
  */
-public class HazelcastMQTopic implements Topic, TemporaryTopic {
+public class HazelcastMQTopic implements Topic {
 
   /**
    * The parent session.
    */
-  private HazelcastMQSession session;
+  protected HazelcastMQSession session;
 
   /**
    * The topic name.
    */
-  private String topicName;
+  protected String topicName;
 
   /**
    * Constructs a topic with the given name.
@@ -37,8 +34,7 @@ public class HazelcastMQTopic implements Topic, TemporaryTopic {
   }
 
   /**
-   * Constructs the topic with no session. Attempting to delete a topic with no
-   * parent session will result in an exception.
+   * Constructs the topic with no session.
    * 
    * @param topicName
    *          the name of the topic
@@ -66,22 +62,6 @@ public class HazelcastMQTopic implements Topic, TemporaryTopic {
   @Override
   public String getTopicName() throws JMSException {
     return topicName;
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.TemporaryTopic#delete()
-   */
-  @Override
-  public void delete() throws JMSException {
-    if (session == null) {
-      throw new IllegalStateException(format(
-          "Cannot delete topic [%s] because it is "
-              + "not associated with a session in this instance.", topicName));
-    }
-
-    session.getHazelcast().getTopic(topicName).destroy();
   }
 
 }

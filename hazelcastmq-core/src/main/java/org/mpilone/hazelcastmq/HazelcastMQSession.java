@@ -3,6 +3,8 @@ package org.mpilone.hazelcastmq;
 import static java.lang.String.format;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.jms.*;
 
@@ -32,7 +34,22 @@ public class HazelcastMQSession implements Session {
   /**
    * The flag which indicates if the session is transacted.
    */
-  private boolean transacted;
+  private boolean transacted = false;
+
+  /**
+   * The flag which indicates if this session has been started yet.
+   */
+  private boolean started = false;
+
+  /**
+   * The list of all open consumers created by this session.
+   */
+  private List<HazelcastMQMessageConsumer> consumers;
+
+  /**
+   * The list of all open producers created by this session.
+   */
+  private List<HazelcastMQMessageProducer> producers;
 
   /**
    * The ID generator used to generate unique IDs for temporary queues and
@@ -70,7 +87,9 @@ public class HazelcastMQSession implements Session {
       hazelcast.getTransaction().begin();
     }
 
-    idGenerator = hazelcast.getIdGenerator(KEY_PREFIX + ".idgenerator");
+    this.idGenerator = hazelcast.getIdGenerator(KEY_PREFIX + ".idgenerator");
+    this.consumers = new ArrayList<HazelcastMQMessageConsumer>();
+    this.producers = new ArrayList<HazelcastMQMessageProducer>();
   }
 
   /**
@@ -78,7 +97,7 @@ public class HazelcastMQSession implements Session {
    * 
    * @return the ID generator
    */
-  public IdGenerator getIdGenerator() {
+  IdGenerator getIdGenerator() {
     return idGenerator;
   }
 
@@ -87,7 +106,7 @@ public class HazelcastMQSession implements Session {
    * 
    * @return the Hazelcast instance
    */
-  public HazelcastInstance getHazelcast() {
+  HazelcastInstance getHazelcast() {
     return hazelcast;
   }
 
@@ -98,9 +117,24 @@ public class HazelcastMQSession implements Session {
    */
   @Override
   public void close() throws JMSException {
+    stop();
+
+    for (MessageProducer producer : producers) {
+      producer.close();
+    }
+    producers.clear();
+
+    for (MessageConsumer consumer : consumers) {
+      consumer.close();
+    }
+    consumers.clear();
+
+    connection.sessionClosed(this);
+
     if (transacted) {
       hazelcast.getTransaction().rollback();
     }
+
   }
 
   /*
@@ -155,13 +189,23 @@ public class HazelcastMQSession implements Session {
   @Override
   public MessageConsumer createConsumer(Destination destination)
       throws JMSException {
+    HazelcastMQMessageConsumer consumer = null;
+
     if (destination instanceof HazelcastMQTopic) {
-      return new HazelcastMQTopicSubscriber(this,
+      consumer = new HazelcastMQTopicSubscriber(this,
           (HazelcastMQTopic) destination);
     }
     else {
-      return new HazelcastMQQueueReceiver(this, (HazelcastMQQueue) destination);
+      consumer = new HazelcastMQQueueReceiver(this,
+          (HazelcastMQQueue) destination);
     }
+
+    if (started) {
+      consumer.start();
+    }
+
+    consumers.add(consumer);
+    return consumer;
   }
 
   /*
@@ -274,7 +318,10 @@ public class HazelcastMQSession implements Session {
   @Override
   public MessageProducer createProducer(Destination destination)
       throws JMSException {
-    return new HazelcastMQMessageProducer(this, destination);
+    HazelcastMQMessageProducer producer = new HazelcastMQMessageProducer(this,
+        destination);
+    producers.add(producer);
+    return producer;
   }
 
   /*
@@ -305,8 +352,10 @@ public class HazelcastMQSession implements Session {
   @Override
   public TemporaryQueue createTemporaryQueue() throws JMSException {
 
-    return new HazelcastMQQueue(this, KEY_PREFIX + ".tmp.queue."
-        + idGenerator.newId());
+    TemporaryQueue queue = new HazelcastMQTemporaryQueue(this, KEY_PREFIX
+        + ".tmp.queue." + idGenerator.newId());
+    connection.addTemporaryDestination(queue);
+    return queue;
   }
 
   /*
@@ -317,8 +366,10 @@ public class HazelcastMQSession implements Session {
   @Override
   public TemporaryTopic createTemporaryTopic() throws JMSException {
 
-    return new HazelcastMQTopic(this, KEY_PREFIX + ".tmp.queue."
-        + idGenerator.newId());
+    TemporaryTopic topic = new HazelcastMQTemporaryTopic(this, KEY_PREFIX
+        + ".tmp.queue." + idGenerator.newId());
+    connection.addTemporaryDestination(topic);
+    return topic;
   }
 
   /*
@@ -439,6 +490,61 @@ public class HazelcastMQSession implements Session {
   @Override
   public void unsubscribe(String arg0) throws JMSException {
     throw new UnsupportedOperationException();
+  }
+
+  HazelcastMQConfig getConfig() {
+    return connection.getConfig();
+  }
+
+  /**
+   * Returns the parent connection of this session.
+   * 
+   * @return the parent connection
+   */
+  HazelcastMQConnection getConnection() {
+    return connection;
+  }
+
+  /**
+   * Indicates that the producer was closed and no longer needs to be tracked.
+   * 
+   * @param producer
+   *          the producer that was closed
+   */
+  void producerClosed(MessageProducer producer) {
+    producers.remove(producer);
+  }
+
+  /**
+   * Indicates that the consumer was closed and no longer needs to be tracked.
+   * 
+   * @param consumer
+   *          the consumer that was closed
+   */
+  void consumerClosed(MessageConsumer consumer) {
+    consumers.remove(consumer);
+  }
+
+  /**
+   * Starts this session. This method must be called by the connection when it
+   * is started.
+   */
+  void start() {
+    started = true;
+    for (HazelcastMQMessageConsumer consumer : consumers) {
+      consumer.start();
+    }
+  }
+
+  /**
+   * Stops this session. This method must be called by the connection when it is
+   * stopped.
+   */
+  void stop() {
+    started = false;
+    for (HazelcastMQMessageConsumer consumer : consumers) {
+      consumer.stop();
+    }
   }
 
 }

@@ -463,9 +463,17 @@ public class HazelcastMQMessage implements Message {
     else {
       String dest;
       String destType;
-      if (destination instanceof HazelcastMQQueue) {
+      if (destination instanceof HazelcastMQTemporaryQueue) {
+        dest = ((HazelcastMQQueue) destination).getQueueName();
+        destType = "temporary-queue";
+      }
+      else if (destination instanceof HazelcastMQQueue) {
         dest = ((HazelcastMQQueue) destination).getQueueName();
         destType = "queue";
+      }
+      else if (destination instanceof HazelcastMQTemporaryTopic) {
+        dest = ((HazelcastMQTopic) destination).getTopicName();
+        destType = "temporary-topic";
       }
       else {
         dest = ((HazelcastMQTopic) destination).getTopicName();
@@ -495,6 +503,12 @@ public class HazelcastMQMessage implements Message {
 
     if (destType.equals("topic")) {
       return new HazelcastMQTopic(dest);
+    }
+    else if (destType.equals("temporary-topic")) {
+      return new HazelcastMQTemporaryTopic(dest);
+    }
+    else if (destType.equals("temporary-queue")) {
+      return new HazelcastMQTemporaryQueue(dest);
     }
     else {
       return new HazelcastMQQueue(dest);

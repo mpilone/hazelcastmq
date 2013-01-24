@@ -1,27 +1,24 @@
 package org.mpilone.hazelcastmq;
 
-import static java.lang.String.format;
-
 import javax.jms.JMSException;
 import javax.jms.Queue;
-import javax.jms.TemporaryQueue;
 
 /**
  * A queue destination for a HazelcastMQ.
  * 
  * @author mpilone
  */
-public class HazelcastMQQueue implements Queue, TemporaryQueue {
+public class HazelcastMQQueue implements Queue {
 
   /**
    * The session that created the queue.
    */
-  private HazelcastMQSession session;
+  protected HazelcastMQSession session;
 
   /**
    * The name of the queue.
    */
-  private String queueName;
+  protected String queueName;
 
   /**
    * Constructs the queue with the given name.
@@ -37,8 +34,7 @@ public class HazelcastMQQueue implements Queue, TemporaryQueue {
   }
 
   /**
-   * Constructs the queue with no session. Attempting to delete a queue with no
-   * parent session will result in an exception.
+   * Constructs the queue with no session.
    * 
    * @param queueName
    *          the name of the queue
@@ -59,22 +55,6 @@ public class HazelcastMQQueue implements Queue, TemporaryQueue {
   @Override
   public String getQueueName() throws JMSException {
     return queueName;
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.TemporaryQueue#delete()
-   */
-  @Override
-  public void delete() throws JMSException {
-    if (session == null) {
-      throw new IllegalStateException(format(
-          "Cannot delete queue [%s] because it is "
-              + "not associated with a session in this instance.", queueName));
-    }
-
-    session.getHazelcast().getQueue(queueName).destroy();
   }
 
 }

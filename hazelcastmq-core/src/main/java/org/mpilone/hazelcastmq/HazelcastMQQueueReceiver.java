@@ -63,11 +63,13 @@ public class HazelcastMQQueueReceiver extends HazelcastMQMessageConsumer
    * Hazelcast queue.
    */
   protected void onHazelcastItemAdded() {
+
     try {
-      // Try to get the new message out of the queue.
-      Message msg = receiveNoWait();
-      if (msg != null && messageListener != null) {
-        messageListener.onMessage(msg);
+      // Try to get the new message out of the queue and dispatch it to the
+      // listener. We should always have a listener here but we'll double check
+      // to be safe.
+      if (messageListener != null) {
+        receiveAndDispatch(hazelcastQueue, messageListener);
       }
     }
     catch (Throwable ex) {

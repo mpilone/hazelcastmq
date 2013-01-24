@@ -87,7 +87,7 @@ public class HazelcastMQMessageProducer implements MessageProducer {
     this.hazelcast = this.session.getHazelcast();
     this.idGenerator = this.session.getIdGenerator();
 
-    messageMarshaller = new StompLikeMessageMarshaller();
+    messageMarshaller = this.session.getConfig().getMessageMarshaller();
   }
 
   /*

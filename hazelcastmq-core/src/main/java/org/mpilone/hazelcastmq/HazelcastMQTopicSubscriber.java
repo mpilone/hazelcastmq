@@ -61,7 +61,8 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
       };
     };
 
-    memoryQueue = new LinkedBlockingQueue<byte[]>(500);
+    memoryQueue = new LinkedBlockingQueue<byte[]>(this.session.getConfig()
+        .getTopicMaxMessageCount());
     hazelcastTopic = session.getHazelcast().getTopic(topic.getTopicName());
     hazelcastTopic.addMessageListener(hazelcastListener);
   }
@@ -125,7 +126,14 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
    */
   private void onHazelcastTopicMessage(byte[] msgData) {
     try {
-      // We always queue the message.
+      if (!started) {
+        // If we are inactive, we ignore topic messages.
+        return;
+      }
+
+      // We always queue the message even if we have a message listener. We'll
+      // immediately pull it out of the queue and dispatch it if there is a
+      // listener.
       if (!memoryQueue.offer(msgData)) {
         log.warn(format("In-memory message buffer full for topic [%s]. "
             + "Messages will be lost. Consider increaing the speed of "
@@ -133,19 +141,37 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
         return;
       }
 
-      // If we have a listener, send the message right away.
+      // If we have a listener, drain any queued messages and push them to the
+      // listener. In theory there should only be the very last message we
+      // received in the queue to be consumed.
       if (messageListener != null) {
-        Message msg = receiveNoWait();
-        if (msg != null) {
-          messageListener.onMessage(msg);
+        boolean msgDispatched = false;
+        do {
+          msgDispatched = receiveAndDispatch(memoryQueue, messageListener);
         }
+        while (msgDispatched);
       }
     }
     catch (Throwable ex) {
       log.error(
-          format("Unable to queue topic message for topic [%s].",
+          format("Unable to buffer or deliver topic message for topic [%s].",
               safeTopicName()), ex);
     }
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see
+   * org.mpilone.hazelcastmq.HazelcastMQMessageConsumer#setMessageListener(javax
+   * .jms.MessageListener)
+   */
+  @Override
+  public void setMessageListener(MessageListener messageListener)
+      throws JMSException {
+    super.setMessageListener(messageListener);
+
+    memoryQueue.clear();
   }
 
   /*
@@ -176,5 +202,17 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
   @Override
   public Message receiveNoWait() throws JMSException {
     return receive(memoryQueue, 0);
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see org.mpilone.hazelcastmq.HazelcastMQMessageConsumer#stop()
+   */
+  @Override
+  void stop() {
+    super.stop();
+
+    memoryQueue.clear();
   }
 }
