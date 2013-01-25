@@ -53,6 +53,15 @@ JMSTemplate.
 
 View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/SpringJmsTemplateOneWay.java).
 
+### Node Failure
+One of the major benefits of using Hazelcast as the message transport/store is that it 
+offers flexible reliability and replication options. This example shows a (local) three 
+node cluster and how messages can be produced and consumed even in the event of a single 
+or multiple node failure in the cluster. If you've ever worked with a clustered JMS broker 
+before, you'll appreciate the simplicity of this configuration.
+
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/NodeFailure.java).
+
 ## Future Work
 
 If there is interest I plan on continuing development of the provider to support more 
