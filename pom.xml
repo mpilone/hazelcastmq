@@ -10,6 +10,7 @@
   <modules>
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-examples</module>
+    <module>hazelcastmq-stomper</module>
   </modules>
 
   <name>HazelcastMQ</name>

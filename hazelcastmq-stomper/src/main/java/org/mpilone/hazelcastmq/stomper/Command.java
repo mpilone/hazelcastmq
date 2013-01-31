@@ -1,0 +1,6 @@
+package org.mpilone.hazelcastmq.stomper;
+
+enum Command {
+  SEND, SUBSCRIBE, UNSUBSCRIBE, BEGIN, COMMIT, ABORT, ACK, NACK, DISCONNECT, CONNECT, STOMP, CONNECTED, MESSAGE, RECEIPT, ERROR
+
+}
