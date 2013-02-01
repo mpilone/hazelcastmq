@@ -1,8 +1,7 @@
 package org.mpilone.hazelcastmq;
 
 import java.io.UnsupportedEncodingException;
-import java.util.Enumeration;
-import java.util.Properties;
+import java.util.*;
 
 import javax.jms.*;
 
@@ -16,19 +15,19 @@ public class HazelcastMQMessage implements Message {
   /**
    * The user defined properties of the message.
    */
-  private Properties properties;
+  private Map<String, String> properties;
 
   /**
    * The standard JMS headers of the message.
    */
-  private Properties headers;
+  private Map<String, String> headers;
 
   /**
    * Constructs a message with no headers or properties.
    */
   public HazelcastMQMessage() {
-    properties = new Properties();
-    headers = new Properties();
+    properties = new HashMap<String, String>();
+    headers = new HashMap<String, String>();
   }
 
   /*
@@ -134,7 +133,7 @@ public class HazelcastMQMessage implements Message {
    */
   private String getHeader(String name, String defaultValue)
       throws JMSException {
-    String value = headers.getProperty(name, defaultValue);
+    String value = headers.get(name);
     if (value == null) {
       value = defaultValue;
     }
@@ -324,7 +323,7 @@ public class HazelcastMQMessage implements Message {
   @SuppressWarnings("rawtypes")
   @Override
   public Enumeration getPropertyNames() throws JMSException {
-    return properties.keys();
+    return Collections.enumeration(properties.keySet());
   }
 
   /*
@@ -344,7 +343,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public String getStringProperty(String name) throws JMSException {
-    return properties.getProperty(name);
+    return properties.get(name);
   }
 
   /*
@@ -365,7 +364,7 @@ public class HazelcastMQMessage implements Message {
   @Override
   public void setBooleanProperty(String name, boolean value)
       throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -375,7 +374,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setByteProperty(String name, byte value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -385,7 +384,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setDoubleProperty(String name, double value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -395,7 +394,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setFloatProperty(String name, float value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -405,7 +404,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setIntProperty(String name, int value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -415,7 +414,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSCorrelationID(String correlationID) throws JMSException {
-    headers.setProperty("JMSCorrelationID", correlationID);
+    headers.put("JMSCorrelationID", correlationID);
   }
 
   /*
@@ -442,7 +441,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSDeliveryMode(int deliveryMode) throws JMSException {
-    headers.setProperty("JMSDeliveryMode", String.valueOf(deliveryMode));
+    headers.put("JMSDeliveryMode", String.valueOf(deliveryMode));
   }
 
   /*
@@ -479,8 +478,8 @@ public class HazelcastMQMessage implements Message {
         dest = ((HazelcastMQTopic) destination).getTopicName();
         destType = "topic";
       }
-      headers.setProperty(headerName, dest);
-      headers.setProperty("HZ" + headerName + "Type", destType);
+      headers.put(headerName, dest);
+      headers.put("HZ" + headerName + "Type", destType);
     }
   }
 
@@ -522,7 +521,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSExpiration(long expiration) throws JMSException {
-    properties.setProperty("JMSExpiration", String.valueOf(expiration));
+    properties.put("JMSExpiration", String.valueOf(expiration));
   }
 
   /*
@@ -532,7 +531,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSMessageID(String messageID) throws JMSException {
-    properties.setProperty("JMSMessageID", messageID);
+    properties.put("JMSMessageID", messageID);
   }
 
   /*
@@ -542,7 +541,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSPriority(int priority) throws JMSException {
-    properties.setProperty("JMSPriority", String.valueOf(priority));
+    properties.put("JMSPriority", String.valueOf(priority));
   }
 
   /*
@@ -552,8 +551,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSRedelivered(boolean redelivered) throws JMSException {
-    properties.setProperty("JMSRedelivered", Boolean.valueOf(redelivered)
-        .toString());
+    properties.put("JMSRedelivered", Boolean.valueOf(redelivered).toString());
   }
 
   /*
@@ -573,7 +571,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSTimestamp(long timestamp) throws JMSException {
-    properties.setProperty("JMSTimestamp", String.valueOf(timestamp));
+    properties.put("JMSTimestamp", String.valueOf(timestamp));
   }
 
   /*
@@ -583,7 +581,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setJMSType(String type) throws JMSException {
-    properties.setProperty("JMSType", type);
+    properties.put("JMSType", type);
   }
 
   /*
@@ -593,7 +591,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setLongProperty(String name, long value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -604,7 +602,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setObjectProperty(String name, Object value) throws JMSException {
-    properties.setProperty(name, value.toString());
+    properties.put(name, value.toString());
 
   }
 
@@ -615,7 +613,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setShortProperty(String name, short value) throws JMSException {
-    properties.setProperty(name, String.valueOf(value));
+    properties.put(name, String.valueOf(value));
   }
 
   /*
@@ -626,7 +624,7 @@ public class HazelcastMQMessage implements Message {
    */
   @Override
   public void setStringProperty(String name, String value) throws JMSException {
-    properties.setProperty(name, value);
+    properties.put(name, value);
   }
 
   /**
@@ -635,7 +633,7 @@ public class HazelcastMQMessage implements Message {
    * 
    * @return the JMS headers or an empty set of properties if none are defined
    */
-  public Properties getHeaders() {
+  Map<String, String> getHeaders() {
     return headers;
   }
 
@@ -646,7 +644,7 @@ public class HazelcastMQMessage implements Message {
    * @return the user defined properties or an empty set of properties if none
    *         are defined
    */
-  public Properties getProperties() {
+  Map<String, String> getProperties() {
     return properties;
   }
 

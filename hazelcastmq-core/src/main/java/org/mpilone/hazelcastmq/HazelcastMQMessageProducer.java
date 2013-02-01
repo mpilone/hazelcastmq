@@ -39,7 +39,7 @@ public class HazelcastMQMessageProducer implements MessageProducer {
   /**
    * The message marshaller to marshal to and from Hazelcast.
    */
-  private MessageMarshaller messageMarshaller;
+  private MessageConverter messageMarshaller;
 
   /**
    * The default delivery mode. Not currently supported.
@@ -87,7 +87,7 @@ public class HazelcastMQMessageProducer implements MessageProducer {
     this.hazelcast = this.session.getHazelcast();
     this.idGenerator = this.session.getIdGenerator();
 
-    messageMarshaller = this.session.getConfig().getMessageMarshaller();
+    messageMarshaller = this.session.getConfig().getMessageConverter();
   }
 
   /*
@@ -227,9 +227,14 @@ public class HazelcastMQMessageProducer implements MessageProducer {
       msg.setJMSTimestamp(now);
     }
 
+    // Put Bytes message in read mode.
+    if (msg instanceof BytesMessage) {
+      ((BytesMessage) msg).reset();
+    }
+
     byte[] msgData = null;
     try {
-      msgData = messageMarshaller.marshal(msg);
+      msgData = messageMarshaller.fromMessage(msg);
     }
     catch (IOException ex) {
       throw new JMSException("Unable to marshal message to wire format: "

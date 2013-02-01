@@ -16,6 +16,12 @@ public class HazelcastMQTextMessage extends HazelcastMQMessage implements
    */
   private String body;
 
+  public HazelcastMQTextMessage() throws JMSException {
+    super();
+
+    setJMSType("TextMessage");
+  }
+
   /*
    * (non-Javadoc)
    * 

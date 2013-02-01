@@ -8,10 +8,10 @@ package org.mpilone.hazelcastmq;
 public class HazelcastMQConfig {
 
   /**
-   * The message marshaller to use for marshalling JMS messages into and out of
-   * Hazelcast. The default is the {@link StompLikeMessageMarshaller}.
+   * The message converter to use for converting JMS messages into and out of
+   * Hazelcast. The default is the {@link StompLikeMessageConverter}.
    */
-  private MessageMarshaller messageMarshaller = new StompLikeMessageMarshaller();
+  private MessageConverter messageConverter = new StompLikeMessageConverter();
 
   /**
    * The maximum number of messages to buffer during topic reception before
@@ -23,20 +23,20 @@ public class HazelcastMQConfig {
 
   /**
    * Returns the message marshaller to use for marshalling JMS messages into and
-   * out of Hazelcast. The default is the {@link StompLikeMessageMarshaller}.
+   * out of Hazelcast. The default is the {@link StompLikeMessageConverter}.
    * 
    * @return the messageMarshaller the message marshaller
    */
-  public MessageMarshaller getMessageMarshaller() {
-    return messageMarshaller;
+  public MessageConverter getMessageConverter() {
+    return messageConverter;
   }
 
   /**
    * @param messageMarshaller
    *          the message marshaller
    */
-  public void setMessageMarshaller(MessageMarshaller messageMarshaller) {
-    this.messageMarshaller = messageMarshaller;
+  public void setMessageConverter(MessageConverter messageMarshaller) {
+    this.messageConverter = messageMarshaller;
   }
 
   /**

@@ -178,7 +178,7 @@ public class HazelcastMQSession implements Session {
    */
   @Override
   public BytesMessage createBytesMessage() throws JMSException {
-    throw new UnsupportedOperationException();
+    return new HazelcastMQBytesMessage();
   }
 
   /*
