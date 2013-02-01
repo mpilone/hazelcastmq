@@ -15,13 +15,13 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 ### Implemented
 * JMS 1.1 APIs implemented
 * Send and receive from queues, topics, and temporary queues
-* Transactional message sending
-* Text message type
+* Transactional message sending (per thread, not session)
+* Text and Bytes message types
 * Message expiration (in the consumer only)
 * Connection start/stop suspended consumer delivery
 
 ### Not Implemented Yet
-* Byte, Object or Stream message types
+* Object or Stream message types
 * Persistence selection per message
 * Queue or topic browsing
 * Probably 100 other things I've missed
@@ -30,6 +30,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Transactional message receiving
 * Message selectors
 * Durable subscriptions
+* Message priority
 
 ## Examples
 

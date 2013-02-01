@@ -53,7 +53,7 @@ public abstract class HazelcastMQMessageConsumer implements MessageConsumer {
   /**
    * The message marshaller used to marshal messages in and out of HazelcastMQ.
    */
-  protected MessageMarshaller messageMarshaller;
+  protected MessageConverter messageMarshaller;
 
   /**
    * The flag which indicates if this consumer has been closed.
@@ -105,7 +105,7 @@ public abstract class HazelcastMQMessageConsumer implements MessageConsumer {
     this.destination = destination;
     this.messageSelector = messageSelector;
 
-    this.messageMarshaller = this.session.getConfig().getMessageMarshaller();
+    this.messageMarshaller = this.session.getConfig().getMessageConverter();
     this.hazelcast = this.session.getHazelcast();
   }
 
@@ -185,11 +185,17 @@ public abstract class HazelcastMQMessageConsumer implements MessageConsumer {
           // Check that we got message data
           if (msgData != null) {
 
-            // Unmarshal the message data back into a JMS message
-            msg = messageMarshaller.unmarshal(msgData);
+            // Convert the message data back into a JMS message
+            msg = messageMarshaller.toMessage(msgData);
+
+            // Switch Bytes messages to read mode
+            if (msg instanceof BytesMessage) {
+              ((BytesMessage) msg).reset();
+            }
 
             // Check for message expiration
             long expirationTime = msg.getJMSExpiration();
+
             if (expirationTime != 0
                 && expirationTime <= System.currentTimeMillis()) {
               log.info(format("Dropping message [%s] because it has expired.",
