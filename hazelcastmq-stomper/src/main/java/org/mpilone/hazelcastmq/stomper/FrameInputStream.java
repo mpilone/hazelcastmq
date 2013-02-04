@@ -1,30 +1,81 @@
 package org.mpilone.hazelcastmq.stomper;
 
-import static org.mpilone.hazelcastmq.stomper.StompConstants.NUL;
+import static org.mpilone.hazelcastmq.stomper.IoUtil.UTF_8;
 
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * An input stream for STOMP frames. Each request to {@link #read()} will block
+ * until a complete frame is available.
+ * 
+ * @author mpilone
+ */
 class FrameInputStream implements Closeable {
 
+  /**
+   * The null terminator that must appear after each STOMP frame.
+   */
+  public static final char NULL_CHARACTER = '\0';
+
+  /**
+   * The low level input stream from which to read.
+   */
   private InputStream instream;
 
+  /**
+   * The log for this class.
+   */
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
+  /**
+   * Constructs the frame input stream which will read from the given input
+   * stream.
+   * 
+   * @param instream
+   *          the low level input stream from which to read
+   */
   public FrameInputStream(InputStream instream) {
     this.instream = instream;
   }
 
+  /**
+   * Reads a complete STOMP frame and returns it. This method will block until a
+   * complete frame is available or there is an error reading.
+   * 
+   * @return the frame read
+   * @throws IOException
+   *           if there is an error reading from the underlying stream
+   */
   public Frame read() throws IOException {
 
     Frame frame = new Frame();
 
     readCommand(frame);
+    log.debug("Read command: " + frame.getCommand());
+
     readHeaders(frame);
+    log.debug("Read headers: " + frame.getHeaders());
+
     readBody(frame);
+    log.debug("Read body: " + frame.getBody());
 
     return frame;
   }
 
+  /**
+   * Reads the body of the frame using the content-length header if available.
+   * The body will be set in the frame after reading.
+   * 
+   * @param frame
+   *          the partial frame that has been read to this point
+   * @throws IOException
+   *           if there is an error reading from the underlying stream
+   */
   private void readBody(Frame frame) throws IOException {
     ByteArrayOutputStream bodyBuf = new ByteArrayOutputStream();
 
@@ -36,8 +87,9 @@ class FrameInputStream implements Closeable {
       int bytesToRead = Integer.valueOf(frame.getHeaders()
           .get("content-length"));
 
-      while (bytesToRead > 0) {
-        int read = instream.read(buf, 0, Math.min(bytesToRead, buf.length));
+      int read = 0;
+      while (bytesToRead > 0 && read != -1) {
+        read = instream.read(buf, 0, Math.min(bytesToRead, buf.length));
 
         bodyBuf.write(buf, 0, read);
         bytesToRead -= read;
@@ -45,14 +97,14 @@ class FrameInputStream implements Closeable {
 
       // Next byte should be a null character or something is wrong.
       int b = instream.read();
-      if ((char) b != NUL) {
-        // TODO
+      if (b != NULL_CHARACTER) {
+        throw new StompException("Stomp frame must end with a NULL terminator.");
       }
     }
     else {
       // Read until we hit the null character.
       int b = instream.read();
-      while (b != NUL) {
+      while (b != NULL_CHARACTER) {
         bodyBuf.write(b);
         b = instream.read();
       }
@@ -61,12 +113,29 @@ class FrameInputStream implements Closeable {
     frame.setBody(bodyBuf.toByteArray());
   }
 
+  /**
+   * Reads the headers of the frame if available. The headers will be set in the
+   * frame after reading.
+   * 
+   * @param frame
+   *          the partial frame that has been read to this point
+   * @throws IOException
+   *           if there is an error reading from the underlying stream
+   */
   private void readHeaders(Frame frame) throws IOException {
 
     Map<String, String> headers = new HashMap<String, String>();
 
-    String line = readLine();
-    while (!line.isEmpty()) {
+    // Read until we find a blank line (i.e. end of headers).
+    boolean eoh = false;
+    while (!eoh) {
+      String line = readLine();
+
+      if (line.isEmpty()) {
+        eoh = true;
+        continue;
+      }
+
       int pos = line.indexOf(':');
       if (pos > 0) {
         String key = line.substring(0, pos);
@@ -83,17 +152,34 @@ class FrameInputStream implements Closeable {
     frame.setHeaders(headers);
   }
 
+  /**
+   * Reads the command of the frame. The command will be set in the frame after
+   * reading.
+   * 
+   * @param frame
+   *          the partial frame that has been read to this point
+   * @throws IOException
+   *           if there is an error reading from the underlying stream
+   */
   private void readCommand(Frame frame) throws IOException {
 
     String line;
     do {
       line = readLine();
     }
-    while (!line.isEmpty());
+    while (line.isEmpty());
 
     frame.setCommand(Command.valueOf(line));
   }
 
+  /**
+   * Reads a single line of UTF-8 text from the stream and returns once a new
+   * line character is found.
+   * 
+   * @return the line of text read
+   * @throws IOException
+   *           if there is an error reading from the underlying stream
+   */
   private String readLine() throws IOException {
 
     ByteArrayOutputStream buf = new ByteArrayOutputStream();
@@ -112,9 +198,14 @@ class FrameInputStream implements Closeable {
       }
     }
 
-    return new String(buf.toByteArray(), "UTF-8");
+    return new String(buf.toByteArray(), UTF_8);
   }
 
+  /*
+   * (non-Javadoc)
+   * 
+   * @see java.io.Closeable#close()
+   */
   @Override
   public void close() throws IOException {
     instream.close();

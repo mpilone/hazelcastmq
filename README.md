@@ -6,11 +6,19 @@ the entire JMS specification. However the basics are there and it can be used wi
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component.
 
+HazelcastMQ also contains HazelcastMQ Stomper which is a STOMP 
+[stomp](http://stomp.github.com) server which maps all SEND and SUBSCRIBE commands to JMS
+producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
+to interact with the MQ capabilities of HazelcastMQ. While Stomper was specifically written
+for HazelcastMQ as the JMS provider, it should work with any JMS provider. Stomper is not
+required when using the JMS facilities but may be used to support a wider range of messaging 
+endpoints.
+
 ## Rationale
 
 Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast-jms-provider.html) for now.
 
-## Features
+## JMS Features (in hazelcastmq-core)
 
 ### Implemented
 * JMS 1.1 APIs implemented
@@ -27,10 +35,28 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Probably 100 other things I've missed
 
 ### Not Going to Work Any Time Soon
-* Transactional message receiving
+* Transactional message reception
 * Message selectors
 * Durable subscriptions
 * Message priority
+
+## STOMP Server Features (in hazelcastmq-stomper)
+
+### Implemented
+* STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
+* Sending and subscribing
+* Multiple clients on single server
+* Queue and Topic send/receive
+
+### Not Implemented Yet
+* Transactions (BEGIN, COMMIT, ABORT)
+* Probably 100 other things I've missed
+* Header encoding/decoding of special characters
+* Heart-beat
+* Protocol version negotiation
+
+## Not Going to Work Any Time Soon
+* Transaction message reception or ACK/NACK (i.e. always auto ACK)
 
 ## Examples
 
@@ -41,6 +67,13 @@ Using HazelcastMQ is similar to using any JMS provider:
 3. Create a session
 4. Create a message producer or consumer
 5. Send or receive messages
+
+Using Stomper is a simple layer on the core JMS functionality:
+
+1. Create a connection factory
+2. Create a stomper configuration
+3. Create a stomper
+4. Connect with STOMP clients
 
 ### Simple Request and Reply
 This example shows a simple request and reply message pattern where both the requester 

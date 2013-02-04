@@ -1,9 +1,6 @@
 package org.mpilone.hazelcastmq.stomper;
 
-import static org.mpilone.hazelcastmq.stomper.IoUtil.stringFromBytes;
-import static org.mpilone.hazelcastmq.stomper.IoUtil.stringToBytes;
-import static org.mpilone.hazelcastmq.stomper.StompConstants.QUEUE_PREFIX;
-import static org.mpilone.hazelcastmq.stomper.StompConstants.TOPIC_PREFIX;
+import static org.mpilone.hazelcastmq.stomper.IoUtil.UTF_8;
 
 import java.util.Map;
 
@@ -19,6 +16,16 @@ import javax.jms.*;
  * @author mpilone
  */
 public class DefaultFrameConverter implements FrameConverter {
+
+  /**
+   * The prefix to use for queue destinations defined in headers.
+   */
+  static final String QUEUE_PREFIX = "/queue/";
+
+  /**
+   * The prefix to use for topic destinations defined in headers.
+   */
+  static final String TOPIC_PREFIX = "/topic/";
 
   /*
    * (non-Javadoc)
@@ -84,8 +91,7 @@ public class DefaultFrameConverter implements FrameConverter {
 
     String contentType = headers.get("content-type");
     if (contentType != null && contentType.startsWith("text/plain")) {
-      msg = session
-          .createTextMessage(stringFromBytes(frame.getBody(), "UTF-8"));
+      msg = session.createTextMessage(new String(frame.getBody(), UTF_8));
     }
     else {
       BytesMessage bytesMsg = session.createBytesMessage();
@@ -143,7 +149,7 @@ public class DefaultFrameConverter implements FrameConverter {
 
       TextMessage textMsg = (TextMessage) msg;
       if (textMsg.getText() != null) {
-        frame.setBody(stringToBytes(textMsg.getText(), "UTF-8"));
+        frame.setBody(textMsg.getText().getBytes(UTF_8));
       }
     }
     else if (msg instanceof BytesMessage) {
@@ -173,6 +179,11 @@ public class DefaultFrameConverter implements FrameConverter {
     Destination replyTo = msg.getJMSReplyTo();
     if (replyTo != null) {
       headers.put("reply-to", toFrameDestination(replyTo));
+    }
+
+    value = msg.getJMSMessageID();
+    if (value != null) {
+      headers.put("message-id", value);
     }
 
     value = msg.getJMSType();

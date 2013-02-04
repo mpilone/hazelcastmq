@@ -134,12 +134,15 @@ public class StompLikeMessageConverter implements MessageConverter {
     Map<String, String> headers = new HashMap<String, String>();
     Map<String, String> properties = new HashMap<String, String>();
 
-    // Read until we find a blank line.
-    while ((line = readLine(instream)) != null) {
+    // Read until we find a blank line (i.e. end of headers).
+    boolean eoh = false;
+    while (!eoh) {
+      line = readLine(instream);
 
+      // We reached the end of the headers.
       if (line.isEmpty()) {
-        // We reached the end of the headers.
-        break;
+        eoh = true;
+        continue;
       }
 
       int pos = line.indexOf(':');
@@ -165,16 +168,19 @@ public class StompLikeMessageConverter implements MessageConverter {
     }
 
     // Read the body bytes.
+    byte[] buf = new byte[1024];
     ByteArrayOutputStream body = new ByteArrayOutputStream();
-    int b;
-    while (contentLength > 0 && (b = instream.read()) != -1) {
-      body.write(b);
-      contentLength--;
+    int read = 0;
+    while (contentLength > 0 && read != -1) {
+      read = instream.read(buf, 0, Math.min((int) contentLength, buf.length));
+
+      body.write(buf, 0, read);
+      contentLength -= read;
     }
     body.close();
 
     // The last character should be the null character.
-    b = instream.read();
+    int b = instream.read();
     if (b != NULL_CHARACTER) {
       throw new IOException("Invalid Hazelcast JMS message. The message must "
           + "end with NULL_CHARACTER.");

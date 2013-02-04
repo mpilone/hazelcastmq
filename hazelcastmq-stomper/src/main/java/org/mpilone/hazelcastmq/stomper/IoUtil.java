@@ -1,32 +1,29 @@
 package org.mpilone.hazelcastmq.stomper;
 
 import java.io.Closeable;
-import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
 
 import javax.jms.*;
 
+/**
+ * IO utility methods for streams and JMS.
+ * 
+ * @author mpilone
+ */
 class IoUtil {
 
-  public static String stringFromBytes(byte[] data, String charset) {
-    try {
-      return new String(data, charset);
-    }
-    catch (UnsupportedEncodingException ex) {
-      throw new StompException("Unable to create String from bytes.", ex);
-    }
-  }
+  /**
+   * The UTF-8 character set used for all conversions.
+   */
+  final static Charset UTF_8 = Charset.forName("UTF-8");
 
-  public static byte[] stringToBytes(String data, String charset) {
-    try {
-      return data.getBytes(charset);
-    }
-    catch (UnsupportedEncodingException ex) {
-      throw new StompException("Unable to create bytes from String.", ex);
-    }
-  }
-
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(Closeable closeable) {
     try {
       closeable.close();
@@ -36,6 +33,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(Socket socket) {
     try {
       socket.close();
@@ -45,6 +47,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(ServerSocket socket) {
     try {
       socket.close();
@@ -54,6 +61,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(Connection connection) {
     try {
       connection.close();
@@ -63,6 +75,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(Session session) {
     try {
       session.close();
@@ -72,6 +89,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(MessageProducer producer) {
     try {
       producer.close();
@@ -81,6 +103,11 @@ class IoUtil {
     }
   }
 
+  /**
+   * Closes the given instance, ignoring any exceptions.
+   * 
+   * @param closeable
+   */
   public static void safeClose(MessageConsumer consumer) {
     try {
       consumer.close();
