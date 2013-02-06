@@ -6,8 +6,8 @@ the entire JMS specification. However the basics are there and it can be used wi
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component.
 
-HazelcastMQ also contains HazelcastMQ Stomper which is a STOMP 
-[stomp](http://stomp.github.com) server which maps all SEND and SUBSCRIBE commands to JMS
+HazelcastMQ also contains HazelcastMQ Stomper which is a [STOMP](http://stomp.github.com) 
+server which maps all SEND and SUBSCRIBE commands to JMS
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
 to interact with the MQ capabilities of HazelcastMQ. While Stomper was specifically written
 for HazelcastMQ as the JMS provider, it should work with any JMS provider. Stomper is not
