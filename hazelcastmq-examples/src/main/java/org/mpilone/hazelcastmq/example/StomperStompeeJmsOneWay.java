@@ -37,6 +37,7 @@ public class StomperStompeeJmsOneWay {
 
   public static void main(String[] args) throws Exception {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
+    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
     new StomperStompeeJmsOneWay();
@@ -98,7 +99,6 @@ public class StomperStompeeJmsOneWay {
       // Shutdown the server.
       log.info("Shutting down Stomper.");
       stomper.shutdown();
-      stomperConfig.getExecutor().shutdown();
     }
     finally {
       // Shutdown Hazelcast.
