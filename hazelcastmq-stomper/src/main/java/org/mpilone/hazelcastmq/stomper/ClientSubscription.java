@@ -7,7 +7,7 @@ import javax.jms.*;
  * 
  * @author mpilone
  */
-class StomperClientSubscription implements MessageListener {
+class ClientSubscription implements MessageListener {
 
   /**
    * The callback to be executed when a new message arrives.
@@ -24,7 +24,7 @@ class StomperClientSubscription implements MessageListener {
      * @param msg
      *          the message that just arrived
      */
-    public void onMessage(StomperClientSubscription subscription, Message msg);
+    public void onMessage(ClientSubscription subscription, Message msg);
   }
 
   /**
@@ -60,7 +60,7 @@ class StomperClientSubscription implements MessageListener {
    * @param session
    *          the session that created the consumer
    */
-  public StomperClientSubscription(MessageCallback callback, String subscriptionId,
+  public ClientSubscription(MessageCallback callback, String subscriptionId,
       MessageConsumer consumer, Session session) throws JMSException {
     super();
     this.callback = callback;

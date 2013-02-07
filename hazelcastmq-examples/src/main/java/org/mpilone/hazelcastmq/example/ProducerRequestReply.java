@@ -72,6 +72,8 @@ public class ProducerRequestReply {
   private void handleReply(Session session, MessageConsumer consumer)
       throws JMSException {
     TextMessage msg = (TextMessage) consumer.receive(5000);
+    Assert.notNull(msg, "Did not get required request.");
+
     log.info("Got reply: " + msg.getText());
   }
 

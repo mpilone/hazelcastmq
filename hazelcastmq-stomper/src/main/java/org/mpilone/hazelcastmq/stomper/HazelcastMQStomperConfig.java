@@ -2,9 +2,10 @@ package org.mpilone.hazelcastmq.stomper;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.jms.ConnectionFactory;
-
 
 /**
  * The configuration of the stomper server.
@@ -57,7 +58,19 @@ public class HazelcastMQStomperConfig {
 
     frameConverter = new DefaultFrameConverter();
     port = 8032;
-    executor = Executors.newCachedThreadPool();
+    executor = Executors.newCachedThreadPool(new ThreadFactory() {
+
+      private AtomicLong counter = new AtomicLong();
+      private ThreadFactory delegate = Executors.defaultThreadFactory();
+
+      @Override
+      public Thread newThread(Runnable r) {
+        Thread t = delegate.newThread(r);
+        t.setName("hazelcastmq-stomper-" + counter.incrementAndGet());
+        t.setDaemon(true);
+        return t;
+      }
+    });
   }
 
   /**

@@ -1,6 +1,7 @@
 package org.mpilone.hazelcastmq.stomper;
 
 import static java.lang.String.format;
+import static org.mpilone.hazelcastmq.stomp.IoUtil.safeAwait;
 import static org.mpilone.hazelcastmq.stomp.IoUtil.safeClose;
 import static org.mpilone.hazelcastmq.stomper.JmsUtil.safeClose;
 
@@ -8,21 +9,23 @@ import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import javax.jms.*;
 
 import org.mpilone.hazelcastmq.stomp.*;
-import org.mpilone.hazelcastmq.stomper.StomperClientSubscription.MessageCallback;
+import org.mpilone.hazelcastmq.stomper.ClientSubscription.MessageCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A single stomper client connection which handles processing all STOMP
- * commands for the client using frame input and output streams.
+ * A Stomper client connection which handles processing all STOMP commands for
+ * the client using frame input and output streams.
  * 
  * @author mpilone
  */
-class StomperClient {
+class ClientAgent {
   /**
    * The log for this class.
    */
@@ -69,10 +72,15 @@ class StomperClient {
   private volatile boolean shutdown;
 
   /**
+   * The shutdown latch that blocks shutdown until complete.
+   */
+  private CountDownLatch shutdownLatch;
+
+  /**
    * The map of subscription ID to the subscription instance for all active
    * client subscriptions.
    */
-  private Map<String, StomperClientSubscription> subscriptions;
+  private Map<String, ClientSubscription> subscriptions;
 
   /**
    * The callback that will handle all messages received from subscriptions and
@@ -97,13 +105,13 @@ class StomperClient {
      * javax.jms.Message)
      */
     @Override
-    public void onMessage(StomperClientSubscription subscription, Message msg) {
+    public void onMessage(ClientSubscription subscription, Message msg) {
       try {
         Frame frame = config.getFrameConverter().toFrame(msg);
         frame.getHeaders()
             .put("subscription", subscription.getSubscriptionId());
 
-        guardedWrite(frame);
+        outstream.write(frame);
       }
       catch (Throwable ex) {
         // Ignore
@@ -123,7 +131,7 @@ class StomperClient {
    * @throws IOException
    * @throws JMSException
    */
-  public StomperClient(Socket clientSocket, HazelcastMQStomper stomper)
+  public ClientAgent(Socket clientSocket, HazelcastMQStomper stomper)
       throws IOException, JMSException {
     this.clientSocket = clientSocket;
     this.stomper = stomper;
@@ -133,9 +141,12 @@ class StomperClient {
 
     config = this.stomper.getConfig();
     connection = config.getConnectionFactory().createConnection();
+    connection.start();
+
     shutdown = false;
-    subscriptions = new HashMap<String, StomperClientSubscription>();
+    subscriptions = new HashMap<String, ClientSubscription>();
     messageCallback = new DefaultMessageCallback();
+    shutdownLatch = new CountDownLatch(1);
 
     config.getExecutor().execute(new Runnable() {
       @Override
@@ -171,9 +182,10 @@ class StomperClient {
     log.debug("Stopping client loop.");
 
     connected = false;
+    shutdown = true;
 
     // Close all consumers/subscriptions.
-    for (StomperClientSubscription subscription : subscriptions.values()) {
+    for (ClientSubscription subscription : subscriptions.values()) {
       safeClose(subscription.getConsumer());
       safeClose(subscription.getSession());
     }
@@ -190,18 +202,19 @@ class StomperClient {
     // Notify the stomper server that we're done.
     stomper.onClientClosed(this);
 
+    shutdownLatch.countDown();
+
     log.debug("Client loop complete.");
   }
 
   /**
-   * Closes this client. This method will return immediately while the client
-   * shuts down in the background. Wait on the
-   * {@link HazelcastMQStomperConfig#getExecutor()} to determine when the client
-   * is completely done.
+   * Closes this client. This method will block until the client is completely
+   * shutdown.
    */
-  public void close() {
+  public void shutdown() {
     shutdown = true;
     safeClose(clientSocket);
+    safeAwait(shutdownLatch, 30, TimeUnit.SECONDS);
   }
 
   /**
@@ -238,7 +251,7 @@ class StomperClient {
       writerBuf.close();
 
       response.setBody(buf.toByteArray());
-      guardedWrite(response);
+      outstream.write(response);
     }
     catch (Throwable ex) {
       // Ignore
@@ -375,8 +388,8 @@ class StomperClient {
     MessageConsumer consumer = session.createConsumer(destination);
 
     // Create the subscription.
-    StomperClientSubscription subscription = new StomperClientSubscription(
-        messageCallback, id, consumer, session);
+    ClientSubscription subscription = new ClientSubscription(messageCallback,
+        id, consumer, session);
     subscriptions.put(id, subscription);
 
     // Send a receipt if the client asked for one.
@@ -397,7 +410,7 @@ class StomperClient {
     String id = getRequiredHeader("id", frame);
 
     // Lookup the existing subscription.
-    StomperClientSubscription subscription = subscriptions.remove(id);
+    ClientSubscription subscription = subscriptions.remove(id);
 
     // Check that it exists.
     if (subscription == null) {
@@ -436,7 +449,7 @@ class StomperClient {
 
   /**
    * Called when a {@link Command#DISCONNECT} frame is received from the client.
-   * This {@link StomperClient} is closed and the thread will exit.
+   * This {@link ClientAgent} is closed and the thread will exit.
    * 
    * @param frame
    *          the frame to process
@@ -446,7 +459,6 @@ class StomperClient {
     sendOptionalReceipt(frame);
 
     connected = false;
-    close();
   }
 
   /**
@@ -465,7 +477,7 @@ class StomperClient {
     Frame response = new Frame(Command.CONNECTED);
     response.getHeaders().put("version", "1.2");
     response.setContentTypeText();
-    guardedWrite(response);
+    outstream.write(response);
 
   }
 
@@ -482,22 +494,8 @@ class StomperClient {
       Frame response = new Frame(Command.RECEIPT);
       response.getHeaders().put("receipt-id",
           requestFrame.getHeaders().get("receipt"));
-      guardedWrite(response);
+      outstream.write(response);
     }
   }
 
-  /**
-   * Writes the given frame to the frame output stream after obtaining the lock
-   * on the stream. This ensures that only one frame can be written at a time to
-   * prevent frame inter-weaving on the client.
-   * 
-   * @param frame
-   *          the frame to write
-   * @throws IOException
-   */
-  private void guardedWrite(Frame frame) throws IOException {
-    synchronized (outstream) {
-      outstream.write(frame);
-    }
-  }
 }

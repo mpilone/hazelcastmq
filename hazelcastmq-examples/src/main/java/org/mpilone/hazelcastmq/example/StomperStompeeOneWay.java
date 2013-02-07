@@ -40,6 +40,7 @@ public class StomperStompeeOneWay {
 
   public static void main(String[] args) throws Exception {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
+    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
     new StomperStompeeOneWay();
@@ -85,7 +86,9 @@ public class StomperStompeeOneWay {
       stompee.send(frame);
 
       // Now consume that message.
-      frame = stompee.receive(2, TimeUnit.SECONDS);
+      frame = stompee.receive(300, TimeUnit.SECONDS);
+      Assert.notNull(frame, "Did not receive expected frame!");
+
       log.info("Got frame: " + new String(frame.getBody(), UTF_8));
 
       // Shutdown the client.
@@ -94,7 +97,6 @@ public class StomperStompeeOneWay {
       // Shutdown the server.
       log.info("Shutting down Stomper.");
       stomper.shutdown();
-      stomperConfig.getExecutor().shutdown();
     }
     finally {
       // Shutdown Hazelcast.

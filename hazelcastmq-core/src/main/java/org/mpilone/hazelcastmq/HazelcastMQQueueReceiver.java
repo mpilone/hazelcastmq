@@ -3,8 +3,6 @@ package org.mpilone.hazelcastmq;
 import javax.jms.*;
 
 import com.hazelcast.core.IQueue;
-import com.hazelcast.core.ItemEvent;
-import com.hazelcast.core.ItemListener;
 
 /**
  * A JMS queue receiver/consumer for HazelcastMQ.
@@ -13,23 +11,10 @@ import com.hazelcast.core.ItemListener;
  */
 public class HazelcastMQQueueReceiver extends HazelcastMQMessageConsumer
     implements QueueReceiver {
-
   /**
    * The Hazelcast queue from which all messages will be consumed.
    */
   private IQueue<byte[]> hazelcastQueue;
-
-  /**
-   * The Hazelcast listener used when a JMS {@link MessageListener} has been
-   * registered requiring event driven message consumption.
-   */
-  private ItemListener<byte[]> hazelcastListener;
-
-  /**
-   * The flag which indicates if the consumer is currently event driven or
-   * polling.
-   */
-  private boolean eventDriven = false;
 
   /**
    * Constructs the receiver whichi will consume from the given queue.
@@ -45,36 +30,6 @@ public class HazelcastMQQueueReceiver extends HazelcastMQMessageConsumer
     super(session, queue);
 
     hazelcastQueue = hazelcast.getQueue(getQueue().getQueueName());
-
-    hazelcastListener = new ItemListener<byte[]>() {
-      @Override
-      public void itemAdded(ItemEvent<byte[]> evt) {
-        onHazelcastItemAdded();
-      }
-
-      @Override
-      public void itemRemoved(ItemEvent<byte[]> evt) {
-      }
-    };
-  }
-
-  /**
-   * Called when the receiver is event driven and a new message was added to the
-   * Hazelcast queue.
-   */
-  protected void onHazelcastItemAdded() {
-
-    try {
-      // Try to get the new message out of the queue and dispatch it to the
-      // listener. We should always have a listener here but we'll double check
-      // to be safe.
-      if (messageListener != null) {
-        receiveAndDispatch(hazelcastQueue, messageListener);
-      }
-    }
-    catch (Throwable ex) {
-      // Ignore
-    }
   }
 
   /*
@@ -85,9 +40,9 @@ public class HazelcastMQQueueReceiver extends HazelcastMQMessageConsumer
    */
   @Override
   public void close() throws JMSException {
-    super.close();
-
     setMessageListener(null);
+
+    super.close();
   }
 
   /*
@@ -99,20 +54,12 @@ public class HazelcastMQQueueReceiver extends HazelcastMQMessageConsumer
   @Override
   public void setMessageListener(MessageListener messageListener)
       throws JMSException {
+
     super.setMessageListener(messageListener);
 
-    if (messageListener == null && eventDriven) {
-      // Switch to polling consumption.
-      hazelcastQueue.removeItemListener(hazelcastListener);
-      eventDriven = false;
-    }
-    else if (messageListener != null && !eventDriven) {
-      // Switch to event driven consumption.
-      hazelcastQueue.addItemListener(hazelcastListener, false);
-      eventDriven = true;
-    }
-    else {
-      // We're already event driven. No change.
+    // If we have a message listener, start polling it.
+    if (messageListener != null) {
+      startMessageQueuePoller(hazelcastQueue);
     }
   }
 

@@ -1,21 +1,24 @@
 package org.mpilone.hazelcastmq.stompee;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-
-import org.mpilone.hazelcastmq.stomp.Frame;
 
 public class HazelcastMQStompeeConfig {
   private String address;
+
   private int port;
-  private BlockingQueue<Frame> frameFetchQueue;
+
+  /**
+   * The maximum number of frames that will be queued for consumption when a
+   * frame listener is not in use. If the incoming frame queue exceeds this
+   * value, frames will be dropped.
+   */
+  private int frameMaxQueueCount;
 
   /**
    * Constructs a configuration which will have a number of defaults:
    * <ul>
    * <li>port: 8032</li>
    * <li>address: localhost</li>
-   * <li>executor: {@link ArrayBlockingQueue} of size 5</li>
+   * <li>frameMaxQueueCount: 10</li>
    * </ul>
    */
   public HazelcastMQStompeeConfig() {
@@ -27,7 +30,7 @@ public class HazelcastMQStompeeConfig {
    * reach the STOMP server and the following defaults:
    * 
    * <ul>
-   * <li>executor: {@link ArrayBlockingQueue} of size 5</li>
+   * <li>frameMaxQueueCount: 10</li>
    * </ul>
    * 
    * @param address
@@ -38,22 +41,23 @@ public class HazelcastMQStompeeConfig {
   public HazelcastMQStompeeConfig(String address, int port) {
     this.address = address;
     this.port = port;
-    this.frameFetchQueue = new ArrayBlockingQueue<Frame>(5);
+    this.frameMaxQueueCount = 10;
   }
 
   /**
-   * @return the frameFetchQueue
+   * 
+   * @return
    */
-  public BlockingQueue<Frame> getFrameFetchQueue() {
-    return frameFetchQueue;
+  public int getFrameMaxQueueCount() {
+    return frameMaxQueueCount;
   }
 
   /**
-   * @param frameFetchQueue
-   *          the frameFetchQueue to set
+   * 
+   * @param frameMaxQueueCount
    */
-  public void setFrameFetchQueue(BlockingQueue<Frame> frameFetchQueue) {
-    this.frameFetchQueue = frameFetchQueue;
+  public void setFrameMaxQueueCount(int frameMaxQueueCount) {
+    this.frameMaxQueueCount = frameMaxQueueCount;
   }
 
   /**

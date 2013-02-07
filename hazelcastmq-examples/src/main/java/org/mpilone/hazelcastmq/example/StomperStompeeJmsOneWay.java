@@ -82,14 +82,18 @@ public class StomperStompeeJmsOneWay {
 
       // Now create a JMS consumer to consume that message.
       Connection connection = connectionFactory.createConnection();
+      connection.start();
       Session session = connection.createSession(false,
           Session.AUTO_ACKNOWLEDGE);
       Destination destination = session.createQueue("demo.test");
       MessageConsumer consumer = session.createConsumer(destination);
 
       Message msg = consumer.receive(120000);
+      Assert.notNull(msg, "Did not get required message.");
+      Assert.isTrue(msg instanceof TextMessage,
+          "Did not get correct message type.");
 
-      log.info("Got message: " + msg);
+      log.info("Got message: " + ((TextMessage) msg).getText());
 
       // Shutdown the JMS consumer
       consumer.close();

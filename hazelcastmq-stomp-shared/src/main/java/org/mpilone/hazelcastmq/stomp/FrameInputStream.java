@@ -6,9 +6,6 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * An input stream for STOMP frames. Each request to {@link #read()} will block
  * until a complete frame is available.
@@ -30,7 +27,7 @@ public class FrameInputStream implements Closeable {
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  // private final Logger log = LoggerFactory.getLogger(getClass());
 
   /**
    * Constructs the frame input stream which will read from the given input
@@ -56,13 +53,13 @@ public class FrameInputStream implements Closeable {
     Frame frame = new Frame();
 
     readCommand(frame);
-    log.debug("Read command: " + frame.getCommand());
+    // log.debug("Read command: " + frame.getCommand());
 
     readHeaders(frame);
-    log.debug("Read headers: " + frame.getHeaders());
+    // log.debug("Read headers: " + frame.getHeaders());
 
     readBody(frame);
-    log.debug("Read body: " + frame.getBody());
+    // log.debug("Read body: " + frame.getBody());
 
     return frame;
   }

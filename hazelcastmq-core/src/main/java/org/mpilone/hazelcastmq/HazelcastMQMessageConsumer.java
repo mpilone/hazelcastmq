@@ -4,6 +4,7 @@ import static java.lang.String.format;
 
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import javax.jms.*;
@@ -21,200 +22,108 @@ import com.hazelcast.core.HazelcastInstance;
 public abstract class HazelcastMQMessageConsumer implements MessageConsumer {
 
   /**
-   * The parent session.
-   */
-  protected HazelcastMQSession session;
-
-  /**
-   * The log for this class.
-   */
-  private final Logger log = LoggerFactory.getLogger(getClass());
-
-  /**
-   * The JMS destination from which to consume.
-   */
-  protected Destination destination;
-
-  /**
-   * The Hazelcast instance from which to consume.
-   */
-  protected HazelcastInstance hazelcast;
-
-  /**
-   * The message listener that will be notified of new messages as they arrive.
-   */
-  protected MessageListener messageListener;
-
-  /**
-   * The JMS message selector. Currently not used or supported.
-   */
-  private String messageSelector;
-
-  /**
-   * The message marshaller used to marshal messages in and out of HazelcastMQ.
-   */
-  protected MessageConverter messageMarshaller;
-
-  /**
-   * The flag which indicates if this consumer has been closed.
-   */
-  protected boolean closed = false;
-
-  /**
-   * The flag which indicates if this consumer has been started yet.
-   */
-  protected boolean started = false;
-
-  /**
-   * The guard/mutex around stopping the consumer. The JMS specification states
-   * that when a connection is stopped, it must block until all consumers are no
-   * longer blocking on receive or dispatching to a message listener. That
-   * behavior is achieved by a mutex on stopping and receiving messages.
-   */
-  protected final Object STOP_GUARD = new Object();
-
-  /**
-   * Constructs the consumer which will consume from the given destination.
+   * A message poller that can run asynchronously in the background continually
+   * attempting to receive messages and dispatch them to a message listener.
    * 
-   * @param session
-   *          the parent session
-   * @param destination
-   *          the destination from which to consume
-   * @throws JMSException
-   */
-  public HazelcastMQMessageConsumer(HazelcastMQSession session,
-      Destination destination) throws JMSException {
-    this(session, destination, null);
-  }
-
-  /**
-   * Constructs the consumer which will consume from the given destination.
+   * @author mpilone
    * 
-   * @param session
-   *          the parent session
-   * @param destination
-   *          the destination from which to consume
-   * @param messageSelector
-   *          the message selector to filter incoming messages (currently not
-   *          supported)
-   * @throws JMSException
    */
-  public HazelcastMQMessageConsumer(HazelcastMQSession session,
-      Destination destination, String messageSelector) throws JMSException {
-    this.session = session;
-    this.destination = destination;
-    this.messageSelector = messageSelector;
+  private class MessageQueuePoller implements Runnable {
 
-    this.messageMarshaller = this.session.getConfig().getMessageConverter();
-    this.hazelcast = this.session.getHazelcast();
-  }
+    /**
+     * The flag which indicates if the poller should be shutdown.
+     */
+    private volatile boolean shutdown;
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.MessageConsumer#close()
-   */
-  @Override
-  public void close() throws JMSException {
-    stop();
-    this.closed = true;
-  }
+    /**
+     * The shutdown latch that blocks shutdown until complete.
+     */
+    private CountDownLatch shutdownLatch;
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.MessageConsumer#getMessageListener()
-   */
-  @Override
-  public MessageListener getMessageListener() throws JMSException {
-    return messageListener;
-  }
+    /**
+     * The message listener that will be notified of new messages.
+     */
+    private MessageListener messageListener;
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.MessageConsumer#getMessageSelector()
-   */
-  @Override
-  public String getMessageSelector() throws JMSException {
-    return messageSelector;
-  }
+    /**
+     * The queue to poll.
+     */
+    private BlockingQueue<byte[]> queue;
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * javax.jms.MessageConsumer#setMessageListener(javax.jms.MessageListener)
-   */
-  @Override
-  public void setMessageListener(MessageListener messageListener)
-      throws JMSException {
-    this.messageListener = messageListener;
-  }
-
-  /**
-   * Receives a message from the given blocking queue, waiting up to the given
-   * timeout value.
-   * 
-   * @param queue
-   *          the queue from which to consume
-   * @param timeout
-   *          greater than 0 to wait the given number of milliseconds, 0 for
-   *          unlimited blocking wait, less than zero for no wait
-   * @return the message received or null if no message was received
-   * @throws JMSException
-   */
-  protected Message receive(BlockingQueue<byte[]> queue, long timeout)
-      throws JMSException {
-
-    // Figure out the receive strategy.
-    ReceiveStrategy receiver = null;
-    if (timeout < 0) {
-      receiver = new IndefiniteBlockingReceive();
-    }
-    else {
-      receiver = new TimedBlockingReceive(timeout);
+    /**
+     * Constructs the poller which, when started, will poll the given queue for
+     * messages and dispatch the messages to the message listener.
+     * 
+     * @param messageListener
+     *          the listener to dispatch to
+     * @param queue
+     *          the queue to poll
+     */
+    public MessageQueuePoller(MessageListener messageListener,
+        BlockingQueue<byte[]> queue) {
+      this.shutdown = false;
+      this.shutdownLatch = new CountDownLatch(1);
+      this.messageListener = messageListener;
+      this.queue = queue;
     }
 
-    Message msg = null;
-    do {
+    /**
+     * Shuts the poller down, blocking until it is complete.
+     */
+    public void shutdown() {
+      shutdown = true;
+
+      try {
+        shutdownLatch.await();
+      }
+      catch (InterruptedException ex) {
+        // Ignore for now.
+      }
+    }
+
+    /**
+     * Performs an atomic {@link #receiveNoWait()} and dispatch to the listener
+     * within the STOP_GUARD which ensures that the consumer cannot be stopped
+     * until the listener has completed processing of the message.
+     * 
+     * @param listener
+     *          the listener to which to dispatch
+     * @return true if a message was dispatched, false otherwise
+     * @throws JMSException
+     */
+    private boolean receiveAndDispatch(BlockingQueue<byte[]> queue,
+        MessageListener listener) throws JMSException {
       synchronized (STOP_GUARD) {
-        try {
-          byte[] msgData = receiver.receive(queue);
+        Message msg = receive(queue, 500);
 
-          // Check that we got message data
-          if (msgData != null) {
-
-            // Convert the message data back into a JMS message
-            msg = messageMarshaller.toMessage(msgData);
-
-            // Switch Bytes messages to read mode
-            if (msg instanceof BytesMessage) {
-              ((BytesMessage) msg).reset();
-            }
-
-            // Check for message expiration
-            long expirationTime = msg.getJMSExpiration();
-
-            if (expirationTime != 0
-                && expirationTime <= System.currentTimeMillis()) {
-              log.info(format("Dropping message [%s] because it has expired.",
-                  msg.getJMSMessageID()));
-              msg = null;
-            }
-          }
+        if (msg != null) {
+          listener.onMessage(msg);
+          return true;
         }
-        catch (InterruptedException ex) {
-          throw new JMSException("Error receiving message: " + ex.getMessage());
-        }
-        catch (IOException ex) {
-          throw new JMSException("Error receiving message: " + ex.getMessage());
+        else {
+          return false;
         }
       }
     }
-    while (msg == null && receiver.isRetryable());
 
-    return msg;
+    /*
+     * (non-Javadoc)
+     * 
+     * @see java.lang.Runnable#run()
+     */
+    @Override
+    public void run() {
+      while (!shutdown) {
+        try {
+          receiveAndDispatch(queue, messageListener);
+        }
+        catch (Throwable ex) {
+          // Ignore
+        }
+      }
+
+      shutdownLatch.countDown();
+    }
   }
 
   /**
@@ -344,28 +253,225 @@ public abstract class HazelcastMQMessageConsumer implements MessageConsumer {
   }
 
   /**
-   * Performs an atomic {@link #receiveNoWait()} and dispatch to the listener
-   * within the STOP_GUARD which ensures that the consumer cannot be stopped
-   * until the listener has completed processing of the message.
+   * The log for this class.
+   */
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
+  /**
+   * The parent session.
+   */
+  protected HazelcastMQSession session;
+
+  /**
+   * The JMS destination from which to consume.
+   */
+  protected Destination destination;
+
+  /**
+   * The Hazelcast instance from which to consume.
+   */
+  protected HazelcastInstance hazelcast;
+
+  /**
+   * The message listener that will be notified of new messages as they arrive.
+   */
+  protected MessageListener messageListener;
+
+  /**
+   * The JMS message selector. Currently not used or supported.
+   */
+  private String messageSelector;
+
+  /**
+   * The message marshaller used to marshal messages in and out of HazelcastMQ.
+   */
+  protected MessageConverter messageMarshaller;
+
+  /**
+   * The flag which indicates if this consumer has been closed.
+   */
+  protected boolean closed = false;
+
+  /**
+   * The flag which indicates if this consumer has been started yet.
+   */
+  protected boolean started = false;
+
+  /**
+   * The message poller that can be run on a background thread to continually
+   * attempt to receive messages from a queue.
+   */
+  private MessageQueuePoller messageQueuePoller;
+
+  /**
+   * The guard/mutex around stopping the consumer. The JMS specification states
+   * that when a connection is stopped, it must block until all consumers are no
+   * longer blocking on receive or dispatching to a message listener. That
+   * behavior is achieved by a mutex on stopping and receiving messages.
+   */
+  protected final Object STOP_GUARD = new Object();
+
+  /**
+   * Constructs the consumer which will consume from the given destination.
    * 
-   * @param listener
-   *          the listener to which to dispatch
-   * @return true if a message was dispatched, false otherwise
+   * @param session
+   *          the parent session
+   * @param destination
+   *          the destination from which to consume
    * @throws JMSException
    */
-  protected boolean receiveAndDispatch(BlockingQueue<byte[]> queue,
-      MessageListener listener) throws JMSException {
-    synchronized (STOP_GUARD) {
-      Message msg = receive(queue, 0);
+  public HazelcastMQMessageConsumer(HazelcastMQSession session,
+      Destination destination) throws JMSException {
+    this(session, destination, null);
+  }
 
-      if (msg != null) {
-        listener.onMessage(msg);
-        return true;
-      }
-      else {
-        return false;
+  /**
+   * Constructs the consumer which will consume from the given destination.
+   * 
+   * @param session
+   *          the parent session
+   * @param destination
+   *          the destination from which to consume
+   * @param messageSelector
+   *          the message selector to filter incoming messages (currently not
+   *          supported)
+   * @throws JMSException
+   */
+  public HazelcastMQMessageConsumer(HazelcastMQSession session,
+      Destination destination, String messageSelector) throws JMSException {
+    this.session = session;
+    this.destination = destination;
+    this.messageSelector = messageSelector;
+
+    this.messageMarshaller = this.session.getConfig().getMessageConverter();
+    this.hazelcast = this.session.getHazelcast();
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see javax.jms.MessageConsumer#close()
+   */
+  @Override
+  public void close() throws JMSException {
+    setMessageListener(null);
+    stop();
+    this.closed = true;
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see javax.jms.MessageConsumer#getMessageListener()
+   */
+  @Override
+  public MessageListener getMessageListener() throws JMSException {
+    return messageListener;
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see javax.jms.MessageConsumer#getMessageSelector()
+   */
+  @Override
+  public String getMessageSelector() throws JMSException {
+    return messageSelector;
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see
+   * javax.jms.MessageConsumer#setMessageListener(javax.jms.MessageListener)
+   */
+  @Override
+  public void setMessageListener(MessageListener messageListener)
+      throws JMSException {
+    // If we have a background consumer, stop it.
+    if (messageQueuePoller != null) {
+      messageQueuePoller.shutdown();
+    }
+    messageQueuePoller = null;
+
+    this.messageListener = messageListener;
+  }
+
+  /**
+   * Receives a message from the given blocking queue, waiting up to the given
+   * timeout value.
+   * 
+   * @param queue
+   *          the queue from which to consume
+   * @param timeout
+   *          greater than 0 to wait the given number of milliseconds, 0 for
+   *          unlimited blocking wait, less than zero for no wait
+   * @return the message received or null if no message was received
+   * @throws JMSException
+   */
+  protected Message receive(BlockingQueue<byte[]> queue, long timeout)
+      throws JMSException {
+
+    // Figure out the receive strategy.
+    ReceiveStrategy receiver = null;
+    if (timeout < 0) {
+      receiver = new IndefiniteBlockingReceive();
+    }
+    else {
+      receiver = new TimedBlockingReceive(timeout);
+    }
+
+    Message msg = null;
+    do {
+      synchronized (STOP_GUARD) {
+        try {
+          byte[] msgData = receiver.receive(queue);
+
+          // Check that we got message data
+          if (msgData != null) {
+
+            // Convert the message data back into a JMS message
+            msg = messageMarshaller.toMessage(msgData);
+
+            // Switch Bytes messages to read mode
+            if (msg instanceof BytesMessage) {
+              ((BytesMessage) msg).reset();
+            }
+
+            // Check for message expiration
+            long expirationTime = msg.getJMSExpiration();
+
+            if (expirationTime != 0
+                && expirationTime <= System.currentTimeMillis()) {
+              log.info(format("Dropping message [%s] because it has expired.",
+                  msg.getJMSMessageID()));
+              msg = null;
+            }
+          }
+        }
+        catch (InterruptedException ex) {
+          throw new JMSException("Error receiving message: " + ex.getMessage());
+        }
+        catch (IOException ex) {
+          throw new JMSException("Error receiving message: " + ex.getMessage());
+        }
       }
     }
+    while (msg == null && receiver.isRetryable());
+
+    return msg;
+  }
+
+  protected void startMessageQueuePoller(BlockingQueue<byte[]> queue) {
+
+    if (messageQueuePoller != null) {
+      throw new java.lang.IllegalStateException(
+          "A message queue poller cannot "
+              + "be started if one is already running.");
+    }
+
+    messageQueuePoller = new MessageQueuePoller(messageListener, queue);
+    session.getConfig().getExecutor().execute(messageQueuePoller);
   }
 
   /**

@@ -1,6 +1,7 @@
 package org.mpilone.hazelcastmq.stomper;
 
 import static java.lang.String.format;
+import static org.mpilone.hazelcastmq.stomp.IoUtil.safeAwait;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -8,6 +9,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import javax.jms.ConnectionFactory;
 
@@ -41,9 +44,14 @@ public class HazelcastMQStomper {
   private volatile boolean shutdown;
 
   /**
+   * The shutdown latch that blocks shutdown until complete.
+   */
+  private CountDownLatch shutdownLatch;
+
+  /**
    * The list of actively connected clients.
    */
-  private List<StomperClient> stomperClients;
+  private List<ClientAgent> stomperClients;
 
   /**
    * The log for this class.
@@ -64,7 +72,8 @@ public class HazelcastMQStomper {
 
     serverSocket = new ServerSocket(config.getPort());
     stomperClients = Collections
-        .synchronizedList(new ArrayList<StomperClient>());
+        .synchronizedList(new ArrayList<ClientAgent>());
+    shutdownLatch = new CountDownLatch(1);
 
     config.getExecutor().execute(new Runnable() {
       @Override
@@ -75,13 +84,13 @@ public class HazelcastMQStomper {
   }
 
   /**
-   * Shuts down the server socket. This method will return immediately. To block
-   * or wait for a complete shutdown, shutdown and wait on the
-   * {@link HazelcastMQStomperConfig#getExecutor()} instance.
+   * Shuts down the server socket. This method will block until the server is
+   * shutdown completely.
    */
   public void shutdown() {
     shutdown = true;
     IoUtil.safeClose(serverSocket);
+    safeAwait(shutdownLatch, 30, TimeUnit.SECONDS);
   }
 
   /**
@@ -101,15 +110,16 @@ public class HazelcastMQStomper {
       }
     }
 
-    log.debug("Stopping server loop. Closing clients.");
+    log.debug("Stopping server loop. Shutting down clients.");
 
-    List<StomperClient> clients = new ArrayList<StomperClient>(stomperClients);
-    for (StomperClient client : clients) {
-      client.close();
+    List<ClientAgent> clients = new ArrayList<ClientAgent>(stomperClients);
+    for (ClientAgent client : clients) {
+      client.shutdown();
     }
 
-    log.debug("Server loop complete.");
+    shutdownLatch.countDown();
 
+    log.debug("Server loop complete.");
   }
 
   /**
@@ -123,7 +133,7 @@ public class HazelcastMQStomper {
   }
 
   /**
-   * Called when a new client socket is accepted. A new {@link StomperClient} is
+   * Called when a new client socket is accepted. A new {@link ClientAgent} is
    * constructed and should begin executing in a separate thread.
    * 
    * @param clientSocket
@@ -132,7 +142,7 @@ public class HazelcastMQStomper {
   protected void onNewClient(Socket clientSocket) {
     try {
       log.debug("Creating new client.");
-      stomperClients.add(new StomperClient(clientSocket, this));
+      stomperClients.add(new ClientAgent(clientSocket, this));
       log.info(format("A total of [%d] clients active.", stomperClients.size()));
     }
     catch (Throwable ex) {
@@ -141,13 +151,13 @@ public class HazelcastMQStomper {
   }
 
   /**
-   * Called when a client closes. Every {@link StomperClient} must call this
+   * Called when a client closes. Every {@link ClientAgent} must call this
    * method to prevent resource leaks.
    * 
    * @param client
    *          the client that just closed
    */
-  void onClientClosed(StomperClient client) {
+  void onClientClosed(ClientAgent client) {
     stomperClients.remove(client);
   }
 }

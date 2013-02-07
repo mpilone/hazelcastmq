@@ -2,12 +2,12 @@ package org.mpilone.hazelcastmq.stomp;
 
 import java.io.*;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * An output stream for STOMP frames.
+ * An output stream for STOMP frames. This implementation is thread-safe,
+ * therefore multiple threads can write frames and they will be process fairly.
  * 
  * @author mpilone
  */
@@ -19,6 +19,11 @@ public class FrameOutputStream implements Closeable {
   private static final char NULL_CHARACTER = '\0';
 
   /**
+   * The mutex to make frame writing thread safe.
+   */
+  private final Lock FRAME_WRITE_GUARD = new ReentrantLock(true);
+
+  /**
    * The low level output stream from which to write.
    */
   private OutputStream outstream;
@@ -26,7 +31,7 @@ public class FrameOutputStream implements Closeable {
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  // private final Logger log = LoggerFactory.getLogger(getClass());
 
   /**
    * Constructs the frame output stream which will read from the given output
@@ -67,12 +72,34 @@ public class FrameOutputStream implements Closeable {
    *           if there is an error on the underlying stream
    */
   public void write(Frame frame, boolean terminate) throws IOException {
+    FRAME_WRITE_GUARD.lock();
+    try {
+      unguardedWrite(frame, terminate);
+    }
+    finally {
+      FRAME_WRITE_GUARD.unlock();
+    }
+  }
 
+  /**
+   * Writes the frame to the output stream. This method is NOT thread-safe
+   * therefore the caller must provide any synchronization required.
+   * 
+   * @param frame
+   *          the frame to write
+   * @param terminate
+   *          true to write the null termination character, false to not write
+   *          it
+   * @throws IOException
+   *           if there is an error on the underlying stream
+   */
+  private void unguardedWrite(Frame frame, boolean terminate)
+      throws IOException {
     PrintWriter writer = new PrintWriter(outstream);
 
     // Write the command
     writer.append(frame.getCommand().name()).append('\n');
-    log.debug("Wrote command: " + frame.getCommand());
+    // log.debug("Wrote command: " + frame.getCommand());
 
     // Write the headers
     for (Map.Entry<String, String> header : frame.getHeaders().entrySet()) {
@@ -82,7 +109,7 @@ public class FrameOutputStream implements Closeable {
       // TODO encode header value
       writer.append(key).append(':').append(value).append('\n');
     }
-    log.debug("Wrote headers: " + frame.getHeaders());
+    // log.debug("Wrote headers: " + frame.getHeaders());
 
     // If we have a body and we don't have a content-length header, write one.
     if (frame.getBody() != null
@@ -99,7 +126,7 @@ public class FrameOutputStream implements Closeable {
     if (frame.getBody() != null) {
       outstream.write(frame.getBody());
     }
-    log.debug("Wrote body: " + frame.getBody());
+    // log.debug("Wrote body: " + frame.getBody());
 
     if (terminate) {
       // Finally the terminator.

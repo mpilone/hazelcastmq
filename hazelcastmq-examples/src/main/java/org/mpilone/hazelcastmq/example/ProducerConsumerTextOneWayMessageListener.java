@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.example;
 
-import java.util.Arrays;
-
 import javax.jms.*;
 
 import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
@@ -13,15 +11,18 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
 /**
- * Example of sending a request bytes message and consuming the message from the
- * queue.
+ * Example of sending a request text message and consuming the message from the
+ * queue using a message listener.
  */
-public class ProducerConsumerBytesOneWay {
+public class ProducerConsumerTextOneWayMessageListener implements
+    MessageListener {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
+  private boolean msgReceived = false;
+
   public static void main(String[] args) throws Exception {
-    new ProducerConsumerBytesOneWay();
+    new ProducerConsumerTextOneWayMessageListener();
   }
 
   /**
@@ -29,7 +30,8 @@ public class ProducerConsumerBytesOneWay {
    * 
    * @throws JMSException
    */
-  public ProducerConsumerBytesOneWay() throws JMSException {
+  public ProducerConsumerTextOneWayMessageListener() throws JMSException,
+      InterruptedException {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -50,20 +52,14 @@ public class ProducerConsumerBytesOneWay {
       // Create a request producer and reply consumer.
       MessageProducer producer1 = session.createProducer(requestDest);
       MessageConsumer consumer1 = session.createConsumer(requestDest);
+      consumer1.setMessageListener(this);
 
-      byte[] data = new byte[] { 8, 6, 7, 5, 3, 0, 9 };
-
-      BytesMessage msg = session.createBytesMessage();
-      msg.writeBytes(data);
+      TextMessage msg = session.createTextMessage("Hello World!");
       producer1.send(msg);
 
-      msg = (BytesMessage) consumer1.receive(2000);
-      Assert.notNull(msg, "Did not get required message.");
-
-      data = new byte[(int) msg.getBodyLength()];
-      msg.readBytes(data);
-
-      log.info("Got message: " + Arrays.toString(data));
+      // Wait for the consumer to receive it.
+      Thread.sleep(1000);
+      Assert.isTrue(msgReceived, "Did not get required message.");
 
       producer1.close();
       consumer1.close();
@@ -74,6 +70,24 @@ public class ProducerConsumerBytesOneWay {
     }
     finally {
       hazelcast.getLifecycleService().shutdown();
+    }
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see javax.jms.MessageListener#onMessage(javax.jms.Message)
+   */
+  @Override
+  public void onMessage(Message msg) {
+    TextMessage textMsg = (TextMessage) msg;
+
+    try {
+      log.info("Got message: " + textMsg.getText());
+      msgReceived = true;
+    }
+    catch (Exception ex) {
+      // Ignore
     }
   }
 }

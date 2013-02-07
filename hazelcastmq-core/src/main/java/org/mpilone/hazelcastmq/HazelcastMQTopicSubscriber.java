@@ -2,8 +2,8 @@ package org.mpilone.hazelcastmq;
 
 import static java.lang.String.format;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.jms.*;
 
@@ -61,7 +61,7 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
       };
     };
 
-    memoryQueue = new LinkedBlockingQueue<byte[]>(this.session.getConfig()
+    memoryQueue = new ArrayBlockingQueue<byte[]>(this.session.getConfig()
         .getTopicMaxMessageCount());
     hazelcastTopic = session.getHazelcast().getTopic(topic.getTopicName());
     hazelcastTopic.addMessageListener(hazelcastListener);
@@ -125,37 +125,19 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
    *          the raw message data
    */
   private void onHazelcastTopicMessage(byte[] msgData) {
-    try {
-      if (!started) {
-        // If we are inactive, we ignore topic messages.
-        return;
-      }
-
-      // We always queue the message even if we have a message listener. We'll
-      // immediately pull it out of the queue and dispatch it if there is a
-      // listener.
-      if (!memoryQueue.offer(msgData)) {
-        log.warn(format("In-memory message buffer full for topic [%s]. "
-            + "Messages will be lost. Consider increaing the speed of "
-            + "the consumer or the message buffer.", getTopic().getTopicName()));
-        return;
-      }
-
-      // If we have a listener, drain any queued messages and push them to the
-      // listener. In theory there should only be the very last message we
-      // received in the queue to be consumed.
-      if (messageListener != null) {
-        boolean msgDispatched = false;
-        do {
-          msgDispatched = receiveAndDispatch(memoryQueue, messageListener);
-        }
-        while (msgDispatched);
-      }
+    if (!started) {
+      // If we are inactive, we ignore topic messages.
+      return;
     }
-    catch (Throwable ex) {
-      log.error(
-          format("Unable to buffer or deliver topic message for topic [%s].",
-              safeTopicName()), ex);
+
+    // We always queue the message even if we have a message listener. We'll
+    // immediately pull it out of the queue and dispatch it if there is a
+    // listener.
+    if (!memoryQueue.offer(msgData)) {
+      log.warn(format("In-memory message buffer full for topic [%s]. "
+          + "Messages will be lost. Consider increaing the speed of "
+          + "the consumer or the message buffer.", safeTopicName()));
+      return;
     }
   }
 
@@ -171,7 +153,7 @@ public class HazelcastMQTopicSubscriber extends HazelcastMQMessageConsumer
       throws JMSException {
     super.setMessageListener(messageListener);
 
-    memoryQueue.clear();
+    startMessageQueuePoller(memoryQueue);
   }
 
   /*

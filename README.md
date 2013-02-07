@@ -6,13 +6,20 @@ the entire JMS specification. However the basics are there and it can be used wi
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component.
 
-HazelcastMQ also contains HazelcastMQ Stomper which is a [STOMP](http://stomp.github.com) 
+HazelcastMQ also contains HazelcastMQ Stomper, a [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to JMS
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
 to interact with the MQ capabilities of HazelcastMQ. While Stomper was specifically written
 for HazelcastMQ as the JMS provider, it should work with any JMS provider. Stomper is not
 required when using the JMS facilities but may be used to support a wider range of messaging 
 endpoints.
+
+HazelcastMQ also contains HazelcastMQ Stompee, a [STOMP](http://stomp.github.com) 
+client which allows STOMP frames to be sent and received from any STOMP server. 
+This allows Java components to use the STOMP API rather than the JMS API if desired.
+While Stompee was specifically written for HazelcastMQ Stomper as the server, it should 
+work with any STOMP server. Stompee is not required when using the JMS or Stomper facilities and
+in most cases doesn't provide much over simply using the JMS APIs directly.
 
 ## Rationale
 
@@ -50,13 +57,26 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 
 ### Not Implemented Yet
 * Transactions (BEGIN, COMMIT, ABORT)
-* Probably 100 other things I've missed
 * Header encoding/decoding of special characters
 * Heart-beat
 * Protocol version negotiation
+* Probably 100 other things I've missed
 
 ## Not Going to Work Any Time Soon
 * Transaction message reception or ACK/NACK (i.e. always auto ACK)
+
+## STOMP Client Features (in hazelcastmq-stompee)
+
+### Implemented
+* STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
+* All frame commands
+* Push and pull message consumption APIs
+
+### Not Implemented Yet
+* Header encoding/decoding of special characters
+* Heart-beat
+* Protocol version negotiation
+* Probably 100 other things I've missed
 
 ## Examples
 
@@ -95,6 +115,21 @@ or multiple node failure in the cluster. If you've ever worked with a clustered 
 before, you'll appreciate the simplicity of this configuration.
 
 View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/NodeFailure.java).
+
+### STOMP Send and STOMP Receive
+Using the Stomper server on top of HazelcastMQ (or any JMS Provider) allows Hazelcast to be 
+used as a distributed messaging system for components written in any language. The STOMP protocol
+is lightweight and simple to understand.
+
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/StomperStompeeOneWay.java).
+
+### STOMP Send and JMS Receive
+Using the Stomper server on top of HazelcastMQ (or any JMS Provider) allows a STOMP frame 
+to be sent from a STOMP client and then consumed by a JMS consumer as a JMS Message. 
+This allows non-Java components to produce and consumer messages while allowing Java 
+components to use the rich JMS API and enterprise integration patterns.
+
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/StomperStompeeJmsOneWay.java).
 
 ## Future Work
 
