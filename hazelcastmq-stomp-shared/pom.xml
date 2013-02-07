@@ -10,8 +10,9 @@
     <version>1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>hazelcastmq-stomper</artifactId>
-  <name>HazelcastMQ Stomper</name>
+  <artifactId>hazelcastmq-stomp-shared</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <name>HazelcastMQ Stomp Shared</name>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -20,23 +21,9 @@
   <dependencies>
     <!-- Compile -->
     <dependency>
-      <groupId>org.mpilone</groupId>
-      <artifactId>hazelcastmq-stomp-shared</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-
-    <!-- Provided -->
-    <dependency>
-      <groupId>org.apache.geronimo.specs</groupId>
-      <artifactId>geronimo-jms_1.1_spec</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <!-- Test -->
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
     </dependency>
   </dependencies>
 </project>

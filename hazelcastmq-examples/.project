@@ -5,6 +5,8 @@
   <projects>
     <project>hazelcastmq-core</project>
     <project>hazelcastmq-stomper</project>
+    <project>hazelcastmq-stompee</project>
+    <project>hazelcastmq-stomp-shared</project>
   </projects>
   <buildSpec>
     <buildCommand>

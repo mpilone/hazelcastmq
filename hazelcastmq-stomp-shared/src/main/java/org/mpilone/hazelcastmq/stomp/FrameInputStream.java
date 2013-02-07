@@ -1,6 +1,6 @@
-package org.mpilone.hazelcastmq.stomper;
+package org.mpilone.hazelcastmq.stomp;
 
-import static org.mpilone.hazelcastmq.stomper.IoUtil.UTF_8;
+import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
 
 import java.io.*;
 import java.util.HashMap;
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author mpilone
  */
-class FrameInputStream implements Closeable {
+public class FrameInputStream implements Closeable {
 
   /**
    * The null terminator that must appear after each STOMP frame.

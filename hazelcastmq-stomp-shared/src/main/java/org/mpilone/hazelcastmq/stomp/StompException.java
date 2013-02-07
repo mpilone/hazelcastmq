@@ -1,4 +1,4 @@
-package org.mpilone.hazelcastmq.stomper;
+package org.mpilone.hazelcastmq.stomp;
 
 /**
  * An exception related to STOMP frame processing.

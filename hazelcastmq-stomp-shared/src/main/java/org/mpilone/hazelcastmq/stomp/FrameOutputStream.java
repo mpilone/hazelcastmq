@@ -1,4 +1,4 @@
-package org.mpilone.hazelcastmq.stomper;
+package org.mpilone.hazelcastmq.stomp;
 
 import java.io.*;
 import java.util.Map;
@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author mpilone
  */
-class FrameOutputStream implements Closeable {
+public class FrameOutputStream implements Closeable {
 
   /**
    * The null terminator that must appear after each STOMP frame.

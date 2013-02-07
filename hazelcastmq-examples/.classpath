@@ -8,6 +8,8 @@
   <classpathentry kind="var" path="M2_REPO/com/hazelcast/hazelcast/2.5/hazelcast-2.5.jar"/>
   <classpathentry kind="var" path="M2_REPO/org/slf4j/slf4j-api/1.7.2/slf4j-api-1.7.2.jar"/>
   <classpathentry kind="src" path="/hazelcastmq-stomper"/>
+  <classpathentry kind="src" path="/hazelcastmq-stompee"/>
+  <classpathentry kind="src" path="/hazelcastmq-stomp-shared"/>
   <classpathentry kind="var" path="M2_REPO/com/hazelcast/hazelcast-client/2.5/hazelcast-client-2.5.jar"/>
   <classpathentry kind="var" path="M2_REPO/org/springframework/spring-jms/3.2.0.RELEASE/spring-jms-3.2.0.RELEASE.jar"/>
   <classpathentry kind="var" path="M2_REPO/org/springframework/spring-core/3.2.0.RELEASE/spring-core-3.2.0.RELEASE.jar"/>

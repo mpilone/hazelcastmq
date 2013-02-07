@@ -1,11 +1,18 @@
 package org.mpilone.hazelcastmq.example;
 
+import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
+
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 
 import javax.jms.ConnectionFactory;
 
 import org.mpilone.hazelcastmq.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
+import org.mpilone.hazelcastmq.stomp.Frame;
+import org.mpilone.hazelcastmq.stomp.FrameBuilder;
+import org.mpilone.hazelcastmq.stompee.HazelcastMQStompee;
+import org.mpilone.hazelcastmq.stompee.HazelcastMQStompeeConfig;
 import org.mpilone.hazelcastmq.stomper.HazelcastMQStomper;
 import org.mpilone.hazelcastmq.stomper.HazelcastMQStomperConfig;
 import org.slf4j.Logger;
@@ -16,15 +23,15 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
 /**
- * This example uses a Stomper STOMP server to accept connections from any 3rd
- * party STOMP client. The Stomper server is backed by the HazelcastMQ
- * {@link ConnectionFactory} which is backed by a local Hazelcast instance. The
- * server can be shutdown by deleting the anchor file created at startup.
+ * This example uses a Stomper STOMP server to accept a Stompee client
+ * connection. The client then sends and receives a STOMP frame. The Stomper
+ * server is backed by the HazelcastMQ {@link ConnectionFactory} which is backed
+ * by a local Hazelcast instance.
  * 
  * @author mpilone
  * 
  */
-public class StompWithStomper {
+public class StomperStompeeOneWay {
 
   /**
    * The log for this class.
@@ -35,10 +42,10 @@ public class StompWithStomper {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
-    new StompWithStomper();
+    new StomperStompeeOneWay();
   }
 
-  public StompWithStomper() throws Exception {
+  public StomperStompeeOneWay() throws Exception {
 
     // Create a shutdown anchor to shut things down cleanly.
     File anchorFile = new File("stomper_example_anchor.lck");
@@ -57,26 +64,42 @@ public class StompWithStomper {
       HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory(
           hazelcast, mqConfig);
 
-      // Setup Stomper
-      HazelcastMQStomperConfig stomperConfig = new HazelcastMQStomperConfig();
-      stomperConfig.setConnectionFactory(connectionFactory);
+      // Create a Stomper server.
+      HazelcastMQStomperConfig stomperConfig = new HazelcastMQStomperConfig(
+          connectionFactory);
       HazelcastMQStomper stomper = new HazelcastMQStomper(stomperConfig);
 
       log.info("Stomper is now listening on port: " + stomperConfig.getPort());
-      log.info("Remove file " + anchorFile.getName() + " to shutdown.");
 
-      while (anchorFile.exists()) {
-        Thread.sleep(1000);
-      }
+      // Create a Stompee client.
+      HazelcastMQStompeeConfig stompeeConfig = new HazelcastMQStompeeConfig(
+          "localhost", stomperConfig.getPort());
+      HazelcastMQStompee stompee = new HazelcastMQStompee(stompeeConfig);
 
+      // Subscribe to a queue.
+      Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
+      stompee.send(frame);
+
+      // Send a message on that queue.
+      frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
+      stompee.send(frame);
+
+      // Now consume that message.
+      frame = stompee.receive(2, TimeUnit.SECONDS);
+      log.info("Got frame: " + new String(frame.getBody(), UTF_8));
+
+      // Shutdown the client.
+      stompee.shutdown();
+
+      // Shutdown the server.
       log.info("Shutting down Stomper.");
       stomper.shutdown();
       stomperConfig.getExecutor().shutdown();
     }
     finally {
+      // Shutdown Hazelcast.
       hazelcast.getLifecycleService().shutdown();
     }
 
   }
-
 }

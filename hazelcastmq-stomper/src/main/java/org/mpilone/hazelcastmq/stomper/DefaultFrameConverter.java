@@ -1,10 +1,14 @@
 package org.mpilone.hazelcastmq.stomper;
 
-import static org.mpilone.hazelcastmq.stomper.IoUtil.UTF_8;
+import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
 
 import java.util.Map;
 
 import javax.jms.*;
+
+import org.mpilone.hazelcastmq.stomp.Command;
+import org.mpilone.hazelcastmq.stomp.Frame;
+import org.mpilone.hazelcastmq.stomp.StompException;
 
 /**
  * Converts a STOMP Frame to and from a JMS Message. This implementation follows

@@ -5,6 +5,7 @@ import java.util.concurrent.Executors;
 
 import javax.jms.ConnectionFactory;
 
+
 /**
  * The configuration of the stomper server.
  * 

@@ -11,10 +11,12 @@
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-examples</module>
     <module>hazelcastmq-stomper</module>
+    <module>hazelcastmq-stompee</module>
+    <module>hazelcastmq-stomp-shared</module>
   </modules>
 
   <name>HazelcastMQ</name>
-  <url>http://mikepilone.blogspot.com</url>
+  <url>https://github.com/mpilone/hazelcastmq</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

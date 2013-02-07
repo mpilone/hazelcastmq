@@ -1,4 +1,4 @@
-package org.mpilone.hazelcastmq.stomper;
+package org.mpilone.hazelcastmq.stomp;
 
 import java.util.HashMap;
 import java.util.Map;

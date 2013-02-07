@@ -1,6 +1,8 @@
 package org.mpilone.hazelcastmq.stomper;
 
 import static java.lang.String.format;
+import static org.mpilone.hazelcastmq.stomp.IoUtil.safeClose;
+import static org.mpilone.hazelcastmq.stomper.JmsUtil.safeClose;
 
 import java.io.*;
 import java.net.Socket;
@@ -9,6 +11,7 @@ import java.util.Map;
 
 import javax.jms.*;
 
+import org.mpilone.hazelcastmq.stomp.*;
 import org.mpilone.hazelcastmq.stomper.StomperClientSubscription.MessageCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,18 +174,18 @@ class StomperClient {
 
     // Close all consumers/subscriptions.
     for (StomperClientSubscription subscription : subscriptions.values()) {
-      IoUtil.safeClose(subscription.getConsumer());
-      IoUtil.safeClose(subscription.getSession());
+      safeClose(subscription.getConsumer());
+      safeClose(subscription.getSession());
     }
     subscriptions.clear();
 
     // Close the JMS connection.
-    IoUtil.safeClose(connection);
+    safeClose(connection);
 
     // Close the socket connection.
-    IoUtil.safeClose(instream);
-    IoUtil.safeClose(outstream);
-    IoUtil.safeClose(clientSocket);
+    safeClose(instream);
+    safeClose(outstream);
+    safeClose(clientSocket);
 
     // Notify the stomper server that we're done.
     stomper.onClientClosed(this);
@@ -198,7 +201,7 @@ class StomperClient {
    */
   public void close() {
     shutdown = true;
-    IoUtil.safeClose(clientSocket);
+    safeClose(clientSocket);
   }
 
   /**
@@ -337,8 +340,8 @@ class StomperClient {
     producer.send(config.getFrameConverter().fromFrame(frame, session));
 
     // Cleanup.
-    IoUtil.safeClose(producer);
-    IoUtil.safeClose(session);
+    safeClose(producer);
+    safeClose(session);
 
     // Send a receipt if the client asked for one.
     sendOptionalReceipt(frame);
@@ -403,8 +406,8 @@ class StomperClient {
     }
 
     // Close the JMS components.
-    IoUtil.safeClose(subscription.getConsumer());
-    IoUtil.safeClose(subscription.getSession());
+    safeClose(subscription.getConsumer());
+    safeClose(subscription.getSession());
 
     // Send the receipt if the client asked.
     sendOptionalReceipt(frame);

@@ -2,6 +2,9 @@ package org.mpilone.hazelcastmq.stomper;
 
 import javax.jms.*;
 
+import org.mpilone.hazelcastmq.stomp.Command;
+import org.mpilone.hazelcastmq.stomp.Frame;
+
 /**
  * Converts a STOMP frame into a JMS message and vice versa. All mappings of
  * frames to message types and headers is handled by the converter.
