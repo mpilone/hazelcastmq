@@ -2,7 +2,6 @@ package org.mpilone.hazelcastmq.example;
 
 import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
 
-import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import javax.jms.ConnectionFactory;
@@ -47,12 +46,6 @@ public class StomperStompeeOneWay {
   }
 
   public StomperStompeeOneWay() throws Exception {
-
-    // Create a shutdown anchor to shut things down cleanly.
-    File anchorFile = new File("stomper_example_anchor.lck");
-    anchorFile.delete();
-    anchorFile.createNewFile();
-    anchorFile.deleteOnExit();
 
     // Create a Hazelcast instance.
     Config config = new Config();

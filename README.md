@@ -71,6 +71,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
 * All frame commands
 * Push and pull message consumption APIs
+* Frame builder for fluent frame construction
 
 ### Not Implemented Yet
 * Header encoding/decoding of special characters

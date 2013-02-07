@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.example;
 
-import java.io.File;
-
 import javax.jms.*;
 
 import org.mpilone.hazelcastmq.HazelcastMQConfig;
@@ -45,12 +43,6 @@ public class StomperStompeeJmsOneWay {
   }
 
   public StomperStompeeJmsOneWay() throws Exception {
-
-    // Create a shutdown anchor to shut things down cleanly.
-    File anchorFile = new File("stomper_example_anchor.lck");
-    anchorFile.delete();
-    anchorFile.createNewFile();
-    anchorFile.deleteOnExit();
 
     // Create a Hazelcast instance.
     Config config = new Config();
