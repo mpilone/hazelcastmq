@@ -229,9 +229,6 @@ class ClientAgent {
    */
   private void sendError(Frame requestFrame, Throwable cause) {
     try {
-      Frame response = new Frame(Command.ERROR);
-      response.getHeaders().put("message", cause.getMessage());
-      response.setContentTypeText();
 
       ByteArrayOutputStream buf = new ByteArrayOutputStream();
       FrameOutputStream frameBuf = new FrameOutputStream(buf);
@@ -250,8 +247,10 @@ class ClientAgent {
       writerBuf.write("\n----------------\n");
       writerBuf.close();
 
-      response.setBody(buf.toByteArray());
-      outstream.write(response);
+      FrameBuilder fb = FrameBuilder.command(Command.ERROR)
+          .header("message", cause.getMessage()).headerContentTypeText()
+          .body(buf.toString());
+      outstream.write(fb.build());
     }
     catch (Throwable ex) {
       // Ignore
@@ -474,10 +473,9 @@ class ClientAgent {
     connected = true;
 
     // Send the response frame.
-    Frame response = new Frame(Command.CONNECTED);
-    response.getHeaders().put("version", "1.2");
-    response.setContentTypeText();
-    outstream.write(response);
+    FrameBuilder fb = FrameBuilder.command(Command.CONNECTED)
+        .header("version", "1.2").headerContentTypeText();
+    outstream.write(fb.build());
 
   }
 

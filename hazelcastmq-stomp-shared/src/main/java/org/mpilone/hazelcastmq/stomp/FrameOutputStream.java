@@ -95,6 +95,12 @@ public class FrameOutputStream implements Closeable {
    */
   private void unguardedWrite(Frame frame, boolean terminate)
       throws IOException {
+
+    // Some sanity checks before we serialize the frame.
+    if (frame.getCommand() == null) {
+      throw new StompException("A frame command is required for all frames.");
+    }
+
     PrintWriter writer = new PrintWriter(outstream);
 
     // Write the command

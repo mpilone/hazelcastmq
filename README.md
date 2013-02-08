@@ -136,3 +136,31 @@ View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastm
 
 If there is interest I plan on continuing development of the provider to support more 
 of the JMS API and feature set. Let me know what you think and what features you need most.
+
+## Getting Builds
+
+The source, javadoc, and binaries are available in the 
+[mpilone/mvn-repo](https://github.com/mpilone/mvn-repo) GitHub repository. You
+can configure Maven or Ivy to directly grab the dependencies by adding the repository:
+
+    <repositories>
+         <repository>
+             <id>mpilone-snapshots</id>
+             <url>https://github.com/mpilone/mvn-repo/raw/master/snapshots</url>
+         </repository>
+         <repository>
+             <id>mpilone-releases</id>
+             <url>https://github.com/mpilone/mvn-repo/raw/master/releases</url>
+         </repository>
+     </repositories>
+
+And then adding the dependency:
+
+    <dependency>
+        <groupId>org.mpilone</groupId>
+        <artifactId>hazelcastmq-core</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </dependency>
+    
+If there is enough interest I could look at moving it to a standard public Maven Repository.
+
