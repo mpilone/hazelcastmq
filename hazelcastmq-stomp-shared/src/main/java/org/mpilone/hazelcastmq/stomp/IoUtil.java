@@ -3,7 +3,6 @@ package org.mpilone.hazelcastmq.stomp;
 import java.io.Closeable;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.Charset;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -13,11 +12,6 @@ import java.util.concurrent.TimeUnit;
  * @author mpilone
  */
 public class IoUtil {
-
-  /**
-   * The UTF-8 character set used for all conversions.
-   */
-  public final static Charset UTF_8 = Charset.forName("UTF-8");
 
   /**
    * Attempts an await on the given latch and ignores exceptions.

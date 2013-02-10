@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.example;
 
-import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
-
 import java.util.concurrent.TimeUnit;
 
 import javax.jms.ConnectionFactory;
@@ -10,6 +8,7 @@ import org.mpilone.hazelcastmq.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
 import org.mpilone.hazelcastmq.stomp.Frame;
 import org.mpilone.hazelcastmq.stomp.FrameBuilder;
+import org.mpilone.hazelcastmq.stomp.StompConstants;
 import org.mpilone.hazelcastmq.stompee.HazelcastMQStompee;
 import org.mpilone.hazelcastmq.stompee.HazelcastMQStompeeConfig;
 import org.mpilone.hazelcastmq.stomper.HazelcastMQStomper;
@@ -82,7 +81,8 @@ public class StomperStompeeOneWay {
       frame = stompee.receive(300, TimeUnit.SECONDS);
       Assert.notNull(frame, "Did not receive expected frame!");
 
-      log.info("Got frame: " + new String(frame.getBody(), UTF_8));
+      log.info("Got frame: "
+          + new String(frame.getBody(), StompConstants.UTF_8));
 
       // Shutdown the client.
       stompee.shutdown();

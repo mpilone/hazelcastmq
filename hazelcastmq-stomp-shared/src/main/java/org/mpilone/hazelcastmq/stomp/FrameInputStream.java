@@ -1,6 +1,6 @@
 package org.mpilone.hazelcastmq.stomp;
 
-import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
+import static org.mpilone.hazelcastmq.stomp.StompConstants.*;
 
 import java.io.*;
 import java.util.HashMap;
@@ -13,11 +13,6 @@ import java.util.Map;
  * @author mpilone
  */
 public class FrameInputStream implements Closeable {
-
-  /**
-   * The null terminator that must appear after each STOMP frame.
-   */
-  public static final char NULL_CHARACTER = '\0';
 
   /**
    * The low level input stream from which to read.
@@ -94,14 +89,14 @@ public class FrameInputStream implements Closeable {
 
       // Next byte should be a null character or something is wrong.
       int b = instream.read();
-      if (b != NULL_CHARACTER) {
+      if (b != StompConstants.NULL_CHARACTER) {
         throw new StompException("Stomp frame must end with a NULL terminator.");
       }
     }
     else {
       // Read until we hit the null character.
       int b = instream.read();
-      while (b != NULL_CHARACTER) {
+      while (b != StompConstants.NULL_CHARACTER) {
         bodyBuf.write(b);
         b = instream.read();
       }
@@ -140,7 +135,12 @@ public class FrameInputStream implements Closeable {
 
         if (!headers.containsKey(key)) {
 
-          // TODO decode the header
+          // Decode header value as per the spec:
+          value = value.replace(OCTET_92_92, OCTET_92);
+          value = value.replace(OCTET_92_99, OCTET_58);
+          value = value.replace(OCTET_92_110, OCTET_10);
+          value = value.replace(OCTET_92_114, OCTET_13);
+
           headers.put(key, value);
         }
       }
@@ -184,18 +184,20 @@ public class FrameInputStream implements Closeable {
 
     while (!eol) {
       int data = instream.read();
-      if ((char) data == '\n') {
+      // LF or end of stream
+      if (data == 10 || data <= 0) {
         eol = true;
       }
-      else if (data == 0) {
-        return null;
+      // CR
+      else if (data == 13) {
+        // Ignore and wait for LF
       }
       else {
         buf.write(data);
       }
     }
 
-    return new String(buf.toByteArray(), UTF_8);
+    return new String(buf.toByteArray(), StompConstants.UTF_8);
   }
 
   /*

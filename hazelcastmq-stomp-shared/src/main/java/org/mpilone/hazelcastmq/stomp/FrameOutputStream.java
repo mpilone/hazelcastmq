@@ -1,5 +1,7 @@
 package org.mpilone.hazelcastmq.stomp;
 
+import static org.mpilone.hazelcastmq.stomp.StompConstants.*;
+
 import java.io.*;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -12,11 +14,6 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author mpilone
  */
 public class FrameOutputStream implements Closeable {
-
-  /**
-   * The null terminator that must appear after each STOMP frame.
-   */
-  private static final char NULL_CHARACTER = '\0';
 
   /**
    * The mutex to make frame writing thread safe.
@@ -112,7 +109,12 @@ public class FrameOutputStream implements Closeable {
       String key = header.getKey();
       String value = header.getValue();
 
-      // TODO encode header value
+      // Encode header value as per the specification.
+      value = value.replace(OCTET_92, OCTET_92_92);
+      value = value.replace(OCTET_58, OCTET_92_99);
+      value = value.replace(OCTET_10, OCTET_92_110);
+      value = value.replace(OCTET_13, OCTET_92_114);
+
       writer.append(key).append(':').append(value).append('\n');
     }
     // log.debug("Wrote headers: " + frame.getHeaders());

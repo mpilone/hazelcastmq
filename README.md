@@ -54,10 +54,10 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Sending and subscribing
 * Multiple clients on single server
 * Queue and Topic send/receive
+* Header encoding/decoding of special characters
 
 ### Not Implemented Yet
 * Transactions (BEGIN, COMMIT, ABORT)
-* Header encoding/decoding of special characters
 * Heart-beat
 * Protocol version negotiation
 * Probably 100 other things I've missed
@@ -72,9 +72,9 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * All frame commands
 * Push and pull message consumption APIs
 * Frame builder for fluent frame construction
+* Header encoding/decoding of special characters
 
 ### Not Implemented Yet
-* Header encoding/decoding of special characters
 * Heart-beat
 * Protocol version negotiation
 * Probably 100 other things I've missed

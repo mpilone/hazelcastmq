@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.stomp;
 
-import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
-
 /**
  * A factory for {@link Frame}s which provides a fluent API for frame
  * construction as well as utility methods for common frame types.
@@ -142,7 +140,7 @@ public class FrameBuilder {
    * @see #headerContentTypeText()
    */
   public FrameBuilder body(String body) {
-    return body(body.getBytes(UTF_8));
+    return body(body.getBytes(StompConstants.UTF_8));
   }
 
   /**

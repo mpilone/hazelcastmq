@@ -1,14 +1,10 @@
 package org.mpilone.hazelcastmq.stomper;
 
-import static org.mpilone.hazelcastmq.stomp.IoUtil.UTF_8;
-
 import java.util.Map;
 
 import javax.jms.*;
 
-import org.mpilone.hazelcastmq.stomp.Command;
-import org.mpilone.hazelcastmq.stomp.Frame;
-import org.mpilone.hazelcastmq.stomp.StompException;
+import org.mpilone.hazelcastmq.stomp.*;
 
 /**
  * Converts a STOMP Frame to and from a JMS Message. This implementation follows
@@ -95,7 +91,8 @@ public class DefaultFrameConverter implements FrameConverter {
 
     String contentType = headers.get("content-type");
     if (contentType != null && contentType.startsWith("text/plain")) {
-      msg = session.createTextMessage(new String(frame.getBody(), UTF_8));
+      msg = session.createTextMessage(new String(frame.getBody(),
+          StompConstants.UTF_8));
     }
     else {
       BytesMessage bytesMsg = session.createBytesMessage();
@@ -153,7 +150,7 @@ public class DefaultFrameConverter implements FrameConverter {
 
       TextMessage textMsg = (TextMessage) msg;
       if (textMsg.getText() != null) {
-        frame.setBody(textMsg.getText().getBytes(UTF_8));
+        frame.setBody(textMsg.getText().getBytes(StompConstants.UTF_8));
       }
     }
     else if (msg instanceof BytesMessage) {
