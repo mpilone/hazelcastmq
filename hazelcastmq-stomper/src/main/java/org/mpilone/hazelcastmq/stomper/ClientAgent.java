@@ -82,6 +82,10 @@ class ClientAgent {
    */
   private Map<String, ClientSubscription> subscriptions;
 
+  /**
+   * The map of transaction ID to the transaction instance for all active client
+   * transactions.
+   */
   private Map<String, ClientTransaction> transactions;
 
   /**
