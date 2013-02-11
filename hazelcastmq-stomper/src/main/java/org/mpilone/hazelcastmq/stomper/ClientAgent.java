@@ -82,6 +82,8 @@ class ClientAgent {
    */
   private Map<String, ClientSubscription> subscriptions;
 
+  private Map<String, ClientTransaction> transactions;
+
   /**
    * The callback that will handle all messages received from subscriptions and
    * need to get dispatched to the client.
@@ -145,6 +147,7 @@ class ClientAgent {
 
     shutdown = false;
     subscriptions = new HashMap<String, ClientSubscription>();
+    transactions = new HashMap<String, ClientTransaction>();
     messageCallback = new DefaultMessageCallback();
     shutdownLatch = new CountDownLatch(1);
 
@@ -190,6 +193,12 @@ class ClientAgent {
       safeClose(subscription.getSession());
     }
     subscriptions.clear();
+
+    // Close all transactions
+    for (ClientTransaction transaction : transactions.values()) {
+      safeClose(transaction.getSession());
+    }
+    transactions.clear();
 
     // Close the JMS connection.
     safeClose(connection);
@@ -317,6 +326,21 @@ class ClientAgent {
       onUnsubscribe(frame);
       break;
 
+    case BEGIN:
+      checkConnected(true);
+      onBegin(frame);
+      break;
+
+    case ABORT:
+      checkConnected(true);
+      onAbort(frame);
+      break;
+
+    case COMMIT:
+      checkConnected(true);
+      onCommit(frame);
+      break;
+
     // TODO add more supported commands
 
     default:
@@ -325,6 +349,92 @@ class ClientAgent {
     }
 
     return true;
+  }
+
+  /**
+   * Called when a {@link Command#ABORT} frame is received from the client. The
+   * session associated with the transaction will be rolled back and closed.
+   * 
+   * @param frame
+   *          the frame to process
+   * @throws JMSException
+   * @throws IOException
+   */
+  private void onAbort(Frame frame) throws JMSException, IOException {
+
+    // Get the transaction ID.
+    String transactionId = getRequiredHeader("transaction", frame);
+
+    // Make sure it exists.
+    ClientTransaction tx = transactions.remove(transactionId);
+    if (tx == null) {
+      throw new StompException(format("Transaction [%s] is not active.",
+          transactionId));
+    }
+
+    tx.getSession().rollback();
+    tx.getSession().close();
+
+    // Send a receipt if the client asked for one.
+    sendOptionalReceipt(frame);
+  }
+
+  /**
+   * Called when a {@link Command#COMMIT} frame is received from the client. The
+   * session associated with the transaction will be committed and closed.
+   * 
+   * @param frame
+   *          the frame to process
+   * @throws JMSException
+   * @throws IOException
+   */
+  private void onCommit(Frame frame) throws JMSException, IOException {
+
+    // Get the transaction ID.
+    String transactionId = getRequiredHeader("transaction", frame);
+
+    // Make sure it exists.
+    ClientTransaction tx = transactions.remove(transactionId);
+    if (tx == null) {
+      throw new StompException(format("Transaction [%s] is not active.",
+          transactionId));
+    }
+
+    tx.getSession().commit();
+    tx.getSession().close();
+
+    // Send a receipt if the client asked for one.
+    sendOptionalReceipt(frame);
+  }
+
+  /**
+   * Called when a {@link Command#BEGIN} frame is received from the client. A
+   * new transacted session will be created and stored for future commands.
+   * 
+   * @param frame
+   *          the frame to process
+   * @throws JMSException
+   * @throws IOException
+   */
+  private void onBegin(Frame frame) throws JMSException, IOException {
+
+    // Get the transaction ID.
+    String transactionId = getRequiredHeader("transaction", frame);
+
+    // Make sure it isn't already in use.
+    if (transactions.containsKey(transactionId)) {
+      throw new StompException(format("Transaction [%s] is already active.",
+          transactionId));
+    }
+
+    // Create a transacted session and store it away for future commands.
+    Session session = connection
+        .createSession(true, Session.CLIENT_ACKNOWLEDGE);
+    transactions.put(transactionId, new ClientTransaction(transactionId,
+        session));
+
+    // Send a receipt if the client asked for one.
+    sendOptionalReceipt(frame);
   }
 
   /**
@@ -342,8 +452,26 @@ class ClientAgent {
     // Get the destination header.
     String destName = getRequiredHeader("destination", frame);
 
+    // Get the optional transaction ID.
+    String transactionId = frame.getHeaders().get("transaction");
+
+    Session session = null;
+
+    // Use a transacted session.
+    if (transactionId != null) {
+      ClientTransaction tx = transactions.get(transactionId);
+      if (tx == null) {
+        throw new StompException(format("Transaction [%s] is not active.",
+            transactionId));
+      }
+      session = tx.getSession();
+    }
+    else {
+      // Use a local session.
+      session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+    }
+
     // Create the JMS components.
-    Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
     Destination destination = config.getFrameConverter().fromFrameDestination(
         destName, session);
     MessageProducer producer = session.createProducer(destination);
@@ -353,7 +481,11 @@ class ClientAgent {
 
     // Cleanup.
     safeClose(producer);
-    safeClose(session);
+
+    // If we're using a local transaction, close it.
+    if (transactionId == null) {
+      safeClose(session);
+    }
 
     // Send a receipt if the client asked for one.
     sendOptionalReceipt(frame);

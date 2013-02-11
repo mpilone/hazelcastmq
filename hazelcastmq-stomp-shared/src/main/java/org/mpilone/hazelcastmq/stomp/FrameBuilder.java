@@ -28,6 +28,14 @@ public class FrameBuilder {
   }
 
   /**
+   * Sets the transaction header to the given ID.
+   */
+  public FrameBuilder headerTransaction(String transactionId) {
+    frame.setHeader("transaction", transactionId);
+    return this;
+  }
+
+  /**
    * Sets the content-type header to application/octet-stream.
    */
   public FrameBuilder headerContentTypeOctetStream() {
@@ -168,6 +176,43 @@ public class FrameBuilder {
     frame = null;
 
     return tmp;
+  }
+
+  /**
+   * Creates a frame builder and configures a standard {@link Command#BEGIN}
+   * frame.
+   * 
+   * @param transactionId
+   *          the unique transaction ID
+   * @return the frame builder
+   */
+  public static FrameBuilder begin(String transactionId) {
+    return FrameBuilder.command(Command.BEGIN).headerTransaction(transactionId);
+  }
+
+  /**
+   * Creates a frame builder and configures a standard {@link Command#COMMIT}
+   * frame.
+   * 
+   * @param transactionId
+   *          the transaction ID
+   * @return the frame builder
+   */
+  public static FrameBuilder commit(String transactionId) {
+    return FrameBuilder.command(Command.COMMIT)
+        .headerTransaction(transactionId);
+  }
+
+  /**
+   * Creates a frame builder and configures a standard {@link Command#ABORT}
+   * frame.
+   * 
+   * @param transactionId
+   *          the transaction ID
+   * @return the frame builder
+   */
+  public static FrameBuilder abort(String transactionId) {
+    return FrameBuilder.command(Command.ABORT).headerTransaction(transactionId);
   }
 
 }

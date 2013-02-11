@@ -29,7 +29,7 @@ import com.hazelcast.core.HazelcastInstance;
  * @author mpilone
  * 
  */
-public class StomperStompeeOneWay {
+public class StomperStompeeOneWayTransaction {
 
   /**
    * The log for this class.
@@ -41,10 +41,10 @@ public class StomperStompeeOneWay {
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
-    new StomperStompeeOneWay();
+    new StomperStompeeOneWayTransaction();
   }
 
-  public StomperStompeeOneWay() throws Exception {
+  public StomperStompeeOneWayTransaction() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -64,28 +64,50 @@ public class StomperStompeeOneWay {
 
       log.info("Stomper is now listening on port: " + stomperConfig.getPort());
 
-      // Create a Stompee client.
+      // Create a Stompee client to send.
       HazelcastMQStompeeConfig stompeeConfig = new HazelcastMQStompeeConfig(
           "localhost", stomperConfig.getPort());
       HazelcastMQStompee stompee = new HazelcastMQStompee(stompeeConfig);
 
+      // Create a Stompee client to receive.
+      stompeeConfig = new HazelcastMQStompeeConfig("localhost",
+          stomperConfig.getPort());
+      HazelcastMQStompee stompee2 = new HazelcastMQStompee(stompeeConfig);
+
       // Subscribe to a queue.
       Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
+      stompee2.send(frame);
+
+      // Start a transaction
+      final String transactionId = "tx1";
+      frame = FrameBuilder.begin(transactionId).build();
       stompee.send(frame);
 
       // Send a message on that queue.
-      frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
+      frame = FrameBuilder.send("/queue/demo.test", "Hello World!")
+          .headerTransaction(transactionId).build();
       stompee.send(frame);
 
-      // Now consume that message.
-      frame = stompee.receive(3, TimeUnit.SECONDS);
-      Assert.notNull(frame, "Did not receive expected frame!");
+      // Now try to consume that message. We shouldn't get anything because the
+      // transaction hasn't been committed.
+      frame = stompee2.receive(2, TimeUnit.SECONDS);
+      Assert.isNull(frame, "Did receive unexpected frame!");
+
+      // Now commit the transaction.
+      frame = FrameBuilder.commit(transactionId).build();
+      stompee.send(frame);
+
+      // Now try to consume that message. We shouldn't get anything because the
+      // transaction hasn't been committed.
+      frame = stompee2.receive(2, TimeUnit.SECONDS);
+      Assert.notNull(frame, "Did not receive unexpected frame!");
 
       log.info("Got frame: "
           + new String(frame.getBody(), StompConstants.UTF_8));
 
       // Shutdown the client.
       stompee.shutdown();
+      stompee2.shutdown();
 
       // Shutdown the server.
       log.info("Shutting down Stomper.");

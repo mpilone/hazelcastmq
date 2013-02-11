@@ -55,9 +55,10 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Multiple clients on single server
 * Queue and Topic send/receive
 * Header encoding/decoding of special characters
+* Send transactions (BEGIN, SEND, COMMIT, ABORT)
 
 ### Not Implemented Yet
-* Transactions (BEGIN, COMMIT, ABORT)
+* Receive transactions (BEGIN, ACK, NACK, COMMIT, ABORT)
 * Heart-beat
 * Protocol version negotiation
 * Probably 100 other things I've missed
