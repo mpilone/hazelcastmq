@@ -5,13 +5,12 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hazelcastmq</artifactId>
-    <groupId>org.mpilone</groupId>
+    <artifactId>hazelcastmq-parent</artifactId>
+    <groupId>org.mpilone.hazelcastmq</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hazelcastmq-stomp-shared</artifactId>
-  <version>1.0-SNAPSHOT</version>
   <name>HazelcastMQ Stomp Shared</name>
 
   <description>Common code for Stompee and Stomper.</description>
