@@ -1,9 +1,12 @@
-package org.mpilone.hazelcastmq.example;
+package org.mpilone.hazelcastmq.example.jms;
 
 import javax.jms.*;
 
-import org.mpilone.hazelcastmq.HazelcastMQConfig;
-import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
+import org.mpilone.hazelcastmq.core.HazelcastMQ;
+import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
+import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConfig;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +38,18 @@ public class ProducerConsumerRequestReply {
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
     try {
-      // Setup the connection factory.
+      // HazelcastMQ Instance
       HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory(
-          hazelcast, mqConfig);
+      mqConfig.setHazelcastInstance(hazelcast);
+
+      HazelcastMQInstance mqInstance = HazelcastMQ
+          .newHazelcastMQInstance(mqConfig);
+
+      // HazelcastMQJms Instance
+      HazelcastMQJmsConfig mqJmsConfig = new HazelcastMQJmsConfig();
+      mqJmsConfig.setHazelcastMQInstance(mqInstance);
+      HazelcastMQJmsConnectionFactory connectionFactory = new HazelcastMQJmsConnectionFactory(
+          mqJmsConfig);
 
       // Create a connection, session, and destinations.
       Connection connection = connectionFactory.createConnection();

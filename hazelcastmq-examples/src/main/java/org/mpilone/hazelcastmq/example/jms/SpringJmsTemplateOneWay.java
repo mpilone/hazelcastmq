@@ -1,6 +1,10 @@
-package org.mpilone.hazelcastmq.example;
+package org.mpilone.hazelcastmq.example.jms;
 
-import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
+import org.mpilone.hazelcastmq.core.HazelcastMQ;
+import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
+import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConfig;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.core.JmsTemplate;
@@ -32,9 +36,19 @@ public class SpringJmsTemplateOneWay {
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
     try {
-      // Setup the connection factory.
-      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory();
-      connectionFactory.setHazelcast(hazelcast);
+      // HazelcastMQ Instance
+      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+      mqConfig.setHazelcastInstance(hazelcast);
+
+      HazelcastMQInstance mqInstance = HazelcastMQ
+          .newHazelcastMQInstance(mqConfig);
+
+      // HazelcastMQJms Instance
+      HazelcastMQJmsConfig mqJmsConfig = new HazelcastMQJmsConfig();
+      mqJmsConfig.setHazelcastMQInstance(mqInstance);
+
+      HazelcastMQJmsConnectionFactory connectionFactory = new HazelcastMQJmsConnectionFactory(
+          mqJmsConfig);
 
       // Setup the JMS Template
       JmsTemplate jmsOps = new JmsTemplate(connectionFactory);

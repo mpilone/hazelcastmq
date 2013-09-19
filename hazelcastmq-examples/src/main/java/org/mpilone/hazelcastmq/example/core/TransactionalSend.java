@@ -1,14 +1,16 @@
-package org.mpilone.hazelcastmq.example;
+package org.mpilone.hazelcastmq.example.core;
 
-import javax.jms.*;
+import java.util.concurrent.TimeUnit;
 
-import org.mpilone.hazelcastmq.HazelcastMQConfig;
-import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
+import javax.jms.JMSException;
+
+import org.mpilone.hazelcastmq.core.*;
+import org.mpilone.hazelcastmq.example.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.config.Join;
+import com.hazelcast.config.JoinConfig;
 import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
@@ -23,7 +25,7 @@ public class TransactionalSend {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private String queueName = "transactional.send.example";
+  private String queueName = "/queue/transactional.send.example";
 
   public static void main(String[] args) throws JMSException,
       InterruptedException {
@@ -41,7 +43,7 @@ public class TransactionalSend {
     NetworkConfig networkConfig = config.getNetworkConfig();
     networkConfig.setPort(10571);
     networkConfig.getInterfaces().addInterface("127.0.0.1");
-    Join joinConfig = networkConfig.getJoin();
+    JoinConfig joinConfig = networkConfig.getJoin();
     joinConfig.getMulticastConfig().setEnabled(false);
     joinConfig.getTcpIpConfig().setEnabled(true);
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10572");
@@ -58,42 +60,36 @@ public class TransactionalSend {
     ClusterNode node2 = new ClusterNode(config);
 
     try {
-      Session session1 = node1.getConnection().createSession(true,
-          Session.AUTO_ACKNOWLEDGE);
-      Destination destination1 = session1.createQueue(queueName);
-      MessageProducer producer = session1.createProducer(destination1);
+      HazelcastMQContext session1 = node1.createContext(true);
 
-      Message msg = session1.createTextMessage("Hello World!");
-      producer.send(msg);
-      producer.close();
+      HazelcastMQProducer producer = session1.createProducer();
+      producer.send(queueName, "Hello World!".getBytes());
 
-      Session session2 = node2.getConnection().createSession(false,
-          Session.AUTO_ACKNOWLEDGE);
-      Destination destination2 = session2.createQueue(queueName);
-      MessageConsumer consumer = session2.createConsumer(destination2);
+      HazelcastMQContext session2 = node2.createContext(false);
+
+      HazelcastMQConsumer consumer = session2.createConsumer(queueName);
 
       // Try to consume the message that was sent in another node in a
       // transaction. This node shouldn't be able to see the message.
-      msg = consumer.receive(1000);
+      HazelcastMQMessage msg = consumer.receive(1, TimeUnit.SECONDS);
       if (msg == null) {
         log.info("Did not get message (expected behavior).");
       }
       else {
-        log.info("Something went wrong. A transactional message shouldn't be visible.");
+        Assert.fail("Something went wrong. A transactional "
+            + "message shouldn't be visible.");
       }
 
       // Commit the transaction so all nodes can see the transactional messages.
+      log.info("Committing producer transaction.");
       session1.commit();
       session1.close();
 
       // Try to consume the message again. This time is should be visible.
-      msg = consumer.receive(1000);
-      if (msg == null) {
-        log.info("Something went wrong. A message should be visible.");
-      }
-      else {
-        log.info("Got message: " + ((TextMessage) msg).getText());
-      }
+      msg = consumer.receive(1, TimeUnit.SECONDS);
+      Assert.notNull(msg, "Something went wrong. A message should be visible.");
+
+      log.info("Got message body: " + new String(msg.getBody()));
 
       session2.close();
     }
@@ -113,8 +109,7 @@ public class TransactionalSend {
 
     private HazelcastInstance hazelcast;
     private Config config;
-    private ConnectionFactory connectionFactory;
-    private Connection connection;
+    private HazelcastMQInstance mqInstance;
 
     /**
      * Constructs the node which will immediately start Hazelcast instance.
@@ -123,32 +118,37 @@ public class TransactionalSend {
      *          the node configuration
      * @throws JMSException
      */
-    public ClusterNode(Config config) throws JMSException {
+    public ClusterNode(Config config) {
 
       this.config = config;
 
       restart();
     }
 
-    public void restart() throws JMSException {
+    public void restart() {
       if (hazelcast != null) {
         shutdown();
       }
 
+      // Hazelcast Instance
       hazelcast = Hazelcast.newHazelcastInstance(config);
-      connectionFactory = new HazelcastMQConnectionFactory(hazelcast,
-          new HazelcastMQConfig());
-      connection = connectionFactory.createConnection();
-      connection.start();
+
+      // HazelcastMQ Instance
+      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+      mqConfig.setHazelcastInstance(hazelcast);
+
+      mqInstance = HazelcastMQ.newHazelcastMQInstance(mqConfig);
     }
 
-    public Connection getConnection() {
-      return connection;
+    public HazelcastMQContext createContext(boolean transacted) {
+      HazelcastMQContext mqContext = mqInstance.createContext(transacted);
+      mqContext.start();
+      return mqContext;
     }
 
-    public void shutdown() throws JMSException {
+    public void shutdown() {
       if (hazelcast != null) {
-        connection.close();
+        mqInstance.shutdown();
 
         hazelcast.getLifecycleService().shutdown();
         hazelcast = null;

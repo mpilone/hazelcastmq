@@ -6,6 +6,10 @@ package org.mpilone.hazelcastmq.example;
  * @author mpilone
  */
 public class Assert {
+  public static void fail(String msg) {
+    throw new RuntimeException(msg);
+  }
+
   public static void notNull(Object obj, String msg) {
     if (obj == null) {
       throw new RuntimeException(msg);

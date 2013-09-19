@@ -1,13 +1,14 @@
-package org.mpilone.hazelcastmq.example;
+package org.mpilone.hazelcastmq.example.stomp;
 
 import java.io.File;
 
 import javax.jms.ConnectionFactory;
 
-import org.mpilone.hazelcastmq.HazelcastMQConfig;
-import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
-import org.mpilone.hazelcastmq.stomper.HazelcastMQStomper;
-import org.mpilone.hazelcastmq.stomper.HazelcastMQStomperConfig;
+import org.mpilone.hazelcastmq.core.HazelcastMQ;
+import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
+import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,15 +17,15 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
 /**
- * This example uses a Stomper STOMP server to accept connections from any 3rd
- * party STOMP client. The Stomper server is backed by the HazelcastMQ
+ * This example uses a STOMP server to accept connections from any 3rd party
+ * STOMP client. The Stomper server is backed by the HazelcastMQ
  * {@link ConnectionFactory} which is backed by a local Hazelcast instance. The
  * server can be shutdown by deleting the anchor file created at startup.
  * 
  * @author mpilone
  * 
  */
-public class StompWithStomper {
+public class StompWithExternalClient {
 
   /**
    * The log for this class.
@@ -35,10 +36,10 @@ public class StompWithStomper {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
-    new StompWithStomper();
+    new StompWithExternalClient();
   }
 
-  public StompWithStomper() throws Exception {
+  public StompWithExternalClient() throws Exception {
 
     // Create a shutdown anchor to shut things down cleanly.
     File anchorFile = new File("stomper_example_anchor.lck");
@@ -52,17 +53,21 @@ public class StompWithStomper {
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
     try {
-      // Setup the connection factory.
+      // Create the HazelcaseMQ instance.
       HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory(
-          hazelcast, mqConfig);
+      mqConfig.setHazelcastInstance(hazelcast);
+      HazelcastMQInstance mqInstance = HazelcastMQ
+          .newHazelcastMQInstance(mqConfig);
 
-      // Setup Stomper
-      HazelcastMQStomperConfig stomperConfig = new HazelcastMQStomperConfig();
-      stomperConfig.setConnectionFactory(connectionFactory);
-      HazelcastMQStomper stomper = new HazelcastMQStomper(stomperConfig);
+      // Create a Stomp server.
+      HazelcastMQStompServerConfig stompConfig = new HazelcastMQStompServerConfig(
+          mqInstance);
+      HazelcastMQStompServer stompServer = new HazelcastMQStompServer(
+          stompConfig);
 
-      log.info("Stomper is now listening on port: " + stomperConfig.getPort());
+      log.info("Stomp server is now listening on port: "
+          + stompConfig.getPort());
+
       log.info("Remove file " + anchorFile.getName() + " to shutdown.");
 
       while (anchorFile.exists()) {
@@ -70,8 +75,8 @@ public class StompWithStomper {
       }
 
       log.info("Shutting down Stomper.");
-      stomper.shutdown();
-      stomperConfig.getExecutor().shutdown();
+      stompServer.shutdown();
+      stompConfig.getExecutor().shutdown();
     }
     finally {
       hazelcast.getLifecycleService().shutdown();

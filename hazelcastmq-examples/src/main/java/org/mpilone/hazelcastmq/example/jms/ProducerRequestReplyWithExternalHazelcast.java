@@ -1,28 +1,33 @@
-package org.mpilone.hazelcastmq.example;
+package org.mpilone.hazelcastmq.example.jms;
 
 import static java.util.Arrays.asList;
 
 import javax.jms.*;
 
-import org.mpilone.hazelcastmq.HazelcastMQConnectionFactory;
+import org.mpilone.hazelcastmq.core.HazelcastMQ;
+import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
+import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.example.Assert;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConfig;
+import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.core.HazelcastInstance;
 
 /**
  * Example of sending a request/reply message to a remote Hazelcast instance
  * assuming some other application will be consuming the message and sending the
- * reply.
+ * reply. This is useful as a simple integration test with existing endpoints.
  */
-public class ProducerRequestReply {
+public class ProducerRequestReplyWithExternalHazelcast {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
   public static void main(String[] args) throws Exception {
-    new ProducerRequestReply();
+    new ProducerRequestReplyWithExternalHazelcast();
   }
 
   /**
@@ -30,7 +35,7 @@ public class ProducerRequestReply {
    * 
    * @throws JMSException
    */
-  public ProducerRequestReply() throws JMSException {
+  public ProducerRequestReplyWithExternalHazelcast() throws JMSException {
 
     // Create a Hazelcast instance client.
     ClientConfig config = new ClientConfig();
@@ -38,9 +43,19 @@ public class ProducerRequestReply {
     HazelcastInstance hazelcast = HazelcastClient.newHazelcastClient(config);
 
     try {
-      // Setup the connection factory.
-      HazelcastMQConnectionFactory connectionFactory = new HazelcastMQConnectionFactory();
-      connectionFactory.setHazelcast(hazelcast);
+      // HazelcastMQ Instance
+      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+      mqConfig.setHazelcastInstance(hazelcast);
+
+      HazelcastMQInstance mqInstance = HazelcastMQ
+          .newHazelcastMQInstance(mqConfig);
+
+      // HazelcastMQJms Instance
+      HazelcastMQJmsConfig mqJmsConfig = new HazelcastMQJmsConfig();
+      mqJmsConfig.setHazelcastMQInstance(mqInstance);
+
+      HazelcastMQJmsConnectionFactory connectionFactory = new HazelcastMQJmsConnectionFactory(
+          mqJmsConfig);
 
       // Create a connection, session, and destinations.
       Connection connection = connectionFactory.createConnection();

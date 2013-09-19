@@ -5,8 +5,8 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hazelcastmq</artifactId>
-    <groupId>org.mpilone</groupId>
+    <artifactId>hazelcastmq-parent</artifactId>
+    <groupId>org.mpilone.hazelcastmq</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
 
@@ -21,18 +21,23 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.mpilone</groupId>
+      <groupId>org.mpilone.hazelcastmq</groupId>
       <artifactId>hazelcastmq-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.mpilone</groupId>
-      <artifactId>hazelcastmq-stomper</artifactId>
+      <groupId>org.mpilone.hazelcastmq</groupId>
+      <artifactId>hazelcastmq-jms</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.mpilone</groupId>
-      <artifactId>hazelcastmq-stompee</artifactId>
+      <groupId>org.mpilone.hazelcastmq</groupId>
+      <artifactId>hazelcastmq-stomp-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.mpilone.hazelcastmq</groupId>
+      <artifactId>hazelcastmq-stomp-client</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
