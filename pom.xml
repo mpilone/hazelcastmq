@@ -1,29 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project
-  xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.mpilone</groupId>
-  <artifactId>hazelcastmq</artifactId>
+  <groupId>org.mpilone.hazelcastmq</groupId>
+  <artifactId>hazelcastmq-parent</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <modules>
-    <module>hazelcastmq-core</module>
     <module>hazelcastmq-examples</module>
-    <module>hazelcastmq-stomper</module>
-    <module>hazelcastmq-stompee</module>
+    <module>hazelcastmq-stomp-client</module>
     <module>hazelcastmq-stomp-shared</module>
+    <module>hazelcastmq-stomp-server</module>
+    <!--
+   <module>hazelcastmq-camel</module>
+    -->
+    <module>hazelcastmq-core</module>
+    <module>hazelcastmq-jms</module>
   </modules>
 
-  <name>HazelcastMQ</name>
+  <name>HazelcastMQ Parent</name>
   <url>https://github.com/mpilone/hazelcastmq</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hazelcast.version>2.5</hazelcast.version>
+    <hazelcast.version>3.0-SNAPSHOT</hazelcast.version>
     <slf4j.version>1.7.2</slf4j.version>
   </properties>
 
