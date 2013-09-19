@@ -4,9 +4,10 @@
   <comment>NO_M2ECLIPSE_SUPPORT: Project files created with the maven-eclipse-plugin are not supported in M2Eclipse.</comment>
   <projects>
     <project>hazelcastmq-core</project>
-    <project>hazelcastmq-stomper</project>
-    <project>hazelcastmq-stompee</project>
+    <project>hazelcastmq-jms</project>
+    <project>hazelcastmq-stomp-server</project>
     <project>hazelcastmq-stomp-shared</project>
+    <project>hazelcastmq-stomp-client</project>
   </projects>
   <buildSpec>
     <buildCommand>
