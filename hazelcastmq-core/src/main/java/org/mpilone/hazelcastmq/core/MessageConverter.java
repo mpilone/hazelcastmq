@@ -1,9 +1,6 @@
-package org.mpilone.hazelcastmq;
+package org.mpilone.hazelcastmq.core;
 
 import java.io.IOException;
-
-import javax.jms.JMSException;
-import javax.jms.Message;
 
 /**
  * A converter responsible for converting a JMS message into a wire format to be
@@ -22,9 +19,9 @@ public interface MessageConverter {
    *          the message to convert
    * @return the message as bytes
    * @throws IOException
-   * @throws JMSException
    */
-  public byte[] fromMessage(Message message) throws IOException, JMSException;
+  public byte[] fromMessage(HazelcastMQMessage message)
+      throws HazelcastMQException;
 
   /**
    * Converts the given block of bytes into a JMS message.
@@ -33,8 +30,7 @@ public interface MessageConverter {
    *          the data to convert
    * @return the bytes as a message
    * @throws IOException
-   * @throws JMSException
    */
-  public Message toMessage(byte[] data) throws IOException, JMSException;
+  public HazelcastMQMessage toMessage(byte[] data) throws HazelcastMQException;
 
 }

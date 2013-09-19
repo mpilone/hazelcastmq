@@ -1,16 +1,24 @@
-package org.mpilone.hazelcastmq;
+package org.mpilone.hazelcastmq.core;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+
 /**
- * The configuration of the HazelcastMQ.
+ * The configuration of the HazelcastMQ instance.
  * 
  * @author mpilone
  */
 public class HazelcastMQConfig {
+
+  /**
+   * The Hazelcast instance to use for all topic and queue management.
+   */
+  private HazelcastInstance hazelcastInstance;
 
   /**
    * The message converter to use for converting JMS messages into and out of
@@ -35,25 +43,14 @@ public class HazelcastMQConfig {
    * <ul>
    * <li>messageConverter: {@link StompLikeMessageConverter}</li>
    * <li>topicMaxMessageCount: 1000</li>
-   * <li>executor: {@link Executors#newCachedThreadPool()}</li>
+   * <li>executor: {@link Executors#newCachedThreadPool()} (lazy initialized)</li>
+   * <li>hazelcastInstance: {@link Hazelcast#newHazelcastInstance()} (lazy
+   * initialized)</li>
    * </ul>
    */
   public HazelcastMQConfig() {
     messageConverter = new StompLikeMessageConverter();
     topicMaxMessageCount = 1000;
-    executor = Executors.newCachedThreadPool(new ThreadFactory() {
-
-      private AtomicLong counter = new AtomicLong();
-      private ThreadFactory delegate = Executors.defaultThreadFactory();
-
-      @Override
-      public Thread newThread(Runnable r) {
-        Thread t = delegate.newThread(r);
-        t.setName("hazelcastmq-" + counter.incrementAndGet());
-        t.setDaemon(true);
-        return t;
-      }
-    });
   }
 
   /**
@@ -101,15 +98,56 @@ public class HazelcastMQConfig {
    * @return the executor service
    */
   public ExecutorService getExecutor() {
+    if (executor == null) {
+      executor = Executors.newCachedThreadPool(new ThreadFactory() {
+        private AtomicLong counter = new AtomicLong();
+        private ThreadFactory delegate = Executors.defaultThreadFactory();
+
+        @Override
+        public Thread newThread(Runnable r) {
+          Thread t = delegate.newThread(r);
+          t.setName("hazelcastmq-" + counter.incrementAndGet());
+          t.setDaemon(true);
+          return t;
+        }
+      });
+    }
+
     return executor;
   }
 
   /**
+   * Sets the executor to use for all background threads.
    * 
    * @param executor
+   *          the executor instance
    */
   public void setExecutor(ExecutorService executor) {
     this.executor = executor;
+  }
+
+  /**
+   * Returns the Hazelcast instance that this MQ will use for all queue and
+   * topic operations.
+   * 
+   * @return the Hazelcast instance
+   */
+  public HazelcastInstance getHazelcastInstance() {
+    if (hazelcastInstance == null) {
+      hazelcastInstance = Hazelcast.newHazelcastInstance();
+    }
+    return hazelcastInstance;
+  }
+
+  /**
+   * Sets the Hazelcast instance that this MQ will use for all queue and topic
+   * operations.
+   * 
+   * @param hazelcastInstance
+   *          the Hazelcast instance
+   */
+  public void setHazelcastInstance(HazelcastInstance hazelcastInstance) {
+    this.hazelcastInstance = hazelcastInstance;
   }
 
 }

@@ -1,30 +1,26 @@
+<?xml version="1.0"?>
 <project
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
   xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
-    <groupId>org.mpilone</groupId>
-    <artifactId>hazelcastmq</artifactId>
+    <artifactId>hazelcastmq-parent</artifactId>
+    <groupId>org.mpilone.hazelcastmq</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-
+  
   <artifactId>hazelcastmq-core</artifactId>
-  <packaging>jar</packaging>
-
   <name>HazelcastMQ Core</name>
+  
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
 
   <dependencies>
-    <!-- Compile -->
-    <dependency>
-      <groupId>com.hazelcast</groupId>
-      <artifactId>hazelcast</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.hazelcast</groupId>
       <artifactId>hazelcast-client</artifactId>
-      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -39,32 +35,12 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- Provided -->
-    <dependency>
-      <groupId>org.apache.geronimo.specs</groupId>
-      <artifactId>geronimo-jms_1.1_spec</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- Test -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
-<!-- 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
- -->
 </project>
