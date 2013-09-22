@@ -8,23 +8,23 @@ should be good enough for most use cases).
 However the basics are there and it 
 
 HazelcastMQ is divided into multiple components:
-* hazelcastmq-core: The core MQ library that provides a JMS 2.0-like API for sending
+* _hazelcastmq-core_: The core MQ library that provides a JMS 2.0-like API for sending
 and receiving messages. Core has no dependencies on JMS and can be used as a light
 weight messaging framework.
-* hazelcastmq-jms: A JMS 1.1 implementation which maps to HazelcastMQ Core. While 
+* _hazelcastmq-jms_: A JMS 1.1 implementation which maps to HazelcastMQ Core. While 
 not a full implementation of the specification, connections, sessions, producers, and 
 consumers on queues and topics are implemented. HazelcastMQ JMS can be used with 
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component to provide a drop-in replacement
 for existing brokers.
-* hazelcastmq-stomp-server: A [STOMP](http://stomp.github.com) 
+* _hazelcastmq-stomp-server_: A [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
 to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ Stomp Server is not
 required when using the Core or JMS facilities but may be used to support a wider 
 range of messaging endpoints. In the future this implementation may be replaced with
 [Stilts](http://stilts.projectodd.org/stilts-stomp/).
-* hazelcastmq-stomp-client:  A [STOMP](http://stomp.github.com) 
+* _hazelcastmq-stomp-client_:  A [STOMP](http://stomp.github.com) 
 client which allows STOMP frames to be sent and received from any STOMP server. 
 This allows Java components to use the STOMP API rather than the JMS API if desired.
 While HazelcastMQ Stomp Client was specifically written for HazelcastMQ Stomp Server as 
@@ -85,7 +85,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Protocol version negotiation
 * Probably 100 other things I've missed
 
-## Not Going to Work Any Time Soon
+### Not Going to Work Any Time Soon
 * Transaction message reception or ACK/NACK (i.e. always auto ACK)
 
 ## STOMP Client Features (in hazelcastmq-stomp-client)
@@ -184,7 +184,8 @@ View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastm
 
 ### More Examples
 There are many more examples in the 
-[hazelcastmq-examples](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/) module.
+[hazelcastmq-examples](https://github.com/mpilone/hazelcastmq/tree/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example) 
+module.
 
 ## Future Work
 
