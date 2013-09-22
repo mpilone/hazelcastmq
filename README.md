@@ -1,31 +1,53 @@
 # HazelcastMQ
 
-HazelcastMQ is a JMS Provider for [Hazelcast](http://www.hazelcast.com/), an in-memory 
-data grid. HazelcastMQ emphasizes simplicity over performance and currently does not implement
-the entire JMS specification. However the basics are there and it can be used with 
+HazelcastMQ provides a simple messaging layer on top of the basic Queue and Topic data 
+structures provided by Hazelcast [Hazelcast](http://www.hazelcast.com/), an in-memory 
+data grid. HazelcastMQ emphasizes simplicity over performance (although performance 
+should be good enough for most use cases). 
+
+However the basics are there and it 
+
+HazelcastMQ is divided into multiple components:
+* hazelcastmq-core: The core MQ library that provides a JMS 2.0-like API for sending
+and receiving messages. Core has no dependencies on JMS and can be used as a light
+weight messaging framework.
+* hazelcastmq-jms: A JMS 1.1 implementation which maps to HazelcastMQ Core. While 
+not a full implementation of the specification, connections, sessions, producers, and 
+consumers on queues and topics are implemented. HazelcastMQ JMS can be used with 
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
-[Apache Camel's](http://camel.apache.org/) JMS Component.
-
-HazelcastMQ also contains HazelcastMQ Stomper, a [STOMP](http://stomp.github.com) 
-server which maps all SEND and SUBSCRIBE commands to JMS
+[Apache Camel's](http://camel.apache.org/) JMS Component to provide a drop-in replacement
+for existing brokers.
+* hazelcastmq-stomp-server: A [STOMP](http://stomp.github.com) 
+server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
-to interact with the MQ capabilities of HazelcastMQ. While Stomper was specifically written
-for HazelcastMQ as the JMS provider, it should work with any JMS provider. Stomper is not
-required when using the JMS facilities but may be used to support a wider range of messaging 
-endpoints.
-
-HazelcastMQ also contains HazelcastMQ Stompee, a [STOMP](http://stomp.github.com) 
+to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ Stomp Server is not
+required when using the Core or JMS facilities but may be used to support a wider 
+range of messaging endpoints. In the future this implementation may be replaced with
+[Stilts](http://stilts.projectodd.org/stilts-stomp/).
+* hazelcastmq-stomp-client:  A [STOMP](http://stomp.github.com) 
 client which allows STOMP frames to be sent and received from any STOMP server. 
 This allows Java components to use the STOMP API rather than the JMS API if desired.
-While Stompee was specifically written for HazelcastMQ Stomper as the server, it should 
-work with any STOMP server. Stompee is not required when using the JMS or Stomper facilities and
-in most cases doesn't provide much over simply using the JMS APIs directly.
+While HazelcastMQ Stomp Client was specifically written for HazelcastMQ Stomp Server as 
+the server side implementation, it should work with any STOMP server. The Stomp Client 
+is not required when using the JMS or Stomp facilities and in most cases doesn't 
+provide much over simply using the JMS APIs directly.
 
 ## Rationale
 
 Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast-jms-provider.html) for now.
 
-## JMS Features (in hazelcastmq-core)
+## Core Features (in hazelcastmq-core)
+
+### Implemented
+* Send and receive from queues, topics, and temporary queues
+* Transactional message sending (per thread, not context due to Hazelcast limitation)
+* Message expiration (in the consumer only)
+* Request/reply pattern using correlation IDs and reply-to destinations
+
+### Not Going to Work Any Time Soon
+* Transactional message reception
+
+## JMS Features (in hazelcastmq-jms)
 
 ### Implemented
 * JMS 1.1 APIs implemented
@@ -47,7 +69,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Durable subscriptions
 * Message priority
 
-## STOMP Server Features (in hazelcastmq-stomper)
+## STOMP Server Features (in hazelcastmq-stomp-server)
 
 ### Implemented
 * STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
@@ -66,7 +88,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 ## Not Going to Work Any Time Soon
 * Transaction message reception or ACK/NACK (i.e. always auto ACK)
 
-## STOMP Client Features (in hazelcastmq-stompee)
+## STOMP Client Features (in hazelcastmq-stomp-client)
 
 ### Implemented
 * STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
@@ -82,7 +104,34 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 
 ## Examples
 
-Using HazelcastMQ is similar to using any JMS provider:
+A code example of sending a message using HazelcastMQ Core is shown below. Normally
+the MQ instance is created at application startup using your DI framework of choice.
+
+    HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+    mqConfig.setHazelcastInstance(hz);
+
+    HazelcastMQInstance mqInstance = HazelcastMQ
+          .newHazelcastMQInstance(mqConfig);
+    HazelcastMQContext mqContext = mqInstance.createContext();
+
+    HazelcastMQMessage msg = new HazelcastMQMessage();
+    msg.setContentAsString("Hello World!");
+    
+    HazelcastMQProducer mqProducer = mqContext.createProducer();
+    mqProducer.send("/queue/example.dest", msg);
+    
+    mqContext.close();
+    mqInstance.shutdown();
+
+Using HazelcastMQ Core is similar to using the JMS 2.0 API (but with no 
+JMS dependencies):
+
+1. Create a HazelcastMQ instance
+2. Create a HazelcastMQContext
+3. Create a message producer or consumer
+4. Send or receive messages
+
+Using HazelcastMQ JMS is similar to using any JMS provider:
 
 1. Create a connection factory
 2. Create a connection
@@ -90,24 +139,24 @@ Using HazelcastMQ is similar to using any JMS provider:
 4. Create a message producer or consumer
 5. Send or receive messages
 
-Using Stomper is a simple layer on the core JMS functionality:
+Using HazelcastMQ Stomp Server is a simple layer on the Core functionality:
 
 1. Create a connection factory
 2. Create a stomper configuration
 3. Create a stomper
 4. Connect with STOMP clients
 
-### Simple Request and Reply
-This example shows a simple request and reply message pattern where both the requester 
-and replier are implemented in the same code.
+### Simple Send and Receive
+This example shows a simple send and receive message pattern where both the producer 
+and consumer are implemented in the same code.
 
-View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/ProducerConsumerRequestReply.java).
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/core/SimpleProducerConsumer.java).
 
 ### Spring JmsTemplate
 Of course you can skip a lot of the JMS API by using support libraries such as Spring's 
 JMSTemplate.
 
-View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/SpringJmsTemplateOneWay.java).
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/jms/SpringJmsTemplateOneWay.java).
 
 ### Node Failure
 One of the major benefits of using Hazelcast as the message transport/store is that it 
@@ -116,22 +165,26 @@ node cluster and how messages can be produced and consumed even in the event of 
 or multiple node failure in the cluster. If you've ever worked with a clustered JMS broker 
 before, you'll appreciate the simplicity of this configuration.
 
-View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/NodeFailure.java).
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/core/NodeFailure.java).
 
 ### STOMP Send and STOMP Receive
-Using the Stomper server on top of HazelcastMQ (or any JMS Provider) allows Hazelcast to be 
-used as a distributed messaging system for components written in any language. The STOMP protocol
-is lightweight and simple to understand.
+Using the Stomp Server on top of HazelcastMQ Core allows Hazelcast to be 
+used as a distributed messaging system for components written in any language. The STOMP 
+protocol is lightweight and simple to understand.
 
-View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/StomperStompeeOneWay.java).
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/stomp/StompToStompOneWay.java).
 
 ### STOMP Send and JMS Receive
-Using the Stomper server on top of HazelcastMQ (or any JMS Provider) allows a STOMP frame 
+Using the Stomp Server on top of HazelcastMQ Core allows a STOMP frame 
 to be sent from a STOMP client and then consumed by a JMS consumer as a JMS Message. 
 This allows non-Java components to produce and consumer messages while allowing Java 
 components to use the rich JMS API and enterprise integration patterns.
 
-View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/StomperStompeeJmsOneWay.java).
+View the [example](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/stomp/StompToJmsOneWay.java).
+
+### More Examples
+There are many more examples in the 
+[hazelcastmq-examples](https://github.com/mpilone/hazelcastmq/blob/master/hazelcastmq-examples/) module.
 
 ## Future Work
 
