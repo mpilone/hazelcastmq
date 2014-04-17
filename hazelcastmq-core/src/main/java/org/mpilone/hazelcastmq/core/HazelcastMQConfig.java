@@ -21,10 +21,10 @@ public class HazelcastMQConfig {
   private HazelcastInstance hazelcastInstance;
 
   /**
-   * The message converter to use for converting JMS messages into and out of
-   * Hazelcast.
+   * The message converter to use for converting HazelcastMQ messages into and
+   * out of Hazelcast.
    */
-  private MessageConverter messageConverter = new StompLikeMessageConverter();
+  private MessageConverter messageConverter = new NoOpMessageConverter();
 
   /**
    * The maximum number of messages to buffer during topic reception before
@@ -41,7 +41,7 @@ public class HazelcastMQConfig {
   /**
    * Constructs the configuration with the following defaults:
    * <ul>
-   * <li>messageConverter: {@link StompLikeMessageConverter}</li>
+   * <li>messageConverter: {@link NoOpMessageConverter}</li>
    * <li>topicMaxMessageCount: 1000</li>
    * <li>executor: {@link Executors#newCachedThreadPool()} (lazy initialized)</li>
    * <li>hazelcastInstance: {@link Hazelcast#newHazelcastInstance()} (lazy
@@ -54,21 +54,25 @@ public class HazelcastMQConfig {
   }
 
   /**
-   * Returns the message marshaller to use for marshalling JMS messages into and
-   * out of Hazelcast. The default is the {@link StompLikeMessageConverter}.
-   * 
-   * @return the messageMarshaller the message marshaller
+   * Returns the message converter to use for converter HazelcastMQ messages
+   * into and out of the objects/data sent into Hazelcast. The default is the
+   * {@link NoOpMessageConverter} so the original {@link HazelcastMQMessage} is
+   * simply passed through to Hazelcast for internal serialization.
+    * 
+   * @return the message converter
    */
   public MessageConverter getMessageConverter() {
     return messageConverter;
   }
 
   /**
-   * @param messageMarshaller
-   *          the message marshaller
+   * Sets the message converter to use for converter HazelcastMQ messages into
+   * and out of the objects/data sent into Hazelcast.
+   *
+   * @param messageConverter the message converter
    */
-  public void setMessageConverter(MessageConverter messageMarshaller) {
-    this.messageConverter = messageMarshaller;
+  public void setMessageConverter(MessageConverter messageConverter) {
+    this.messageConverter = messageConverter;
   }
 
   /**
@@ -100,8 +104,8 @@ public class HazelcastMQConfig {
   public ExecutorService getExecutor() {
     if (executor == null) {
       executor = Executors.newCachedThreadPool(new ThreadFactory() {
-        private AtomicLong counter = new AtomicLong();
-        private ThreadFactory delegate = Executors.defaultThreadFactory();
+        private final AtomicLong counter = new AtomicLong();
+        private final ThreadFactory delegate = Executors.defaultThreadFactory();
 
         @Override
         public Thread newThread(Runnable r) {

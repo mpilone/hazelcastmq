@@ -1,5 +1,6 @@
 package org.mpilone.hazelcastmq.core;
 
+import java.io.Serializable;
 import java.nio.charset.Charset;
 
 /**
@@ -7,7 +8,7 @@ import java.nio.charset.Charset;
  *
  * @author mpilone
  */
-public class HazelcastMQMessage {
+public class HazelcastMQMessage implements Serializable {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private byte[] body;

@@ -30,18 +30,18 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The parent context of this consumer.
    */
-  private DefaultHazelcastMQContext hazelcastMQContext;
+  private final DefaultHazelcastMQContext hazelcastMQContext;
 
   /**
    * The locally cached context configuration.
    */
-  private HazelcastMQConfig config;
+  private final HazelcastMQConfig config;
 
   /**
    * The unique ID of this consumer. The ID is generated using a Hazelcast
    * {@link IdGenerator} so the ID will be unique across the entire cluster.
    */
-  private String id;
+  private final String id;
 
   /**
    * The flag which indicates if the consumer is currently active, that is, the
@@ -186,7 +186,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       // if we don't have a message listener. If this has a performance impact
       // on Hazelcast we may want to only listen if there is a registered
       // message listener that we need to notify.
-      IQueue<byte[]> queue = hazelcastMQContext.resolveQueue(destination);
+      IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
       if (queue != null) {
         // Get the raw queue outside of any transactional context so we can add
         // an item listener.
@@ -196,7 +196,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
       // If we are a consumer on a topic, immediately start listening for events
       // so we can buffer them for (a)synchronous consumption.
-      ITopic<byte[]> topic = hazelcastMQContext.resolveTopic(destination);
+      ITopic<Object> topic = hazelcastMQContext.resolveTopic(destination);
       if (topic != null) {
         topicListener = new HzTopicListener(topic);
       }
@@ -295,7 +295,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       receiveLock.lock();
       try {
 
-        IQueue<byte[]> queue = hazelcastMQContext.resolveQueue(destination);
+        IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
 
         if (queue == null && topicListener == null) {
           throw new HazelcastMQException(format(
@@ -305,7 +305,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
           queue = topicListener.getQueue();
         }
 
-        byte[] msgData = strategy.receive(queue);
+        Object msgData = strategy.receive(queue);
         if (msgData != null) {
           msg = config.getMessageConverter().toMessage(msgData);
         }
@@ -333,22 +333,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     return msg;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#receive()
-   */
   @Override
   public HazelcastMQMessage receive() {
     return receive(0, TimeUnit.MILLISECONDS);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#receive(long,
-   * java.util.concurrent.TimeUnit)
-   */
   @Override
   public HazelcastMQMessage receive(long timeout, TimeUnit unit) {
 
@@ -367,22 +356,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#receiveNoWait()
-   */
   @Override
   public HazelcastMQMessage receiveNoWait() {
     return doReceive(new NoWaitReceive());
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#receiveBody(long,
-   * java.util.concurrent.TimeUnit)
-   */
   @Override
   public byte[] receiveBody(long timeout, TimeUnit unit) {
     HazelcastMQMessage msg = receive(timeout, unit);
@@ -395,11 +373,6 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#receiveBodyNoWait()
-   */
   @Override
   public byte[] receiveBodyNoWait() {
     HazelcastMQMessage msg = receiveNoWait();
@@ -419,10 +392,10 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
    * 
    * @author mpilone
    */
-  private class HzQueueListener implements ItemListener<byte[]> {
+  private class HzQueueListener implements ItemListener<Object> {
 
-    private String registrationId;
-    private IQueue<byte[]> queue;
+    private final String registrationId;
+    private final IQueue<Object> queue;
 
     /**
      * Constructs the listener which will listen on the given queue.
@@ -430,7 +403,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * @param queue
      *          the queue to listen to
      */
-    public HzQueueListener(IQueue<byte[]> queue) {
+    public HzQueueListener(IQueue<Object> queue) {
       this.queue = queue;
       registrationId = this.queue.addItemListener(this, false);
     }
@@ -439,14 +412,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       queue.removeItemListener(registrationId);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * com.hazelcast.core.ItemListener#itemAdded(com.hazelcast.core.ItemEvent)
-     */
     @Override
-    public void itemAdded(ItemEvent<byte[]> arg0) {
+    public void itemAdded(ItemEvent<Object> arg0) {
       if (messageListener != null) {
         // Notify the context that this consumer is ready for asynchronous
         // dispatch.
@@ -454,14 +421,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * com.hazelcast.core.ItemListener#itemRemoved(com.hazelcast.core.ItemEvent)
-     */
     @Override
-    public void itemRemoved(ItemEvent<byte[]> arg0) {
+    public void itemRemoved(ItemEvent<Object> arg0) {
       // no op
     }
 
@@ -475,13 +436,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
    * 
    * @author mpilone
    */
-  private class HzTopicListener implements MessageListener<byte[]> {
+  private class HzTopicListener implements MessageListener<Object> {
 
-    private IQueue<byte[]> queue;
-
-    private ITopic<byte[]> msgTopic;
-
-    private String registrationId;
+    private final IQueue<Object> queue;
+    private final ITopic<Object> msgTopic;
+    private final String registrationId;
 
     /**
      * Constructs the topic listener which will listen on the given topic.
@@ -489,11 +448,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * @param topic
      *          the topic to listen to
      */
-    public HzTopicListener(ITopic<byte[]> topic) {
+    public HzTopicListener(ITopic<Object> topic) {
 
       this.queue = QueueTopicProxyFactory
-          .createQueueProxy(new ArrayBlockingQueue<byte[]>(config
-              .getTopicMaxMessageCount()));
+          .createQueueProxy(new ArrayBlockingQueue<Object>(config
+                  .getTopicMaxMessageCount()));
       this.msgTopic = topic;
 
       registrationId = topic.addMessageListener(this);
@@ -505,7 +464,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * 
      * @return the internal buffer queue
      */
-    public IQueue<byte[]> getQueue() {
+    public IQueue<Object> getQueue() {
       return queue;
     }
 
@@ -516,7 +475,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * com.hazelcast.core.MessageListener#onMessage(com.hazelcast.core.Message)
      */
     @Override
-    public void onMessage(Message<byte[]> hzMsg) {
+    public void onMessage(Message<Object> hzMsg) {
       // We always queue the message even if we have a message listener. We'll
       // immediately pull it out of the queue and dispatch in a separate thread.
       // This is important to prevent slow message handlers from blocking topic
@@ -556,7 +515,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      *          the queue to receive from
      * @return the raw message received or null if no message was received
      */
-    public byte[] receive(IQueue<byte[]> queue);
+    public Object receive(IQueue<Object> queue);
 
     /**
      * Returns true as long as the strategy is retryable, that is, as long as
@@ -576,15 +535,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
    */
   private class NoWaitReceive implements ReceiveStrategy {
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #receive(com.hazelcast.core.IQueue)
-     */
     @Override
-    public byte[] receive(IQueue<byte[]> queue) {
+    public Object receive(IQueue<Object> queue) {
       if (closed || !active) {
         return null;
       }
@@ -592,13 +544,6 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       return queue.poll();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #isRetryable()
-     */
     @Override
     public boolean isRetryable() {
       return false;
@@ -628,7 +573,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * #receive(com.hazelcast.core.IQueue)
      */
     @Override
-    public byte[] receive(IQueue<byte[]> queue) {
+    public Object receive(IQueue<Object> queue) {
       if (closed) {
         return null;
       }
@@ -651,13 +596,6 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #isRetryable()
-     */
     @Override
     public boolean isRetryable() {
       return !Thread.interrupted() && timeout > 0 && !closed;
@@ -672,15 +610,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
    */
   private class IndefiniteWaitReceive implements ReceiveStrategy {
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #receive(com.hazelcast.core.IQueue)
-     */
     @Override
-    public byte[] receive(IQueue<byte[]> queue) {
+    public Object receive(IQueue<Object> queue) {
       if (closed) {
         return null;
       }
@@ -700,13 +631,6 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #isRetryable()
-     */
     @Override
     public boolean isRetryable() {
       return !Thread.interrupted() && !closed;

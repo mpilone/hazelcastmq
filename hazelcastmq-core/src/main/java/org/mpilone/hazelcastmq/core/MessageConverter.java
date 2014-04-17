@@ -15,10 +15,10 @@ public interface MessageConverter {
    * 
    * @param message
    *          the message to convert
-   * @return the message as bytes
+   * @return the converted message
    * @throws HazelcastMQException if there is an error converting the message
    */
-  public byte[] fromMessage(HazelcastMQMessage message)
+   Object fromMessage(HazelcastMQMessage message)
       throws HazelcastMQException;
 
   /**
@@ -29,6 +29,6 @@ public interface MessageConverter {
    * @return the bytes as a message
    * @throws HazelcastMQException if there is an error converting the message
    */
-  public HazelcastMQMessage toMessage(byte[] data) throws HazelcastMQException;
+   HazelcastMQMessage toMessage(Object data) throws HazelcastMQException;
 
 }

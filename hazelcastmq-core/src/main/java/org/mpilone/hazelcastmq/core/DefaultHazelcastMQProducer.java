@@ -13,16 +13,16 @@ import com.hazelcast.core.IdGenerator;
 
 class DefaultHazelcastMQProducer implements HazelcastMQProducer {
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  private DefaultHazelcastMQContext hazelcastMQContext;
-  private HazelcastMQConfig config;
+  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final DefaultHazelcastMQContext hazelcastMQContext;
+  private final HazelcastMQConfig config;
+  private final IdGenerator idGenerator;
+
   private String replyTo = null;
   private String correlationId = null;
   private long timeToLive = -1;
-
-  private IdGenerator idGenerator;
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   public DefaultHazelcastMQProducer(DefaultHazelcastMQContext hazelcastMQContext) {
     this.hazelcastMQContext = hazelcastMQContext;
@@ -32,13 +32,6 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
         "hazelcastmqproducer");
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQProducer#send(java.lang.String,
-   * byte[])
-   */
   @Override
   public void send(String destination, byte[] body) {
 
@@ -49,25 +42,11 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     send(destination, msg);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQProducer#send(java.lang.String,
-   * java.lang.String)
-   */
   @Override
   public void send(String destination, String body) {
     send(destination, body.getBytes(UTF_8));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQProducer#send(java.lang.String,
-   * org.mpilone.hazelcastmq.core.HazelcastMQMessage)
-   */
   @Override
   public void send(String destination, HazelcastMQMessage msg) {
 
@@ -88,10 +67,10 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     msg.setId("hazelcastmq-" + idGenerator.newId());
     msg.setDestination(destination);
 
-    byte[] msgData = config.getMessageConverter().fromMessage(msg);
+    Object msgData = config.getMessageConverter().fromMessage(msg);
 
-    BlockingQueue<byte[]> queue = hazelcastMQContext.resolveQueue(destination);
-    ITopic<byte[]> topic = null;
+    BlockingQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
+    ITopic<Object> topic = null;
 
     // Only resolve the topic if we couldn't resolve it as a queue. This is a
     // minor optimization.

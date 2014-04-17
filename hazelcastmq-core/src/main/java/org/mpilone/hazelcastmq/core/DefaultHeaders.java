@@ -1,13 +1,16 @@
 package org.mpilone.hazelcastmq.core;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Set;
 
 /**
+ * Default implementation of HazelcastMQ message headers.
+ *
  * @author mpilone
- * 
  */
-class DefaultHeaders extends HashMap<String, String> implements Headers {
+class DefaultHeaders extends HashMap<String, String> implements Headers,
+    Serializable {
 
   /**
    * Serialization ID.

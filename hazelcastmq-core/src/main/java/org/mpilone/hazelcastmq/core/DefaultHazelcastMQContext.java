@@ -18,12 +18,12 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   /**
    * The set of active temporary queues.
    */
-  private Set<String> temporaryQueues;
+  private final Set<String> temporaryQueues;
 
   /**
    * The set of active temporary topics.
    */
-  private Set<String> temporaryTopics;
+  private final Set<String> temporaryTopics;
 
   /**
    * The Hazelcast transaction context if this context is transactional,
@@ -46,23 +46,23 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   /**
    * The HazelcastMQ configuration for this context.
    */
-  private HazelcastMQConfig config;
+  private final HazelcastMQConfig config;
 
   /**
    * The unique ID of this context. The ID is generated using a Hazelcast
    * {@link IdGenerator} so the ID will be unique across the entire cluster.
    */
-  private String id;
+  private final String id;
 
   /**
    * The map of consumer IDs to active consumers.
    */
-  private Map<String, DefaultHazelcastMQConsumer> consumerMap;
+  private final Map<String, DefaultHazelcastMQConsumer> consumerMap;
 
   /**
    * The parent HazelcastMQ instance that owns this topic.
    */
-  private DefaultHazelcastMQInstance hazelcastMQInstance;
+  private final DefaultHazelcastMQInstance hazelcastMQInstance;
 
   /**
    * The dispatcher which calls consumers that are ready to push a message to
@@ -269,11 +269,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     active = true;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#stop()
-   */
   @Override
   public void stop() {
     if (!active) {
@@ -292,24 +287,19 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   public void destroyTemporaryDestination(String destination) {
     if (temporaryQueues.remove(destination)) {
-      IQueue<byte[]> queue = resolveQueue(destination);
+      IQueue<Object> queue = resolveQueue(destination);
       if (queue != null) {
         queue.destroy();
       }
     }
     else if (temporaryTopics.remove(destination)) {
-      ITopic<byte[]> topic = resolveTopic(destination);
+      ITopic<Object> topic = resolveTopic(destination);
       if (topic != null) {
         topic.destroy();
       }
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#createTemporaryQueue()
-   */
   @Override
   public String createTemporaryQueue() {
     IdGenerator idGenerator = config.getHazelcastInstance().getIdGenerator(
@@ -324,11 +314,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     return destination;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#createTemporaryTopic()
-   */
   @Override
   public String createTemporaryTopic() {
     IdGenerator idGenerator = config.getHazelcastInstance().getIdGenerator(
@@ -371,7 +356,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    *          the destination to be resolved
    * @return the resolved queue or null
    */
-  public IQueue<byte[]> resolveQueue(String destination) {
+  public IQueue<Object> resolveQueue(String destination) {
     String queueName = null;
 
     if (destination.startsWith(Headers.DESTINATION_QUEUE_PREFIX)) {
@@ -389,7 +374,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     }
 
     else if (txnContext != null) {
-      TransactionalQueue<byte[]> txnQueue = txnContext.getQueue(queueName);
+      TransactionalQueue<Object> txnQueue = txnContext.getQueue(queueName);
       return QueueTopicProxyFactory.createQueueProxy(txnQueue);
     }
 
@@ -408,7 +393,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    *          the destination to be resolved
    * @return the resolved topic or null
    */
-  public ITopic<byte[]> resolveTopic(String destination) {
+  public ITopic<Object> resolveTopic(String destination) {
     String topicName = null;
 
     if (destination.startsWith(Headers.DESTINATION_TOPIC_PREFIX)) {
@@ -425,14 +410,14 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
       return null;
     }
 
-    ITopic<byte[]> topic = config.getHazelcastInstance().getTopic(topicName);
+    ITopic<Object> topic = config.getHazelcastInstance().getTopic(topicName);
     if (txnContext != null) {
       // Hazelcast as of v3.0 doesn't support transactional topics.
       // Therefore we fake it by writing to a transactional queue and on
       // commit, relaying all the messages in the queue to the correct
       // topic. This has the overhead of an extra serialization round
       // trip, but it is better than no topic transactions.
-      TransactionalQueue<byte[]> txnQueue = txnContext
+      TransactionalQueue<Object> txnQueue = txnContext
           .getQueue(DefaultHazelcastMQInstance.TXN_TOPIC_QUEUE_NAME);
       return QueueTopicProxyFactory.createTopicProxy(txnQueue, topic);
     }

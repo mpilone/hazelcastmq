@@ -19,11 +19,16 @@ import java.nio.charset.Charset;
  */
 public class StompLikeMessageConverter implements MessageConverter {
 
+  /**
+   * The UTF-8 character set used for all conversions.
+   */
   private final static Charset UTF_8 = Charset.forName("UTF-8");
 
   private static final String MESSAGE_COMMAND = "HAZELCASTMQ-MESSAGE";
 
-  private static final String HEADER_CONTENT_LENGTH = "stomp-converter-content-length";
+  private static final String HEADER_CONTENT_LENGTH =
+      "stomp-converter-content-length";
+
   /**
    * The NULL character to write at the end of STOMP message.
    */
@@ -31,19 +36,8 @@ public class StompLikeMessageConverter implements MessageConverter {
 
   private static final char NEWLINE = '\n';
 
-  /**
-   * The UTF-8 character set used for all conversions.
-   */
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.prss.contentdepot.integration.util.camel.hazelcastjms.MessageMarshaller
-   * #marshal(javax.jms.Message)
-   */
   @Override
-  public byte[] fromMessage(HazelcastMQMessage message)
+  public Object fromMessage(HazelcastMQMessage message)
       throws HazelcastMQException {
     try {
       return doFromMessage(message);
@@ -117,19 +111,12 @@ public class StompLikeMessageConverter implements MessageConverter {
     outstream.write(NEWLINE);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.prss.contentdepot.integration.util.camel.hazelcastmq.ExchangeMarshaller
-   * #unmarshal(java.io.InputStream, org.apache.camel.Exchange)
-   */
   @Override
-  public HazelcastMQMessage toMessage(byte[] msgData)
+  public HazelcastMQMessage toMessage(Object msgData)
       throws HazelcastMQException {
 
     try {
-      return doToMessage(msgData);
+      return doToMessage((byte[]) msgData);
     }
     catch (IOException ex) {
       throw new HazelcastMQException(
