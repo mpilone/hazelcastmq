@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.io.IOException;
-
 /**
  * A converter responsible for converting a JMS message into a wire format to be
  * sent via the HazelcastMQ. It is assumed that the same converter
@@ -18,7 +16,7 @@ public interface MessageConverter {
    * @param message
    *          the message to convert
    * @return the message as bytes
-   * @throws IOException
+   * @throws HazelcastMQException if there is an error converting the message
    */
   public byte[] fromMessage(HazelcastMQMessage message)
       throws HazelcastMQException;
@@ -29,7 +27,7 @@ public interface MessageConverter {
    * @param data
    *          the data to convert
    * @return the bytes as a message
-   * @throws IOException
+   * @throws HazelcastMQException if there is an error converting the message
    */
   public HazelcastMQMessage toMessage(byte[] data) throws HazelcastMQException;
 

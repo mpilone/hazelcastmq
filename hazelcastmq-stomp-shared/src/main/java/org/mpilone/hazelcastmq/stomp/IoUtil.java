@@ -39,7 +39,7 @@ public class IoUtil {
   /**
    * Closes the given instance, ignoring any exceptions.
    * 
-   * @param closeable
+   * @param closeable the closeable to close
    */
   public static void safeClose(Closeable closeable) {
     try {
@@ -53,7 +53,7 @@ public class IoUtil {
   /**
    * Closes the given instance, ignoring any exceptions.
    * 
-   * @param closeable
+   * @param socket the socket to close
    */
   public static void safeClose(Socket socket) {
     try {
@@ -67,7 +67,7 @@ public class IoUtil {
   /**
    * Closes the given instance, ignoring any exceptions.
    * 
-   * @param closeable
+   * @param socket the socke to close
    */
   public static void safeClose(ServerSocket socket) {
     try {

@@ -28,10 +28,7 @@ public class HazelcastMQJmsConnectionFactory implements ConnectionFactory {
   /**
    * Constructs the factory with the given Hazelcast instance and configuration.
    * 
-   * @param hazelcast
-   *          the Hazelcast instance to use for all message passing
-   * @param config
-   *          the configuration of the MQ layer
+   * @param config  the configuration of the MQ layer
    */
   public HazelcastMQJmsConnectionFactory(HazelcastMQJmsConfig config) {
     super();

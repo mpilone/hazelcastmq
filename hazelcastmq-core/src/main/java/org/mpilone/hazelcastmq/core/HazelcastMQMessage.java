@@ -2,6 +2,11 @@ package org.mpilone.hazelcastmq.core;
 
 import java.nio.charset.Charset;
 
+/**
+ * A message to be sent over HazelcastMQ containing headers and a body.
+ *
+ * @author mpilone
+ */
 public class HazelcastMQMessage {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
@@ -13,10 +18,8 @@ public class HazelcastMQMessage {
   }
 
   /**
-   * @param id
-   * @param destination
-   * @param contentType
-   * @param body
+   * @param headers the headers for the message
+   * @param body the body of the message
    */
   public HazelcastMQMessage(Headers headers, byte[] body) {
     super();
@@ -55,7 +58,7 @@ public class HazelcastMQMessage {
   }
 
   /**
-   * @return the content
+   * @return the body of the message
    */
   public byte[] getBody() {
     return body;

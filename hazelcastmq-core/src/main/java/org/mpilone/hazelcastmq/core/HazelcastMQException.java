@@ -1,5 +1,10 @@
 package org.mpilone.hazelcastmq.core;
 
+/**
+ * An exception raised by HazelcastMQ.
+ *
+ * @author mpilone
+ */
 public class HazelcastMQException extends RuntimeException {
 
   /**
@@ -8,20 +13,22 @@ public class HazelcastMQException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
   /**
-   * @param arg0
-   * @param arg1
+   * Constructs the exception.
+   *
+   * @param message the exception message
+   * @param cause the root cause exception
    */
-  public HazelcastMQException(String arg0, Throwable arg1) {
-    super(arg0, arg1);
-    // TODO Auto-generated constructor stub
+  public HazelcastMQException(String message, Throwable cause) {
+    super(message, cause);
   }
 
   /**
-   * @param arg0
+   * Constructs the exception with no root cause.
+   *
+   * @param message the exception message
    */
-  public HazelcastMQException(String arg0) {
-    super(arg0);
-    // TODO Auto-generated constructor stub
+  public HazelcastMQException(String message) {
+    super(message);
   }
 
 }

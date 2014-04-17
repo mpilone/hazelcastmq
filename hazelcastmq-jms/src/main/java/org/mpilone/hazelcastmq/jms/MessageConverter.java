@@ -1,7 +1,5 @@
 package org.mpilone.hazelcastmq.jms;
 
-import java.io.IOException;
-
 import javax.jms.JMSException;
 import javax.jms.Message;
 
@@ -25,8 +23,7 @@ public interface MessageConverter {
    * @param message
    *          the message to convert
    * @return the MQ message
-   * @throws IOException
-   * @throws JMSException
+   * @throws JMSException if there is a problem converting the message
    */
   public HazelcastMQMessage fromJmsMessage(Message message) throws JMSException;
 
@@ -36,8 +33,7 @@ public interface MessageConverter {
    * @param mqMsg
    *          the MQ message to convert
    * @return the JMS message
-   * @throws IOException
-   * @throws JMSException
+   * @throws JMSException if there is a problem converting the message
    */
   public Message toJmsMessage(HazelcastMQMessage mqMsg) throws JMSException;
 

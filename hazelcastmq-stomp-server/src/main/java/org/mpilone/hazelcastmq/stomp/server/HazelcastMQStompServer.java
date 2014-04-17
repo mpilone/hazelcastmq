@@ -12,29 +12,29 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.stomp.IoUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A STOMP server which uses a JMS {@link ConnectionFactory} to create message
- * producers and consumers. The server is started automatically at construction
- * and will terminate when the {@link #shutdown()} method is called.
- * 
+ * A STOMP server backed by {@link HazelcastMQ}. The server is started
+ * automatically at construction and will terminate when the {@link #shutdown()}
+ * method is called.
+  * 
  * @author mpilone
- * 
  */
 public class HazelcastMQStompServer {
 
   /**
    * The configuration of the STOMP server.
    */
-  private HazelcastMQStompServerConfig config;
+  private final HazelcastMQStompServerConfig config;
 
   /**
    * The server socket used to accept new connections.
    */
-  private ServerSocket serverSocket;
+  private final ServerSocket serverSocket;
 
   /**
    * The flag which indicates if the server has been requested to shutdown.
@@ -44,12 +44,12 @@ public class HazelcastMQStompServer {
   /**
    * The shutdown latch that blocks shutdown until complete.
    */
-  private CountDownLatch shutdownLatch;
+  private final CountDownLatch shutdownLatch;
 
   /**
    * The list of actively connected clients.
    */
-  private List<ClientAgent> stomperClients;
+  private final List<ClientAgent> stomperClients;
 
   /**
    * The log for this class.

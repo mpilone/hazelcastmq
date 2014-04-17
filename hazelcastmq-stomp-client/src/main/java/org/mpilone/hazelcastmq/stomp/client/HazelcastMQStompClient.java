@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
  * A STOMP client that can be used with any STOMP server; however it was
  * designed and tested against HazelcastMQ Stomper. To use the client, create a
  * {@link HazelcastMQStompClientConfig} and pass it to
- * {@link HazelcastMQStompClient#HazelcastMQStompee(HazelcastMQStompClientConfig)}. The
- * client will immediately connect to the server and perform the CONNECT
+ * {@link HazelcastMQStompClient#HazelcastMQStompClient(org.mpilone.hazelcastmq.stomp.client.HazelcastMQStompClientConfig) }.
+ * The client will immediately connect to the server and perform the CONNECT
  * handshake. Frames can then be sent with the {@link #send(Frame)} method and
  * received by pull via {@link #receive(long, TimeUnit)} or push via
  * {@link #setFrameListener(FrameListener)}.
