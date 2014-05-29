@@ -15,7 +15,6 @@
   <name>HazelcastMQ Examples</name>
 
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <spring.version>3.2.0.RELEASE</spring.version>
   </properties>
 
@@ -43,6 +42,7 @@
     <dependency>
       <groupId>com.hazelcast</groupId>
       <artifactId>hazelcast-client</artifactId>
+      <version>${hazelcast.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
@@ -54,8 +54,8 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
       <scope>runtime</scope>
-      <optional>true</optional>
     </dependency>
 
     <!-- Provided -->
@@ -65,14 +65,4 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
-  <!-- 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
-   -->
 </project>
