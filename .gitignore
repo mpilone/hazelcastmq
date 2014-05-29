@@ -3,3 +3,4 @@
 attic
 
 hazelcastmq-core/.classpath
+/netty-stomp/target/

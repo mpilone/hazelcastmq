@@ -17,6 +17,7 @@
     -->
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-jms</module>
+    <module>netty-stomp</module>
   </modules>
 
   <name>HazelcastMQ Parent</name>
@@ -26,30 +27,11 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <hazelcast.version>3.2</hazelcast.version>
     <slf4j.version>1.7.2</slf4j.version>
+    <junit.version>4.11</junit.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>com.hazelcast</groupId>
-        <artifactId>hazelcast</artifactId>
-        <version>${hazelcast.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.hazelcast</groupId>
-        <artifactId>hazelcast-client</artifactId>
-        <version>${hazelcast.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-simple</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
       <dependency>
         <groupId>org.apache.geronimo.specs</groupId>
         <artifactId>geronimo-jms_1.1_spec</artifactId>
