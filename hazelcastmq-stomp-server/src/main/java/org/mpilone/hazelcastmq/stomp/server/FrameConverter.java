@@ -1,8 +1,8 @@
 package org.mpilone.hazelcastmq.stomp.server;
 
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
-import org.mpilone.hazelcastmq.stomp.Command;
-import org.mpilone.hazelcastmq.stomp.Frame;
+import org.mpilone.stomp.Command;
+import org.mpilone.stomp.Frame;
 
 /**
  * Converts a STOMP frame into a {@link HazelcastMQMessage} and vice versa. All

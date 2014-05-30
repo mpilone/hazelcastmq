@@ -1,6 +1,6 @@
-package org.mpilone.stomp.shared;
+package org.mpilone.stomp;
 
-import static org.mpilone.stomp.shared.StompConstants.*;
+import static org.mpilone.stomp.StompConstants.*;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;

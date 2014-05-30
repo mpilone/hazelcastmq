@@ -1,9 +1,9 @@
 
 package org.mpilone.stomp.server;
 
-import org.mpilone.stomp.shared.FrameDebugHandler;
-import org.mpilone.stomp.shared.StompFrameDecoder;
-import org.mpilone.stomp.shared.StompFrameEncoder;
+import org.mpilone.stomp.FrameDebugHandler;
+import org.mpilone.stomp.StompFrameDecoder;
+import org.mpilone.stomp.StompFrameEncoder;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;

@@ -8,12 +8,11 @@ import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.Assert;
 import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConfig;
 import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConnectionFactory;
-import org.mpilone.hazelcastmq.stomp.Frame;
-import org.mpilone.hazelcastmq.stomp.FrameBuilder;
-import org.mpilone.hazelcastmq.stomp.client.HazelcastMQStompClient;
-import org.mpilone.hazelcastmq.stomp.client.HazelcastMQStompClientConfig;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
+import org.mpilone.stomp.Frame;
+import org.mpilone.stomp.FrameBuilder;
+import org.mpilone.stomp.client.BasicStompClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +51,7 @@ public class StompToJmsOneWay {
     // Create a Hazelcast instance.
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
     try {
@@ -71,15 +71,13 @@ public class StompToJmsOneWay {
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      HazelcastMQStompClientConfig stompClientConfig = new HazelcastMQStompClientConfig(
-          "localhost", stompConfig.getPort());
-      HazelcastMQStompClient stompClient = new HazelcastMQStompClient(
-          stompClientConfig);
+      BasicStompClient stompClient = new BasicStompClient();
+      stompClient.connect("localhost", stompConfig.getPort());
 
       // Send a message to a queue.
       Frame frame = FrameBuilder.send("/queue/demo.test", "Hello World!")
           .build();
-      stompClient.send(frame);
+      stompClient.write(frame);
 
       // Now create a JMS consumer to consume that message.
       HazelcastMQJmsConfig jmsConfig = new HazelcastMQJmsConfig();
@@ -108,10 +106,10 @@ public class StompToJmsOneWay {
       connection.close();
 
       // Shutdown the client.
-      stompClient.shutdown();
+      stompClient.disconnect();
 
       // Shutdown the server.
-      log.info("Shutting down Stomper.");
+      log.info("Shutting down STOMP server.");
       stompServer.shutdown();
     }
     finally {

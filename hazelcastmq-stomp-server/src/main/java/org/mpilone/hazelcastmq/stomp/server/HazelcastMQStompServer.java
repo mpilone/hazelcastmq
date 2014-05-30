@@ -1,21 +1,19 @@
 package org.mpilone.hazelcastmq.stomp.server;
 
-import static java.lang.String.format;
-import static org.mpilone.hazelcastmq.stomp.IoUtil.safeAwait;
 
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
-import org.mpilone.hazelcastmq.stomp.IoUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.stomp.server.*;
+import org.mpilone.stomp.StompFrameDecoder;
+import org.mpilone.stomp.StompFrameEncoder;
+import org.slf4j.*;
+
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
  * A STOMP server backed by {@link HazelcastMQ}. The server is started
@@ -27,34 +25,23 @@ import org.slf4j.LoggerFactory;
 public class HazelcastMQStompServer {
 
   /**
+   * The log for this class.
+   */
+  private final Logger log = LoggerFactory.getLogger(
+      HazelcastMQStompServer.class);
+
+  /**
    * The configuration of the STOMP server.
    */
   private final HazelcastMQStompServerConfig config;
 
   /**
-   * The server socket used to accept new connections.
+   * The server channel used to accept new connections.
    */
-  private final ServerSocket serverSocket;
+  private Channel channel;
 
-  /**
-   * The flag which indicates if the server has been requested to shutdown.
-   */
-  private volatile boolean shutdown;
-
-  /**
-   * The shutdown latch that blocks shutdown until complete.
-   */
-  private final CountDownLatch shutdownLatch;
-
-  /**
-   * The list of actively connected clients.
-   */
-  private final List<ClientAgent> stomperClients;
-
-  /**
-   * The log for this class.
-   */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private  NioEventLoopGroup bossGroup;
+  private  NioEventLoopGroup workerGroup;
 
   /**
    * Constructs the stomper STOMP server which will immediately begin listening
@@ -65,20 +52,42 @@ public class HazelcastMQStompServer {
    * @throws IOException
    *           if the server socket could not be properly initialized
    */
-  public HazelcastMQStompServer(HazelcastMQStompServerConfig config)
+  public HazelcastMQStompServer(final HazelcastMQStompServerConfig config)
       throws IOException {
     this.config = config;
 
-    serverSocket = new ServerSocket(config.getPort());
-    stomperClients = Collections.synchronizedList(new ArrayList<ClientAgent>());
-    shutdownLatch = new CountDownLatch(1);
+    bossGroup = new NioEventLoopGroup();
+    workerGroup = new NioEventLoopGroup();
 
-    config.getExecutor().execute(new Runnable() {
-      @Override
-      public void run() {
-        runServerLoop();
-      }
-    });
+    ServerBootstrap b = new ServerBootstrap();
+    b.group(bossGroup, workerGroup)
+        .channel(NioServerSocketChannel.class)
+        .childHandler(new ChannelInitializer<SocketChannel>() {
+          @Override
+          public void initChannel(SocketChannel ch) throws Exception {
+            ch.pipeline().addLast(new StompFrameDecoder());
+            ch.pipeline().addLast(new StompFrameEncoder());
+
+            ch.pipeline().addLast(new ConnectFrameHandler());
+            ch.pipeline().addLast(new SendFrameHandler(config));
+            ch.pipeline().addLast(new SubscribeFrameHandler(config));
+            ch.pipeline().addLast(new ReceiptWritingHandler());
+            ch.pipeline().addLast(new DisconnectFrameHandler());
+            ch.pipeline().addLast(new ErrorWritingHandler());
+          }
+        })
+        .option(ChannelOption.SO_BACKLOG, 128)
+        .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+    try {
+      // Bind and start to accept incoming connections.
+      ChannelFuture f = b.bind(config.getPort()).sync();
+      channel = f.channel();
+    }
+    catch (InterruptedException ex) {
+      log.warn("Interrupted while starting up. "
+          + "Startup may not be complete.", ex);
+    }
   }
 
   /**
@@ -86,38 +95,24 @@ public class HazelcastMQStompServer {
    * shutdown completely.
    */
   public void shutdown() {
-    shutdown = true;
-    IoUtil.safeClose(serverSocket);
-    safeAwait(shutdownLatch, 30, TimeUnit.SECONDS);
-  }
-
-  /**
-   * Runs the loop accepting clients and spinning up client threads.
-   */
-  private void runServerLoop() {
-
-    log.debug("Starting server loop.");
-
-    while (!shutdown) {
-      try {
-        Socket clientSocket = serverSocket.accept();
-        onNewClient(clientSocket);
-      }
-      catch (Exception ex) {
-        log.debug("Server loop exception.", ex);
+    try {
+      // Wait until the server socket is closed.
+      if (channel.isActive()) {
+        channel.close().sync();
       }
     }
-
-    log.debug("Stopping server loop. Shutting down clients.");
-
-    List<ClientAgent> clients = new ArrayList<ClientAgent>(stomperClients);
-    for (ClientAgent client : clients) {
-      client.shutdown();
+    catch (InterruptedException ex) {
+      log.warn("Interrupted while shutting down. "
+          + "Shutdown may not be complete.", ex);
     }
+    finally {
+      workerGroup.shutdownGracefully();
+      bossGroup.shutdownGracefully();
 
-    shutdownLatch.countDown();
-
-    log.debug("Server loop complete.");
+      workerGroup = null;
+      bossGroup = null;
+      channel = null;
+    }
   }
 
   /**
@@ -128,34 +123,5 @@ public class HazelcastMQStompServer {
    */
   public HazelcastMQStompServerConfig getConfig() {
     return config;
-  }
-
-  /**
-   * Called when a new client socket is accepted. A new {@link ClientAgent} is
-   * constructed and should begin executing in a separate thread.
-   * 
-   * @param clientSocket
-   *          the new socket that was just accepted
-   */
-  protected void onNewClient(Socket clientSocket) {
-    try {
-      log.debug("Creating new client.");
-      stomperClients.add(new ClientAgent(clientSocket, this));
-      log.info(format("A total of [%d] clients active.", stomperClients.size()));
-    }
-    catch (Throwable ex) {
-      log.warn("Failed to start client session.", ex);
-    }
-  }
-
-  /**
-   * Called when a client closes. Every {@link ClientAgent} must call this
-   * method to prevent resource leaks.
-   * 
-   * @param client
-   *          the client that just closed
-   */
-  void onClientClosed(ClientAgent client) {
-    stomperClients.remove(client);
   }
 }

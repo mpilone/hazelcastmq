@@ -1,8 +1,13 @@
 package org.mpilone.stomp.server;
 
-import static org.mpilone.stomp.shared.StompConstants.UTF_8;
+import org.mpilone.stomp.StompFrameEncoder;
+import org.mpilone.stomp.Command;
+import org.mpilone.stomp.Headers;
+import org.mpilone.stomp.StompClientException;
+import org.mpilone.stomp.FrameBuilder;
+import org.mpilone.stomp.Frame;
 
-import org.mpilone.stomp.shared.*;
+import static org.mpilone.stomp.StompConstants.UTF_8;
 
 import io.netty.buffer.*;
 import io.netty.channel.*;
@@ -11,29 +16,8 @@ import io.netty.channel.*;
  *
  * @author mpilone
  */
-public class ErrorWritingHandler extends SimpleChannelInboundHandler<Frame> {
+public class ErrorWritingHandler extends ChannelHandlerAdapter {
 
-  public ErrorWritingHandler() {
-    super(Frame.class, true);
-  }
-
-  @Override
-  protected void channelRead0(ChannelHandlerContext ctx, Frame frame) throws
-      Exception {
-    ctx.fireChannelRead(frame);
-  }
-
-  private StompClientException unwrapClientException(Throwable cause) {
-    if (cause == null) {
-      return null;
-    }
-    else if (cause instanceof StompClientException) {
-      return (StompClientException) cause;
-    }
-    else {
-      return unwrapClientException(cause.getCause());
-    }
-  }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws
@@ -74,6 +58,18 @@ public class ErrorWritingHandler extends SimpleChannelInboundHandler<Frame> {
     fb.headerContentLength();
     ctx.writeAndFlush(fb.build());
     ctx.close();
+  }
+
+  private StompClientException unwrapClientException(Throwable cause) {
+    if (cause == null) {
+      return null;
+    }
+    else if (cause instanceof StompClientException) {
+      return (StompClientException) cause;
+    }
+    else {
+      return unwrapClientException(cause.getCause());
+    }
   }
 
 }

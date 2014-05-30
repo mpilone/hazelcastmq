@@ -1,4 +1,4 @@
-package org.mpilone.stomp.shared;
+package org.mpilone.stomp;
 
 /**
  * Possible STOMP commands, both server and client.

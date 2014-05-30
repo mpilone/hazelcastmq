@@ -35,11 +35,6 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.mpilone.hazelcastmq</groupId>
-      <artifactId>hazelcastmq-stomp-client</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
       <groupId>com.hazelcast</groupId>
       <artifactId>hazelcast-client</artifactId>
       <version>${hazelcast.version}</version>
@@ -48,6 +43,11 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-jms</artifactId>
       <version>${spring.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.apache.geronimo.specs</groupId>
+      <artifactId>geronimo-jms_1.1_spec</artifactId>
+      <scope>compile</scope>
     </dependency>
 
     <!-- Runtime -->
@@ -58,11 +58,5 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- Provided -->
-    <dependency>
-      <groupId>org.apache.geronimo.specs</groupId>
-      <artifactId>geronimo-jms_1.1_spec</artifactId>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
 </project>

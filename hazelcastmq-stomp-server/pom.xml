@@ -21,7 +21,7 @@
     <!-- Compile -->
     <dependency>
       <groupId>org.mpilone.hazelcastmq</groupId>
-      <artifactId>hazelcastmq-stomp-shared</artifactId>
+      <artifactId>netty-stomp</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

@@ -8,13 +8,12 @@ import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.stomp.Frame;
-import org.mpilone.hazelcastmq.stomp.FrameBuilder;
-import org.mpilone.hazelcastmq.stomp.StompConstants;
-import org.mpilone.hazelcastmq.stomp.client.HazelcastMQStompClient;
-import org.mpilone.hazelcastmq.stomp.client.HazelcastMQStompClientConfig;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
+import org.mpilone.stomp.Frame;
+import org.mpilone.stomp.FrameBuilder;
+import org.mpilone.stomp.StompConstants;
+import org.mpilone.stomp.client.BasicStompClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +50,7 @@ public class StompToStompOneWay {
     // Create a Hazelcast instance.
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
     try {
@@ -70,18 +70,16 @@ public class StompToStompOneWay {
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      HazelcastMQStompClientConfig stompClientConfig = new HazelcastMQStompClientConfig(
-          "localhost", stompConfig.getPort());
-      HazelcastMQStompClient stompClient = new HazelcastMQStompClient(
-          stompClientConfig);
+      BasicStompClient stompClient = new BasicStompClient();
+      stompClient.connect("localhost", stompConfig.getPort());
 
       // Subscribe to a queue.
       Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
-      stompClient.send(frame);
+      stompClient.write(frame);
 
       // Send a message on that queue.
       frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
-      stompClient.send(frame);
+      stompClient.write(frame);
 
       // Now consume that message.
       frame = stompClient.receive(3, TimeUnit.SECONDS);
@@ -91,10 +89,10 @@ public class StompToStompOneWay {
           + new String(frame.getBody(), StompConstants.UTF_8));
 
       // Shutdown the client.
-      stompClient.shutdown();
+      stompClient.disconnect();
 
       // Shutdown the server.
-      log.info("Shutting down Stomp.");
+      log.info("Shutting down STOMP server.");
       stompServer.shutdown();
     }
     finally {

@@ -1,4 +1,4 @@
-package org.mpilone.stomp.shared;
+package org.mpilone.stomp;
 
 import java.io.Serializable;
 import java.util.HashMap;

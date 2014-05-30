@@ -1,8 +1,8 @@
 package org.mpilone.stomp.example;
 
+import org.mpilone.stomp.*;
 import org.mpilone.stomp.client.BasicStompClient;
 import org.mpilone.stomp.server.*;
-import org.mpilone.stomp.shared.*;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
@@ -21,19 +21,18 @@ public class ServerClientApp {
 
     BasicStompClient client1 = new BasicStompClient();
     client1.connect("localhost", 8090);
-    client1.write(FrameBuilder.subscribe("foo.bar", "client1-1").build(), false);
-    client1.setMessageFrameListener(
-          new BasicStompClient.MessageFrameListener() {
-            public void onMessageFrameReceived(Frame frame) {
+    client1.write(FrameBuilder.subscribe("foo.bar", "client1-1").build());
+    client1.setFrameListener(          new BasicStompClient.FrameListener() {
+            public void frameReceived(Frame frame) {
               System.out.println("Received message: " + frame.getBodyAsString());
             }
           });
 
     BasicStompClient client2 = new BasicStompClient();
     client2.connect("localhost", 8090);
-    client2.write(FrameBuilder.send("foo.bar", "Hello").build(), false);
-    client2.write(FrameBuilder.send("foo.poo", "Goodbye").build(), false);
-    client2.write(FrameBuilder.send("foo.bar", "World!").build(), false);
+    client2.write(FrameBuilder.send("foo.bar", "Hello").build());
+    client2.write(FrameBuilder.send("foo.poo", "Goodbye").build());
+    client2.write(FrameBuilder.send("foo.bar", "World!").build());
 
     try {
       // Wait for the messages to arrive.

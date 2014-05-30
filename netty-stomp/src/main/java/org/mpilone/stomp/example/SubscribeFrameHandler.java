@@ -1,11 +1,13 @@
 
 package org.mpilone.stomp.example;
 
+import org.mpilone.stomp.Headers;
+import org.mpilone.stomp.StompClientException;
+import org.mpilone.stomp.Frame;
+
 import static java.lang.String.format;
 
 import java.util.*;
-
-import org.mpilone.stomp.shared.*;
 
 import io.netty.channel.*;
 

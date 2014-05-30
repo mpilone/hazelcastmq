@@ -1,10 +1,11 @@
 package org.mpilone.stomp.client;
 
-
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.mpilone.stomp.shared.*;
+import org.mpilone.stomp.*;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -20,15 +21,17 @@ public class BasicStompClient {
 
   private Channel channel;
   private NioEventLoopGroup workerGroup;
-  private final Object waiter = new Object();
-  private boolean connected = false;
-  private Frame receivedFrame;
-  private MessageFrameListener messageFrameListener;
+  private FrameListener frameListener;
   private final static AtomicInteger RECEIPT_COUNT = new AtomicInteger();
 
-  public Frame connect(String host, int port) throws InterruptedException {
+  /**
+   * The frame queue that will buffer incoming frames until they are consumed
+   * via the pull API.
+   */
+  private BlockingQueue<Frame> frameQueue;
 
-    receivedFrame = null;
+  public void connect(String host, int port) throws InterruptedException {
+
     workerGroup = new NioEventLoopGroup();
 
     Bootstrap b = new Bootstrap();
@@ -37,19 +40,20 @@ public class BasicStompClient {
     b.option(ChannelOption.SO_KEEPALIVE, true);
     b.handler(createHandler());
 
+    this.frameQueue = new ArrayBlockingQueue<Frame>(100);
+
     // Start the client.
     ChannelFuture f = b.connect(host, port).sync();
     channel = f.channel();
 
     Frame frame = FrameBuilder.connect("1.2", host).build();
     channel.writeAndFlush(frame);
-    sleep();
 
-    if (!connected) {
-      System.out.println("Expected to be connected but wasn't!");
+    Frame response = receive(10, TimeUnit.SECONDS);
+    if (response == null || response.getCommand() != Command.CONNECTED) {
+      throw new StompClientException(
+          "Unexpected frame returned while connecting: " + response);
     }
-
-    return receivedFrame;
   }
 
   protected ChannelHandler createHandler() {
@@ -65,50 +69,68 @@ public class BasicStompClient {
     };
   }
 
-  public void setMessageFrameListener(MessageFrameListener messageFrameListener) {
-    this.messageFrameListener = messageFrameListener;
+  /**
+   * Receives the next available frame if there is one, otherwise the method
+   * returns null immediately.
+   *
+   * @return the available frame or null
+   */
+  public Frame receiveNoWait() {
+    return frameQueue.poll();
   }
 
-  private void sleep() {
-    synchronized (waiter) {
-      try {
-        waiter.wait(TimeUnit.SECONDS.toMillis(5));
-//        waiter.wait(TimeUnit.MINUTES.toMillis(5));
-      }
-      catch (InterruptedException ex) {
-        throw new RuntimeException("Interrupted while sleeping.");
-      }
-    }
+  /**
+   * Receives the next available frame, blocking up to the given timeout. Null
+   * is returned if no frame is available before the timeout.
+   *
+   * @param timeout the maximum time to block waiting for a frame
+   * @param unit the time unit
+   *
+   * @return the frame or null
+   * @throws InterruptedException if there is an error waiting for a frame
+   */
+  public Frame receive(long timeout, TimeUnit unit) throws InterruptedException {
+      return frameQueue.poll(timeout, unit);
   }
 
-  private void wake() {
-    synchronized (waiter) {
-      waiter.notify();
-    }
+  /**
+   * Sets the frame listener to receive frames as soon as they arrive. Only a
+   * single thread services the listener so if the frame takes a long time to
+   * process, it should be handled in a separate thread. If this client was
+   * already subscribed and has been receiving messages, the messages could be
+   * lost when the listener is set. To remove the listener, set it to null.
+   *
+   * @param frameListener the frame listener to set or null to clear it
+   */
+  public void setFrameListener(FrameListener frameListener) {
+    this.frameListener = frameListener;
+
+    // It is possible that we could lose frames here if the client was already
+    // receiving messages before setting the listener; however this isn't a
+    // supported operation.
+    frameQueue.clear();
   }
 
-  public Frame write(Frame frame, boolean waitForResponse) {
-    receivedFrame = null;
-
+  public void write(Frame frame) {
     channel.writeAndFlush(frame);
-    if (waitForResponse) {
-      sleep();
-    }
-
-    return receivedFrame;
   }
 
-  public Frame disconnect() throws InterruptedException {
-    receivedFrame = null;
+  public void disconnect() throws InterruptedException {
+
+    frameListener = null;
 
     if (channel.isActive()) {
       try {
         Frame frame = FrameBuilder.disconnect().header(Headers.RECEIPT,
             "receipt-" + RECEIPT_COUNT.incrementAndGet()).build();
-        channel.writeAndFlush(frame);
-        sleep();
+        channel.writeAndFlush(frame).sync();
 
-        // Wait until the connection is closed.
+        frame = receive(5, TimeUnit.SECONDS);
+
+        if (frame == null || frame.getCommand() != Command.RECEIPT) {
+          // TODO: raise an error?
+        }
+
         channel.close().sync();
       }
       finally {
@@ -118,12 +140,10 @@ public class BasicStompClient {
         channel = null;
       }
     }
-
-    return receivedFrame;
   }
 
-  public interface MessageFrameListener {
-    void onMessageFrameReceived(Frame frame);
+  public interface FrameListener {
+    void frameReceived(Frame frame);
   }
 
   private class BasicClientFrameHandler extends SimpleChannelInboundHandler<Frame> {
@@ -132,38 +152,28 @@ public class BasicStompClient {
     protected void channelRead0(ChannelHandlerContext ctx, Frame frame) throws
         Exception {
 
-      switch (frame.getCommand()) {
-        case CONNECTED:
-          connected = true;
-          receivedFrame = frame;
-          break;
-
-        case RECEIPT:
-          receivedFrame = frame;
-          break;
-
-        case ERROR:
-          receivedFrame = frame;
-          break;
-
-        case MESSAGE:
-          if (messageFrameListener != null) {
-            messageFrameListener.onMessageFrameReceived(frame);
-          }
-          break;
-
-        default:
-          System.out.println("Unexpected frame: " + frame);
-          break;
+      try {
+        if (frameListener != null) {
+          frameListener.frameReceived(frame);
+        }
+      // Queue it up if there is no listener and assume that someone is going to
+        // dequeue it.
+        else if (!frameQueue.offer(frame, 2, TimeUnit.SECONDS)) {
+          System.out.println(
+              "Unable to queue incoming frame. The max frame queue count or "
+              + "message consumption performance must increase. Frames will "
+              + "be lost.");
+        }
+      }
+      catch (Throwable ex) {
+        // Ignore and wait for the next frame.
       }
 
       ctx.fireChannelRead(frame);
-      wake();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-      connected = false;
       super.channelInactive(ctx);
     }
   }

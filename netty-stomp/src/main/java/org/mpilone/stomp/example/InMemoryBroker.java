@@ -3,9 +3,9 @@ package org.mpilone.stomp.example;
 
 import java.util.*;
 
-import org.mpilone.stomp.shared.Frame;
-import org.mpilone.stomp.shared.FrameBuilder;
-import org.mpilone.stomp.shared.Headers;
+import org.mpilone.stomp.Frame;
+import org.mpilone.stomp.FrameBuilder;
+import org.mpilone.stomp.Headers;
 
 import io.netty.channel.Channel;
 

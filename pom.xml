@@ -9,8 +9,6 @@
 
   <modules>
     <module>hazelcastmq-examples</module>
-    <module>hazelcastmq-stomp-client</module>
-    <module>hazelcastmq-stomp-shared</module>
     <module>hazelcastmq-stomp-server</module>
     <!--
    <module>hazelcastmq-camel</module>
@@ -28,6 +26,9 @@
     <hazelcast.version>3.2</hazelcast.version>
     <slf4j.version>1.7.2</slf4j.version>
     <junit.version>4.11</junit.version>
+    
+    <maven.compile.source>1.7</maven.compile.source>
+    <maven.compile.target>1.7</maven.compile.target>
   </properties>
 
   <dependencyManagement>

@@ -1,5 +1,5 @@
 
-package org.mpilone.stomp.shared;
+package org.mpilone.stomp;
 
 import java.util.Date;
 import java.util.UUID;

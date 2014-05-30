@@ -1,7 +1,7 @@
 
 package org.mpilone.stomp.server;
 
-import org.mpilone.stomp.shared.Frame;
+import org.mpilone.stomp.Frame;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;

@@ -1,8 +1,8 @@
 
 package org.mpilone.stomp.example;
 
-import org.mpilone.stomp.shared.Frame;
-import org.mpilone.stomp.shared.Headers;
+import org.mpilone.stomp.Frame;
+import org.mpilone.stomp.Headers;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;

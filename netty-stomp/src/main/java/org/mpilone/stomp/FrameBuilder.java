@@ -1,4 +1,4 @@
-package org.mpilone.stomp.shared;
+package org.mpilone.stomp;
 
 /**
  * A factory for {@link Frame}s which provides a fluent API for frame
