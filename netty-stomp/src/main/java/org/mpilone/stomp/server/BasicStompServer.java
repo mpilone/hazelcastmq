@@ -1,6 +1,7 @@
 
 package org.mpilone.stomp.server;
 
+import org.mpilone.stomp.shared.FrameDebugHandler;
 import org.mpilone.stomp.shared.StompFrameDecoder;
 import org.mpilone.stomp.shared.StompFrameEncoder;
 
@@ -26,17 +27,7 @@ public class BasicStompServer {
     ServerBootstrap b = new ServerBootstrap(); 
     b.group(bossGroup, workerGroup)
         .channel(NioServerSocketChannel.class) 
-        .childHandler(new ChannelInitializer<SocketChannel>() { 
-          @Override
-          public void initChannel(SocketChannel ch) throws Exception {
-            ch.pipeline().addLast(new StompFrameDecoder());
-            ch.pipeline().addLast(new StompFrameEncoder());
-            ch.pipeline().addLast(new ConnectFrameHandler());
-            ch.pipeline().addLast(new ReceiptWriteHandler());
-            ch.pipeline().addLast(new ErrorWriteHandler());
-            ch.pipeline().addLast(new DisconnectFrameHandler());
-          }
-        })
+        .childHandler(createChildHandler())
         .option(ChannelOption.SO_BACKLOG, 128) 
         .childOption(ChannelOption.SO_KEEPALIVE, true);
 
@@ -48,8 +39,6 @@ public class BasicStompServer {
   public void stop() throws InterruptedException {
     try {
       // Wait until the server socket is closed.
-      // In this example, this does not happen, but you can do that to gracefully
-      // shut down your server.
       if (channel.isActive()) {
         channel.close().sync();
       }
@@ -62,6 +51,22 @@ public class BasicStompServer {
       bossGroup = null;
       channel = null;
     }
+  }
+
+  protected ChannelHandler createChildHandler() {
+    return new ChannelInitializer<SocketChannel>() {
+      @Override
+      public void initChannel(SocketChannel ch) throws Exception {
+        ch.pipeline().addLast(new StompFrameDecoder());
+        ch.pipeline().addLast(new StompFrameEncoder());
+
+        ch.pipeline().addLast(new FrameDebugHandler());
+        ch.pipeline().addLast(new ConnectFrameHandler());
+        ch.pipeline().addLast(new ReceiptWritingHandler());
+        ch.pipeline().addLast(new ErrorWritingHandler());
+        ch.pipeline().addLast(new DisconnectFrameHandler());
+      }
+    };
   }
 
 }

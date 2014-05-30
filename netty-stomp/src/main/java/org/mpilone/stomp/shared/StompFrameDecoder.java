@@ -10,6 +10,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
 
 /**
+ * TODO: enforce a maximum message size and header size
  *
  * @author mpilone
  */
@@ -17,6 +18,9 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
   private Frame frame;
 
+  /**
+   * Constructs the decoder with an initial state.
+   */
   public StompFrameDecoder() {
     super(DecoderState.READ_COMMAND);
   }
@@ -129,17 +133,19 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       bytesToRead = in.bytesBefore((byte) NULL_CHAR);
     }
 
-    if (bytesToRead >= 0) {
+    if (bytesToRead > -1) {
 
-      byte[] data = new byte[bytesToRead];
-      in.readBytes(data, 0, data.length);
+      if (bytesToRead > 0) {
+        byte[] data = new byte[bytesToRead];
+        in.readBytes(data, 0, data.length);
+        frame.setBody(data);
+      }
 
       // Sanity check that the frame ends appropriately.
       if (in.readByte() != NULL_CHAR) {
         throw new StompClientException("Frame must end with NULL character.");
       }
-
-      frame.setBody(data);
+      
       eob = true;
     }
 

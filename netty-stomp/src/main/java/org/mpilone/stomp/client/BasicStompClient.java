@@ -2,6 +2,7 @@ package org.mpilone.stomp.client;
 
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.mpilone.stomp.shared.*;
 
@@ -22,29 +23,22 @@ public class BasicStompClient {
   private final Object waiter = new Object();
   private boolean connected = false;
   private Frame receivedFrame;
-  private MessageFrameListener listener;
+  private MessageFrameListener messageFrameListener;
+  private final static AtomicInteger RECEIPT_COUNT = new AtomicInteger();
 
   public Frame connect(String host, int port) throws InterruptedException {
 
     receivedFrame = null;
     workerGroup = new NioEventLoopGroup();
 
-    Bootstrap b = new Bootstrap(); // (1)
-    b.group(workerGroup); // (2)
-    b.channel(NioSocketChannel.class); // (3)
-    b.option(ChannelOption.SO_KEEPALIVE, true); // (4)
-    b.handler(new ChannelInitializer<SocketChannel>() {
-      @Override
-      public void initChannel(SocketChannel ch) throws Exception {
-        ch.pipeline().addLast(new StompFrameDecoder());
-        ch.pipeline().addLast(new StompFrameEncoder());
-
-        ch.pipeline().addLast(new BasicClientFrameHandler());
-      }
-    });
+    Bootstrap b = new Bootstrap();
+    b.group(workerGroup);
+    b.channel(NioSocketChannel.class);
+    b.option(ChannelOption.SO_KEEPALIVE, true);
+    b.handler(createHandler());
 
     // Start the client.
-    ChannelFuture f = b.connect(host, port).sync(); // (5)
+    ChannelFuture f = b.connect(host, port).sync();
     channel = f.channel();
 
     Frame frame = FrameBuilder.connect("1.2", host).build();
@@ -56,6 +50,23 @@ public class BasicStompClient {
     }
 
     return receivedFrame;
+  }
+
+  protected ChannelHandler createHandler() {
+    return new ChannelInitializer<SocketChannel>() {
+      @Override
+      public void initChannel(SocketChannel ch) throws Exception {
+        ch.pipeline().addLast(new StompFrameDecoder());
+        ch.pipeline().addLast(new StompFrameEncoder());
+
+        ch.pipeline().addLast(new FrameDebugHandler());
+        ch.pipeline().addLast(new BasicClientFrameHandler());
+      }
+    };
+  }
+
+  public void setMessageFrameListener(MessageFrameListener messageFrameListener) {
+    this.messageFrameListener = messageFrameListener;
   }
 
   private void sleep() {
@@ -92,8 +103,8 @@ public class BasicStompClient {
 
     if (channel.isActive()) {
       try {
-        Frame frame = FrameBuilder.disconnect().header(Headers.RECEIPT, "1").
-            build();
+        Frame frame = FrameBuilder.disconnect().header(Headers.RECEIPT,
+            "receipt-" + RECEIPT_COUNT.incrementAndGet()).build();
         channel.writeAndFlush(frame);
         sleep();
 
@@ -123,25 +134,21 @@ public class BasicStompClient {
 
       switch (frame.getCommand()) {
         case CONNECTED:
-          System.out.println("Connected: " + frame);
           connected = true;
           receivedFrame = frame;
           break;
 
         case RECEIPT:
-          System.out.println("Receipt: " + frame);
           receivedFrame = frame;
           break;
 
         case ERROR:
-          System.out.println("Error: " + frame);
           receivedFrame = frame;
           break;
 
         case MESSAGE:
-          System.out.println("Message: " + frame);
-          if (listener != null) {
-            listener.onMessageFrameReceived(frame);
+          if (messageFrameListener != null) {
+            messageFrameListener.onMessageFrameReceived(frame);
           }
           break;
 
@@ -150,6 +157,7 @@ public class BasicStompClient {
           break;
       }
 
+      ctx.fireChannelRead(frame);
       wake();
     }
 

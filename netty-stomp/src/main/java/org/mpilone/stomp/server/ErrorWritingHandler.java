@@ -11,22 +11,15 @@ import io.netty.channel.*;
  *
  * @author mpilone
  */
-public class ErrorWriteHandler extends SimpleChannelInboundHandler<Frame> {
+public class ErrorWritingHandler extends SimpleChannelInboundHandler<Frame> {
 
-  public ErrorWriteHandler() {
+  public ErrorWritingHandler() {
     super(Frame.class, true);
   }
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, Frame frame) throws
       Exception {
-
-    String receiptId = frame.getHeaders().get(Headers.RECEIPT);
-    if (receiptId != null) {
-      Frame resp = FrameBuilder.receipt(receiptId).build();
-      ctx.writeAndFlush(resp);
-    }
-
     ctx.fireChannelRead(frame);
   }
 

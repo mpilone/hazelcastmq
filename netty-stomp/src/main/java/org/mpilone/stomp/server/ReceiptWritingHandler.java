@@ -11,9 +11,9 @@ import io.netty.channel.SimpleChannelInboundHandler;
  *
  * @author mpilone
  */
-public class ReceiptWriteHandler extends SimpleChannelInboundHandler<Frame> {
+public class ReceiptWritingHandler extends SimpleChannelInboundHandler<Frame> {
 
-  public ReceiptWriteHandler() {
+  public ReceiptWritingHandler() {
     super(Frame.class, true);
   }
 
