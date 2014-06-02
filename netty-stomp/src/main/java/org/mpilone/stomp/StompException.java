@@ -5,7 +5,7 @@ package org.mpilone.stomp;
  * 
  * @author mpilone
  */
-public class StompServerException extends RuntimeException {
+public class StompException extends RuntimeException {
 
   /**
    * Serialization ID.
@@ -23,7 +23,7 @@ public class StompServerException extends RuntimeException {
    * @param details the detailed error message to include in a response body
    * @param frame the frame that was being processed when the error occurred
    */
-  public StompServerException(String message, String details, Frame frame) {
+  public StompException(String message, String details, Frame frame) {
     this(message);
 
     this.frame = frame;
@@ -55,7 +55,7 @@ public class StompServerException extends RuntimeException {
    * @param message
    *          the human readable message
    */
-  public StompServerException(String message) {
+  public StompException(String message) {
     super(message);
   }
 
@@ -65,7 +65,7 @@ public class StompServerException extends RuntimeException {
    * @param cause
    *          the root cause exception
    */
-  public StompServerException(Throwable cause) {
+  public StompException(Throwable cause) {
     super(cause);
   }
 
@@ -77,7 +77,7 @@ public class StompServerException extends RuntimeException {
    * @param cause
    *          the root cause exception
    */
-  public StompServerException(String message, Throwable cause) {
+  public StompException(String message, Throwable cause) {
     super(message, cause);
   }
 

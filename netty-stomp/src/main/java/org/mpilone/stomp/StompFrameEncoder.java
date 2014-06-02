@@ -17,8 +17,8 @@ public class StompFrameEncoder extends MessageToByteEncoder<Frame> {
       throws Exception {
 
     // Some sanity checks before we serialize the frame.
-    if (frame.getCommand() == null) {
-      throw new StompServerException(
+    if (frame == null || frame.getCommand() == null) {
+      throw new IllegalArgumentException(
           "A frame command is required for all frames.");
     }
 

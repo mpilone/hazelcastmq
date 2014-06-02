@@ -4,16 +4,9 @@ package org.mpilone.hazelcastmq.stomp.server;
 import java.io.IOException;
 
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
+import org.mpilone.stomp.Stomplet;
 import org.mpilone.stomp.server.*;
-import org.mpilone.stomp.StompFrameDecoder;
-import org.mpilone.stomp.StompFrameEncoder;
 import org.slf4j.*;
-
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
  * A STOMP server backed by {@link HazelcastMQ}. The server is started
@@ -36,12 +29,9 @@ public class HazelcastMQStompServer {
   private final HazelcastMQStompServerConfig config;
 
   /**
-   * The server channel used to accept new connections.
+   * The STOMP server that will relay messages into HazelcastMQ.
    */
-  private Channel channel;
-
-  private  NioEventLoopGroup bossGroup;
-  private  NioEventLoopGroup workerGroup;
+  private final StompServer stompServer;
 
   /**
    * Constructs the stomper STOMP server which will immediately begin listening
@@ -55,34 +45,13 @@ public class HazelcastMQStompServer {
   public HazelcastMQStompServer(final HazelcastMQStompServerConfig config)
       throws IOException {
     this.config = config;
-
-    bossGroup = new NioEventLoopGroup();
-    workerGroup = new NioEventLoopGroup();
-
-    ServerBootstrap b = new ServerBootstrap();
-    b.group(bossGroup, workerGroup)
-        .channel(NioServerSocketChannel.class)
-        .childHandler(new ChannelInitializer<SocketChannel>() {
-          @Override
-          public void initChannel(SocketChannel ch) throws Exception {
-            ch.pipeline().addLast(new StompFrameDecoder());
-            ch.pipeline().addLast(new StompFrameEncoder());
-
-            ch.pipeline().addLast(new ConnectFrameHandler());
-            ch.pipeline().addLast(new SendFrameHandler(config));
-            ch.pipeline().addLast(new SubscribeFrameHandler(config));
-            ch.pipeline().addLast(new ReceiptWritingHandler());
-            ch.pipeline().addLast(new DisconnectFrameHandler());
-            ch.pipeline().addLast(new ErrorWritingHandler());
-          }
-        })
-        .option(ChannelOption.SO_BACKLOG, 128)
-        .childOption(ChannelOption.SO_KEEPALIVE, true);
+    this.stompServer = StompServerBuilder.port(this.config.getPort()).
+        frameDebug(false).stompletFactory(new HazelcastMQStompletFactory()).
+        build();
 
     try {
       // Bind and start to accept incoming connections.
-      ChannelFuture f = b.bind(config.getPort()).sync();
-      channel = f.channel();
+      stompServer.start();
     }
     catch (InterruptedException ex) {
       log.warn("Interrupted while starting up. "
@@ -97,21 +66,11 @@ public class HazelcastMQStompServer {
   public void shutdown() {
     try {
       // Wait until the server socket is closed.
-      if (channel.isActive()) {
-        channel.close().sync();
-      }
+     stompServer.stop();
     }
     catch (InterruptedException ex) {
       log.warn("Interrupted while shutting down. "
           + "Shutdown may not be complete.", ex);
-    }
-    finally {
-      workerGroup.shutdownGracefully();
-      bossGroup.shutdownGracefully();
-
-      workerGroup = null;
-      bossGroup = null;
-      channel = null;
     }
   }
 
@@ -123,5 +82,19 @@ public class HazelcastMQStompServer {
    */
   public HazelcastMQStompServerConfig getConfig() {
     return config;
+  }
+
+  /**
+   * A {@link StompServer.StompletFactory} that returns new instances of
+   * {@link HazelcastMQStomplet}s.
+   */
+  private class HazelcastMQStompletFactory implements
+      StompServer.StompletFactory {
+
+    @Override
+    public Stomplet createStomplet() throws Exception {
+      return new HazelcastMQStomplet(config);
+    }
+
   }
 }

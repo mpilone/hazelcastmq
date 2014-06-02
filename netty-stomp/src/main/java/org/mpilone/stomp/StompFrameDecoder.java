@@ -19,6 +19,15 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
   private Frame frame;
 
   /**
+   * A "magic" header that indicates that the frame was poorly formatted. If set
+   * on a frame, the contents of the frame should be considered invalid and an
+   * error should probably be sent to the client. The value of the header will
+   * be a simple error message describing the failure.
+   */
+  public static final String HEADER_BAD_REQUEST = StompFrameDecoder.class.
+      getName() + "::BAD_REQUEST";
+
+  /**
    * Constructs the decoder with an initial state.
    */
   public StompFrameDecoder() {
@@ -55,6 +64,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
         break;
 
       default:
+        // This should never happen unless there is a bug in the decoder.
         throw new IllegalStateException("Unknown state: " + state());
     }
   }
@@ -143,7 +153,8 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
       // Sanity check that the frame ends appropriately.
       if (in.readByte() != NULL_CHAR) {
-        throw new StompClientException("Frame must end with NULL character.");
+        frame.getHeaders().put(HEADER_BAD_REQUEST,
+            "Frame must end with NULL character.");
       }
       
       eob = true;
@@ -183,11 +194,12 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
           if (!headers.getHeaderNames().contains(key)) {
 
-            // Decode header value as per the spec:
-            value = value.replace(OCTET_92_92, OCTET_92);
-            value = value.replace(OCTET_92_99, OCTET_58);
-            value = value.replace(OCTET_92_110, OCTET_10);
-            value = value.replace(OCTET_92_114, OCTET_13);
+            // Decode header value as per the spec. Is there a faster way
+            // to do this?
+            value = value.replace(OCTET_92_92, OCTET_92)
+                .replace(OCTET_92_99, OCTET_58)
+                .replace(OCTET_92_110, OCTET_10)
+                .replace(OCTET_92_114, OCTET_13);
 
             headers.put(key, value);
           }

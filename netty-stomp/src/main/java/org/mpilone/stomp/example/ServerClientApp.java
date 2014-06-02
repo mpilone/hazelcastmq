@@ -4,10 +4,6 @@ import org.mpilone.stomp.*;
 import org.mpilone.stomp.client.BasicStompClient;
 import org.mpilone.stomp.server.*;
 
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.socket.SocketChannel;
-
 /**
  *
  * @author mpilone
@@ -16,8 +12,9 @@ public class ServerClientApp {
 
   public static void main(String[] args) throws InterruptedException {
 
-    DemoStompServer server = new DemoStompServer();
-    server.start(8090);
+    StompServer server = StompServerBuilder.port(8090).frameDebug(true).
+        stompletClass(InMemoryBrokerStomplet.class).build();
+    server.start();
 
     BasicStompClient client1 = new BasicStompClient();
     client1.connect("localhost", 8090);
@@ -48,27 +45,4 @@ public class ServerClientApp {
     server.stop();
   }
 
-  private static class DemoStompServer extends BasicStompServer {
-
-    @Override
-    protected ChannelHandler createChildHandler() {
-      final InMemoryBroker broker = new InMemoryBroker();
-
-      return new ChannelInitializer<SocketChannel>() {
-        @Override
-        public void initChannel(SocketChannel ch) throws Exception {
-          ch.pipeline().addLast(new StompFrameDecoder());
-          ch.pipeline().addLast(new StompFrameEncoder());
-
-          ch.pipeline().addLast(new FrameDebugHandler());
-          ch.pipeline().addLast(new ConnectFrameHandler());
-          ch.pipeline().addLast(new SendFrameHandler(broker));
-          ch.pipeline().addLast(new SubscribeFrameHandler(broker));
-          ch.pipeline().addLast(new ReceiptWritingHandler());
-          ch.pipeline().addLast(new DisconnectFrameHandler());
-          ch.pipeline().addLast(new ErrorWritingHandler());
-        }
-      };
-    }
-  }
 }
