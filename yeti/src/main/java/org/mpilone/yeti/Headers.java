@@ -1,33 +1,56 @@
 package org.mpilone.yeti;
 
-import java.util.Set;
+import java.util.Collection;
+import java.util.Map;
 
+/**
+ * The frame headers which are simple String/String pairs. Constants are defined
+ * for the standard STOMP headers.
+ *
+ * @author mpilone
+ */
 public interface Headers {
-  public static final String CONTENT_TYPE = "content-type";
-  public static final String CONTENT_LENGTH = "content-length";
-  public static final String DESTINATION = "destination";
-  public static final String RECEIPT = "receipt";
-  public static final String RECEIPT_ID = "receipt-id";
-  public static final String ID = "id";
-  public static final String ACK = "ack";
-  public static final String TRANSACTION = "transaction";
-  public static final String VERSION = "version";
-  public static final String ACCEPT_VERSION = "accept-version";
-  public static final String HOST = "host";
-  public static final String LOGIN = "login";
-  public static final String PASSCODE = "passcode";
-  public static final String HEART_BEAT = "heart-beat";
-  public static final String SESSION = "session";
-  public static final String SERVER = "server";
-  public static final String MESSAGE_ID = "message-id";
-  public static final String SUBSCRIPTION = "subscription";
-  public static final String MESSAGE = "message";
+   static final String CONTENT_TYPE = "content-type";
+   static final String CONTENT_LENGTH = "content-length";
+   static final String DESTINATION = "destination";
+   static final String RECEIPT = "receipt";
+   static final String RECEIPT_ID = "receipt-id";
+   static final String ID = "id";
+   static final String ACK = "ack";
+   static final String TRANSACTION = "transaction";
+   static final String VERSION = "version";
+   static final String ACCEPT_VERSION = "accept-version";
+   static final String HOST = "host";
+   static final String LOGIN = "login";
+   static final String PASSCODE = "passcode";
+   static final String HEART_BEAT = "heart-beat";
+   static final String SESSION = "session";
+   static final String SERVER = "server";
+   static final String MESSAGE_ID = "message-id";
+   static final String SUBSCRIPTION = "subscription";
+   static final String MESSAGE = "message";
 
-  public String get(String headerName);
+  /**
+   * Returns the value of the header with the given name or null if the header
+   * is not defined.
+   *
+   * @param headerName the name of the header
+   *
+   * @return the value or null
+   */
+   String get(String headerName);
 
-  public Set<String> getHeaderNames();
+  /**
+   * Returns the names of the headers defined in the frame.
+   *
+   * @return an unmodifiable collection of names
+   */
+   Collection<String> getHeaderNames();
 
-  public String put(String headerName, String headerValue);
-
-  public void remove(String headerName);
+   /**
+    * Returns an unmodifiable {@link Map} of header names and values.
+    *
+    * @return an unmodifiable map
+    */
+   Map<String, String> getHeaderMap();
 }

@@ -4,6 +4,7 @@ package org.mpilone.hazelcastmq.stomp.server;
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
 import org.mpilone.yeti.Command;
 import org.mpilone.yeti.Frame;
+import org.mpilone.yeti.FrameBuilder;
 
 /**
  * Converts a STOMP Frame to and from a {@link HazelcastMQMessage}. This
@@ -44,17 +45,16 @@ public class DefaultFrameConverter implements FrameConverter {
 
   @Override
   public Frame toFrame(HazelcastMQMessage msg) {
-    Frame frame = new Frame(Command.MESSAGE);
 
-    org.mpilone.yeti.Headers headers = frame.getHeaders();
+    FrameBuilder fb = FrameBuilder.command(Command.MESSAGE);
+    fb.body(msg.getBody());
+
     for (String name : msg.getHeaders().getHeaderNames()) {
       String value = msg.getHeaders().get(name);
 
-      headers.put(name, value);
+      fb.header(name, value);
     }
 
-    frame.setBody(msg.getBody());
-
-    return frame;
+    return fb.build();
   }
 }

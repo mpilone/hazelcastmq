@@ -7,16 +7,35 @@ package org.mpilone.yeti;
  * @author mpilone
  */
 public class FrameBuilder {
-  /**
-   * The frame being assembled.
-   */
-  private Frame frame;
+
+  private byte[] body;
+  private final DefaultHeaders headers;
+  private Command command;
 
   /**
    * Constructs the frame builder with an empty frame.
    */
   private FrameBuilder() {
-    frame = new Frame();
+    headers = new DefaultHeaders();
+  }
+
+  /**
+   * Creates a frame builder populated with all the values of the source frame.
+   *
+   * @param source the source frame to copy
+   *
+   * @return the populated frame builder
+   */
+  public static FrameBuilder copy(Frame source) {
+    FrameBuilder fb = command(source.getCommand());
+    fb.body = source.getBody();
+
+    Headers headers = source.getHeaders();
+    if (headers != null) {
+      fb.headers.putAll(headers.getHeaderMap());
+    }
+
+    return fb;
   }
 
   /**
@@ -25,7 +44,7 @@ public class FrameBuilder {
    * @return the frame builder
    */
   public FrameBuilder headerContentTypeText() {
-    frame.setHeader(Headers.CONTENT_TYPE, "text/plain");
+    headers.put(Headers.CONTENT_TYPE, "text/plain");
     return this;
   }
 
@@ -35,7 +54,7 @@ public class FrameBuilder {
    * @return the frame builder
    */
   public FrameBuilder headerContentTypeOctetStream() {
-    frame.setHeader(Headers.CONTENT_TYPE, "application/octet-stream");
+    headers.put(Headers.CONTENT_TYPE, "application/octet-stream");
     return this;
   }
 
@@ -129,7 +148,7 @@ public class FrameBuilder {
    */
   public static FrameBuilder command(Command command) {
     FrameBuilder fb = new FrameBuilder();
-    fb.frame.setCommand(command);
+    fb.command = command;
     return fb;
   }
 
@@ -144,7 +163,7 @@ public class FrameBuilder {
    * @return the frame builder
    */
   public FrameBuilder header(String name, String value) {
-    frame.setHeader(name, value);
+    headers.put(name, value);
     return this;
   }
 
@@ -168,13 +187,11 @@ public class FrameBuilder {
    * @return the frame builder
    */
   public FrameBuilder headerContentLength() {
-    byte[] body = frame.getBody();
-
     if (body != null) {
       header(Headers.CONTENT_LENGTH, String.valueOf(body.length));
     }
     else {
-      frame.getHeaders().remove(Headers.CONTENT_LENGTH);
+      headers.remove(Headers.CONTENT_LENGTH);
     }
 
     return this;
@@ -190,7 +207,7 @@ public class FrameBuilder {
    * @see #headerContentTypeOctetStream()
    */
   public FrameBuilder body(byte[] body) {
-    frame.setBody(body);
+    this.body = body;
     return this;
   }
 
@@ -201,10 +218,7 @@ public class FrameBuilder {
    * @return the configured frame
    */
   public Frame build() {
-    Frame tmp = frame;
-    frame = null;
-
-    return tmp;
+    return new Frame(command, headers, body);
   }
 
   /**

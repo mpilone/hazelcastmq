@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.yeti.Frame;
+import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.StompClientException;
 import org.mpilone.yeti.server.ConnectDisconnectStomplet;
 
@@ -392,13 +393,12 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
     @Override
     public void onMessage(HazelcastMQMessage msg) {
-      Frame frame = config.getFrameConverter().toFrame(msg);
-      frame.getHeaders()
-          .put(org.mpilone.yeti.Headers.SUBSCRIPTION,
-              getSubscriptionId());
+      FrameBuilder fb = FrameBuilder.copy(config.getFrameConverter().
+          toFrame(msg));
+      fb.header(org.mpilone.yeti.Headers.SUBSCRIPTION, getSubscriptionId());
 
       if (frameChannel != null) {
-        frameChannel.write(frame);
+        frameChannel.write(fb.build());
       }
     }
 

@@ -16,7 +16,9 @@ import io.netty.handler.codec.ReplayingDecoder;
  */
 public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.DecoderState> {
 
-  private Frame frame;
+  private Command command;
+  private DefaultHeaders headers;
+  private byte[] body;
 
   /**
    * A "magic" header that indicates that the frame was poorly formatted. If set
@@ -38,27 +40,28 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
   protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)
       throws Exception {
 
-    if (frame == null) {
-      frame = new Frame();
-    }
-
     switch (state()) {
       case READ_COMMAND:
-        if (readCommand(frame, in)) {
+        if (readCommand(in)) {
           checkpoint(DecoderState.READ_HEADERS);
         }
         break;
 
       case READ_HEADERS:
-        if (readHeaders(frame, in)) {
+        if (readHeaders(in)) {
           checkpoint(DecoderState.READ_BODY);
         }
         break;
 
       case READ_BODY:
-        if (readBody(frame, in)) {
-          out.add(frame);
-          frame = null;
+        if (readBody(in)) {
+          out.add(new Frame(command, headers, body));
+
+          // Reset to the inital state.
+          command = null;
+          headers = null;
+          body = null;
+
           checkpoint(DecoderState.READ_COMMAND);
         }
         break;
@@ -123,16 +126,15 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @throws IOException if there is an error reading from the underlying stream
    */
-  private boolean readBody(Frame frame, ByteBuf in) {
+  private boolean readBody(ByteBuf in) {
 
     int bytesToRead;
     boolean eob = false;
 
     // See if we have a content-length header.
-    if (frame.getHeaders().getHeaderNames().contains(Headers.CONTENT_LENGTH)) {
+    if (headers.getHeaderNames().contains(Headers.CONTENT_LENGTH)) {
       // Read the number of bytes specified in the content-length header.
-      bytesToRead = Integer.valueOf(frame.getHeaders()
-          .get(Headers.CONTENT_LENGTH));
+      bytesToRead = Integer.valueOf(headers.get(Headers.CONTENT_LENGTH));
 
       // If we don't have enough bytes yet we won't try to read anything.
       if (in.readableBytes() < bytesToRead) {
@@ -148,12 +150,12 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       if (bytesToRead > 0) {
         byte[] data = new byte[bytesToRead];
         in.readBytes(data, 0, data.length);
-        frame.setBody(data);
+        body = data;
       }
 
       // Sanity check that the frame ends appropriately.
       if (in.readByte() != NULL_CHAR) {
-        frame.getHeaders().put(HEADER_BAD_REQUEST,
+        headers.put(HEADER_BAD_REQUEST,
             "Frame must end with NULL character.");
       }
       
@@ -171,9 +173,9 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @throws IOException if there is an error reading from the underlying stream
    */
-  private boolean readHeaders(Frame frame, ByteBuf in) throws IOException {
+  private boolean readHeaders(ByteBuf in) throws IOException {
 
-    Headers headers = new DefaultHeaders();
+    headers = new DefaultHeaders();
 
     // Read until we find a blank line (i.e. end of headers).
     boolean eoh = false;
@@ -207,10 +209,6 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       }
     }
 
-    if (eoh) {
-      frame.setHeaders(headers);
-    }
-
     return eoh;
   }
 
@@ -222,7 +220,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @throws IOException if there is an error reading from the underlying stream
    */
-  private boolean readCommand(Frame frame, ByteBuf in) {
+  private boolean readCommand(ByteBuf in) {
 
     boolean eoc = false;
     String line;
@@ -232,13 +230,16 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
     } while (line != null && line.isEmpty());
 
     if (line != null) {
-      frame.setCommand(Command.valueOf(line));
+      command = Command.valueOf(line);
       eoc = true;
     }
 
     return eoc;
   }
 
+  /**
+   * The various frame parsing states when decoding a STOMP frame.
+   */
   enum DecoderState {
 
     READ_COMMAND,

@@ -1,8 +1,7 @@
 package org.mpilone.yeti;
 
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Default implementation of STOMP frame headers.
@@ -23,12 +22,13 @@ class DefaultHeaders extends HashMap<String, String> implements Headers,
   }
 
   @Override
-  public Set<String> getHeaderNames() {
-    return keySet();
+  public Collection<String> getHeaderNames() {
+    return Collections.unmodifiableCollection(keySet());
   }
- 
+
   @Override
-  public void remove(String headerName) {
-    super.remove(headerName);
+  public Map<String, String> getHeaderMap() {
+    return Collections.unmodifiableMap(this);
   }
+
 }
