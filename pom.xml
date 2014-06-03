@@ -9,13 +9,13 @@
 
   <modules>
     <module>hazelcastmq-examples</module>
-    <module>hazelcastmq-stomp-server</module>
     <!--
    <module>hazelcastmq-camel</module>
     -->
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-jms</module>
-    <module>netty-stomp</module>
+    <module>yeti</module>
+    <module>hazelcastmq-stomp</module>
   </modules>
 
   <name>HazelcastMQ Parent</name>

@@ -3,9 +3,7 @@
 HazelcastMQ provides a simple messaging layer on top of the basic Queue and Topic data 
 structures provided by Hazelcast [Hazelcast](http://www.hazelcast.com/), an in-memory 
 data grid. HazelcastMQ emphasizes simplicity over performance (although performance 
-should be good enough for most use cases). 
-
-However the basics are there and it 
+should be good enough for the vast majority of use cases). 
 
 HazelcastMQ is divided into multiple components:
 * _hazelcastmq-core_: The core MQ library that provides a JMS 2.0-like API for sending
@@ -17,20 +15,21 @@ consumers on queues and topics are implemented. HazelcastMQ JMS can be used with
 the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component to provide a drop-in replacement
 for existing brokers.
-* _hazelcastmq-stomp-server_: A [STOMP](http://stomp.github.com) 
+* _hazelcastmq-stomp_: A [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
-to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ Stomp Server is not
+to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ STOMP Server is not
 required when using the Core or JMS facilities but may be used to support a wider 
-range of messaging endpoints. In the future this implementation may be replaced with
-[Stilts](http://stilts.projectodd.org/stilts-stomp/).
-* _hazelcastmq-stomp-client_:  A [STOMP](http://stomp.github.com) 
-client which allows STOMP frames to be sent and received from any STOMP server. 
-This allows Java components to use the STOMP API rather than the JMS API if desired.
-While HazelcastMQ Stomp Client was specifically written for HazelcastMQ Stomp Server as 
-the server side implementation, it should work with any STOMP server. The Stomp Client 
-is not required when using the JMS or Stomp facilities and in most cases doesn't 
-provide much over simply using the JMS APIs directly.
+range of messaging endpoints.
+* _yeti_: A [STOMP](http://stomp.github.com) server and client framework built 
+on [Netty](http://netty.io/) to make it simple to build STOMP interfaces for 
+existing brokers. Yeti borrows the best ideas from 
+[Stampy](https://github.com/mrstampy/Stampy) and 
+[Stilts](http://stilts.projectodd.org/stilts-stomp/) to provide a fast, Netty based 
+STOMP frame codecs and frame handlers. Yeti is the core STOMP server 
+implementation used in HazelcastMQ STOMP however it has no direct dependency 
+on Hazelcast/HazelcastMQ and may be split out into a separate project in the 
+future.
 
 ## Rationale
 
@@ -69,7 +68,7 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Durable subscriptions
 * Message priority
 
-## STOMP Server Features (in hazelcastmq-stomp-server)
+## STOMP Server Features (in hazelcastmq-stomp)
 
 ### Implemented
 * STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
@@ -77,10 +76,10 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 * Multiple clients on single server
 * Queue and Topic send/receive
 * Header encoding/decoding of special characters
-* Send transactions (BEGIN, SEND, COMMIT, ABORT)
+* Transactions (BEGIN, SEND, COMMIT, ABORT)
 
 ### Not Implemented Yet
-* Receive transactions (BEGIN, ACK, NACK, COMMIT, ABORT)
+* Acks (ACK, NACK)
 * Heart-beat
 * Protocol version negotiation
 * Probably 100 other things I've missed
@@ -88,19 +87,26 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 ### Not Going to Work Any Time Soon
 * Transaction message reception or ACK/NACK (i.e. always auto ACK)
 
-## STOMP Client Features (in hazelcastmq-stomp-client)
+## Yeti STOMP Framework Features (in yeti)
 
 ### Implemented
 * STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
-* All frame commands
-* Push and pull message consumption APIs
+* Simple Stomplet structure for handling frame commands
+* Pure Netty configuration for endless network I/O configuration options
+* STOMP client implementation support async and sync message receiption
 * Frame builder for fluent frame construction
 * Header encoding/decoding of special characters
 
 ### Not Implemented Yet
-* Heart-beat
+* Heart-beat (but probably coming soon)
 * Protocol version negotiation
 * Probably 100 other things I've missed
+
+### Yeti, Really?
+The name Yeti came about because:
+1. All the cool variations of STOMP are already taken by other [implementations](http://stomp.github.io/implementations.html).
+2. It is a fun play on words with Netty Yeti STOMP.
+3. My daughter was watching Backyardigans and [this song](http://www.nickjr.com/kids-videos/backyardigans-the-yeti-stomp.html) gets stuck in your head.
 
 ## Examples
 
@@ -139,11 +145,11 @@ Using HazelcastMQ JMS is similar to using any JMS provider:
 4. Create a message producer or consumer
 5. Send or receive messages
 
-Using HazelcastMQ Stomp Server is a simple layer on the Core functionality:
+Using HazelcastMQ STOMP is a simple layer on the Core functionality:
 
 1. Create a connection factory
-2. Create a stomper configuration
-3. Create a stomper
+2. Create a stomp configuration
+3. Create a stomp server
 4. Connect with STOMP clients
 
 ### Simple Send and Receive

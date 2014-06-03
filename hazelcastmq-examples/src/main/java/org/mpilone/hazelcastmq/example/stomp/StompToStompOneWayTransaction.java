@@ -8,10 +8,10 @@ import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.Assert;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
-import org.mpilone.stomp.Frame;
-import org.mpilone.stomp.FrameBuilder;
-import org.mpilone.stomp.client.StompClient;
-import org.mpilone.stomp.client.StompClientBuilder;
+import org.mpilone.yeti.Frame;
+import org.mpilone.yeti.FrameBuilder;
+import org.mpilone.yeti.client.StompClient;
+import org.mpilone.yeti.client.StompClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +89,7 @@ public class StompToStompOneWayTransaction {
 
       // Send a message on that queue.
       frame = FrameBuilder.send("/queue/demo.test", "Hello World!")
-          .header(org.mpilone.stomp.Headers.TRANSACTION, transactionId).build();
+          .header(org.mpilone.yeti.Headers.TRANSACTION, transactionId).build();
       stompClient.send(frame);
 
       // Now try to consume that message. We shouldn't get anything because the

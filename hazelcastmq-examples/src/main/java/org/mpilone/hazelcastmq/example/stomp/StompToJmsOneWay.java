@@ -7,8 +7,10 @@ import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
 import org.mpilone.hazelcastmq.jms.*;
 import org.mpilone.hazelcastmq.stomp.server.*;
-import org.mpilone.stomp.*;
-import org.mpilone.stomp.client.*;
+import org.mpilone.yeti.Frame;
+import org.mpilone.yeti.FrameBuilder;
+import org.mpilone.yeti.client.StompClient;
+import org.mpilone.yeti.client.StompClientBuilder;
 import org.slf4j.*;
 
 import com.hazelcast.config.Config;

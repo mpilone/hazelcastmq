@@ -31,7 +31,7 @@
     </dependency>
     <dependency>
       <groupId>org.mpilone.hazelcastmq</groupId>
-      <artifactId>hazelcastmq-stomp-server</artifactId>
+      <artifactId>hazelcastmq-stomp</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
