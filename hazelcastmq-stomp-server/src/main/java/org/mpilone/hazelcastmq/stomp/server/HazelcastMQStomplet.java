@@ -98,6 +98,8 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     ClientSubscription subscription = new ClientSubscription(id,
         res.getFrameChannel(), consumer, session);
     subscriptions.put(id, subscription);
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
   @Override
@@ -122,6 +124,8 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Close the MQ components.
     safeClose(subscription.getConsumer());
     safeClose(subscription.getContext());
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
   @Override
@@ -143,6 +147,8 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
     tx.getContext().rollback();
     safeClose(tx.getContext());
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
   @Override
@@ -164,6 +170,8 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
     tx.getContext().commit();
     safeClose(tx.getContext());
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
   @Override
@@ -189,8 +197,11 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
             true);
     transactions.put(transactionId, new ClientTransaction(transactionId,
         mqContext));
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
+  @Override
   protected void doSend(StompletRequest req, StompletResponse res) throws
       Exception {
 
@@ -222,6 +233,8 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
     // Convert and send the message.
     producer.send(destName, config.getFrameConverter().fromFrame(frame));
+
+    writeOptionalReceipt(frame, res.getFrameChannel());
   }
 
   /**
@@ -238,7 +251,9 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
       throws StompClientException {
     String value = frame.getHeaders().get(name);
     if (value == null) {
-      throw new StompClientException(format("Header %s is required.", name));
+      throw new StompClientException("Required header not found.", format(
+          "Header %s is required for the command %s.", name, frame.getCommand()),
+          frame);
     }
     return value;
   }

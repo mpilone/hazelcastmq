@@ -1,7 +1,10 @@
 package org.mpilone.stomp.example;
 
+import java.util.concurrent.TimeUnit;
+
 import org.mpilone.stomp.*;
-import org.mpilone.stomp.client.BasicStompClient;
+import org.mpilone.stomp.client.StompClient;
+import org.mpilone.stomp.client.StompClientBuilder;
 import org.mpilone.stomp.server.*;
 
 /**
@@ -12,34 +15,42 @@ public class ServerClientApp {
 
   public static void main(String[] args) throws InterruptedException {
 
-    StompServer server = StompServerBuilder.port(8090).frameDebug(true).
+    int port = 8090;
+
+    StompServer server = StompServerBuilder.port(port).frameDebug(true).
         stompletClass(InMemoryBrokerStomplet.class).build();
     server.start();
 
-    BasicStompClient client1 = new BasicStompClient();
-    client1.connect("localhost", 8090);
-    client1.write(FrameBuilder.subscribe("foo.bar", "client1-1").build());
-    client1.setFrameListener(          new BasicStompClient.FrameListener() {
-            public void frameReceived(Frame frame) {
-              System.out.println("Received message: " + frame.getBodyAsString());
-            }
-          });
+    StompClient.QueuingFrameListener msgListener =
+        new StompClient.QueuingFrameListener();
 
-    BasicStompClient client2 = new BasicStompClient();
-    client2.connect("localhost", 8090);
-    client2.write(FrameBuilder.send("foo.bar", "Hello").build());
-    client2.write(FrameBuilder.send("foo.poo", "Goodbye").build());
-    client2.write(FrameBuilder.send("foo.bar", "World!").build());
+    StompClient client1 =
+        StompClientBuilder.port(port).host("localhost").frameDebug(true).build();
+    client1.connect();
+    client1.subscribe(FrameBuilder.subscribe("foo.bar", "client1-1").build(),
+        msgListener);
+
+    StompClient client2 = StompClientBuilder.port(port).host("localhost").
+        frameDebug(true).build();
+    client2.connect();
+    client2.send(FrameBuilder.send("foo.bar", "Hello").build());
+    client2.send(FrameBuilder.send("foo.poo", "Goodbye").build());
+    client2.send(FrameBuilder.send("foo.bar", "World!").build());
+    client2.disconnect();
 
     try {
-      // Wait for the messages to arrive.
-      Thread.sleep(2000);
+      // Wait for the messages to arrive. We should get two of them.
+      Frame msg = msgListener.poll(2, TimeUnit.SECONDS);
+      System.out.println("Got message 1: " + msg.getBodyAsString());
+
+      msg = msgListener.poll(2, TimeUnit.SECONDS);
+      System.out.println("Got message 2: " + msg.getBodyAsString());
     }
     catch (InterruptedException ex) {
       // ignore
     }
 
-    client2.disconnect();
+    client1.unsubscribe(FrameBuilder.unsubscribe("client1-1").build());
     client1.disconnect();
 
     server.stop();

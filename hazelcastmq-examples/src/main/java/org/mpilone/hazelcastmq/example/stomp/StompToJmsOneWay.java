@@ -1,24 +1,18 @@
 package org.mpilone.hazelcastmq.example.stomp;
 
 import javax.jms.*;
+import javax.jms.Message;
 
-import org.mpilone.hazelcastmq.core.HazelcastMQ;
-import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
-import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConfig;
-import org.mpilone.hazelcastmq.jms.HazelcastMQJmsConnectionFactory;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
-import org.mpilone.stomp.Frame;
-import org.mpilone.stomp.FrameBuilder;
-import org.mpilone.stomp.client.BasicStompClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.jms.*;
+import org.mpilone.hazelcastmq.stomp.server.*;
+import org.mpilone.stomp.*;
+import org.mpilone.stomp.client.*;
+import org.slf4j.*;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
 
 /**
  * This example uses a stomp-server to accept a stomp-client connection. The
@@ -71,13 +65,14 @@ public class StompToJmsOneWay {
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      BasicStompClient stompClient = new BasicStompClient();
-      stompClient.connect("localhost", stompConfig.getPort());
+      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
+          host("localhost").build();
+      stompClient.connect();
 
       // Send a message to a queue.
       Frame frame = FrameBuilder.send("/queue/demo.test", "Hello World!")
           .build();
-      stompClient.write(frame);
+      stompClient.send(frame);
 
       // Now create a JMS consumer to consume that message.
       HazelcastMQJmsConfig jmsConfig = new HazelcastMQJmsConfig();

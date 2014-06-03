@@ -4,22 +4,15 @@ import java.util.concurrent.TimeUnit;
 
 import javax.jms.ConnectionFactory;
 
-import org.mpilone.hazelcastmq.core.HazelcastMQ;
-import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
-import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
-import org.mpilone.stomp.Frame;
-import org.mpilone.stomp.FrameBuilder;
-import org.mpilone.stomp.StompConstants;
-import org.mpilone.stomp.client.BasicStompClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.stomp.server.*;
+import org.mpilone.stomp.*;
+import org.mpilone.stomp.client.*;
+import org.slf4j.*;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
 
 /**
  * This example uses a Stomper STOMP server to accept a Stompee client
@@ -70,23 +63,25 @@ public class StompToStompOneWay {
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      BasicStompClient stompClient = new BasicStompClient();
-      stompClient.connect("localhost", stompConfig.getPort());
+      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
+          host("localhost").build();
+      stompClient.connect();
 
       // Subscribe to a queue.
+      StompClient.QueuingFrameListener msgListener =
+          new StompClient.QueuingFrameListener();
       Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
-      stompClient.write(frame);
+      stompClient.subscribe(frame, msgListener);
 
       // Send a message on that queue.
       frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
-      stompClient.write(frame);
+      stompClient.send(frame);
 
       // Now consume that message.
-      frame = stompClient.receive(3, TimeUnit.SECONDS);
+      frame = msgListener.poll(3, TimeUnit.SECONDS);
       Assert.notNull(frame, "Did not receive expected frame!");
 
-      log.info("Got frame: "
-          + new String(frame.getBody(), StompConstants.UTF_8));
+      log.info("Got frame: " + frame.getBodyAsString());
 
       // Shutdown the client.
       stompClient.disconnect();

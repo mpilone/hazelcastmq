@@ -10,8 +10,8 @@ import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
 import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
 import org.mpilone.stomp.Frame;
 import org.mpilone.stomp.FrameBuilder;
-import org.mpilone.stomp.StompConstants;
-import org.mpilone.stomp.client.BasicStompClient;
+import org.mpilone.stomp.client.StompClient;
+import org.mpilone.stomp.client.StompClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,43 +67,46 @@ public class StompToStompOneWayTransaction {
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      BasicStompClient stompClient = new BasicStompClient();
-      stompClient.connect("localhost", stompConfig.getPort());
+      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
+          host("localhost").build();
+      stompClient.connect();
 
-      // Create a Stomp client to receive.
-      BasicStompClient stompClient2 = new BasicStompClient();
-      stompClient2.connect("localhost", stompConfig.getPort());
+      // Create a Stomp client to poll.
+      StompClient stompClient2 = StompClientBuilder.port(stompConfig.getPort()).
+          host("localhost").build();
+      stompClient2.connect();
 
       // Subscribe to a queue.
+      StompClient.QueuingFrameListener msgListener =
+          new StompClient.QueuingFrameListener();
       Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
-      stompClient2.write(frame);
+      stompClient2.subscribe(frame, msgListener);
 
       // Start a transaction
       final String transactionId = "tx1";
       frame = FrameBuilder.begin(transactionId).build();
-      stompClient.write(frame);
+      stompClient.begin(frame);
 
       // Send a message on that queue.
       frame = FrameBuilder.send("/queue/demo.test", "Hello World!")
           .header(org.mpilone.stomp.Headers.TRANSACTION, transactionId).build();
-      stompClient.write(frame);
+      stompClient.send(frame);
 
       // Now try to consume that message. We shouldn't get anything because the
       // transaction hasn't been committed.
-      frame = stompClient2.receive(2, TimeUnit.SECONDS);
+      frame = msgListener.poll(2, TimeUnit.SECONDS);
       Assert.isNull(frame, "Received unexpected frame!");
 
       // Now commit the transaction.
       frame = FrameBuilder.commit(transactionId).build();
-      stompClient.write(frame);
+      stompClient.commit(frame);
 
       // Now try to consume that message. We shouldn't get anything because the
       // transaction hasn't been committed.
-      frame = stompClient2.receive(2, TimeUnit.SECONDS);
+      frame = msgListener.poll(2, TimeUnit.SECONDS);
       Assert.notNull(frame, "Did not receive unexpected frame!");
 
-      log.info("Got expected frame: "
-          + new String(frame.getBody(), StompConstants.UTF_8));
+      log.info("Got expected frame: " + frame.getBodyAsString());
 
       // Shutdown the client.
       stompClient.disconnect();

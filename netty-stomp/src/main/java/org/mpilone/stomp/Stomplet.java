@@ -11,7 +11,7 @@ package org.mpilone.stomp;
  * @author mpilone
  */
 public interface Stomplet {
-  void init();
+  void init(StompletContext context);
 
   void service(StompletRequest req, StompletResponse res) throws Exception;
 
@@ -31,5 +31,9 @@ public interface Stomplet {
   interface WritableFrameChannel {
 
     void write(Frame frame);
+  }
+
+  interface StompletContext {
+
   }
 }

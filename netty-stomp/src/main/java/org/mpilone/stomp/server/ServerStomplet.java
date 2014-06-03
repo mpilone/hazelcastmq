@@ -8,12 +8,7 @@ import org.mpilone.stomp.*;
  *
  * @author mpilone
  */
-public class ServerStomplet implements Stomplet {
-
-  @Override
-  public void init() {
-    // no op
-  }
+public class ServerStomplet extends GenericStomplet {
 
   @Override
   public void service(StompletRequest req, StompletResponse res) throws
@@ -63,6 +58,14 @@ public class ServerStomplet implements Stomplet {
 
       case UNSUBSCRIBE:
         doUnsubscribe(req, res);
+        break;
+
+      case ACK:
+        doAck(req, res);
+        break;
+
+      case NACK:
+        doNack(req, res);
         break;
 
       default:
@@ -123,5 +126,13 @@ public class ServerStomplet implements Stomplet {
     if (receiptId != null) {
       channel.write(FrameBuilder.receipt(receiptId).build());
     }
+  }
+
+  protected void doAck(StompletRequest req, StompletResponse res) {
+    // no op
+  }
+
+  protected void doNack(StompletRequest req, StompletResponse res) {
+    // no op
   }
 }

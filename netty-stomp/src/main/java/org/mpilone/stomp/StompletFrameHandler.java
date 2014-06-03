@@ -36,7 +36,9 @@ public class StompletFrameHandler extends SimpleChannelInboundHandler<Frame> {
 
   @Override
   public void channelActive(ChannelHandlerContext ctx) throws Exception {
-    stomplet.init();
+    // TODO: add support for setting up the heartbeat via the stomplet context.
+    stomplet.init(new Stomplet.StompletContext() {
+    });
   }
 
   @Override
