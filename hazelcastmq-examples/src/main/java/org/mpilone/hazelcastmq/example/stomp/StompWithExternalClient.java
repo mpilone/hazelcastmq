@@ -7,8 +7,9 @@ import javax.jms.ConnectionFactory;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStomp;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompConfig;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,10 +61,10 @@ public class StompWithExternalClient {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompServerConfig stompConfig = new HazelcastMQStompServerConfig(
+      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
-      HazelcastMQStompServer stompServer = new HazelcastMQStompServer(
-          stompConfig);
+      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
+          newHazelcastMQStompInstance(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());

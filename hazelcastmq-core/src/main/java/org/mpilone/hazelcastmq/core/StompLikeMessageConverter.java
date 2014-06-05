@@ -12,9 +12,10 @@ import java.nio.charset.Charset;
  * A message converter that uses a STOMP (http://stomp.github.com/) like message
  * format (it is not guaranteed to be compatible with the STOMP specification).
  * While not the most efficient format, its plain text nature allows for easy
- * monitoring, inspection, and debugging during transport. An alternate, binary
- * implementation may be available in the future.
- * 
+ * monitoring, inspection, and debugging during transport. The alternate,
+ * {@link NoOpMessageConverter} delegates to Hazelcast's own serialization which
+ * will be much faster.
+  * 
  * @author mpilone
  */
 public class StompLikeMessageConverter implements MessageConverter {

@@ -2,7 +2,6 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
-import java.nio.charset.Charset;
 import java.util.concurrent.BlockingQueue;
 
 import org.slf4j.Logger;
@@ -11,64 +10,155 @@ import org.slf4j.LoggerFactory;
 import com.hazelcast.core.ITopic;
 import com.hazelcast.core.IdGenerator;
 
+/**
+ * The default implementation of a producer.
+ *
+ * @author mpilone
+ */
 class DefaultHazelcastMQProducer implements HazelcastMQProducer {
 
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  /**
+   * The log for this class.
+   */
+  private final static Logger log = LoggerFactory.getLogger(
+      DefaultHazelcastMQProducer.class);
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  /**
+   * The context that this producer belongs to.
+   */
   private final DefaultHazelcastMQContext hazelcastMQContext;
+
+  /**
+   * The instance configuration.
+   */
   private final HazelcastMQConfig config;
+
+  /**
+   * The ID generator used to generate unique message IDs.
+   */
   private final IdGenerator idGenerator;
 
-  private String replyTo = null;
-  private String correlationId = null;
-  private long timeToLive = -1;
+  /**
+   * The destination to use for send operations that don't specify a
+   * destination.
+   */
+  private final String destination;
 
-  public DefaultHazelcastMQProducer(DefaultHazelcastMQContext hazelcastMQContext) {
+  /**
+   * The default time to live in milliseconds for messages if a time to live
+   * isn't explicitly given on the send operation.
+   */
+  private long timeToLive = 0;
+
+  /**
+   * Constructs the producer.
+   *
+   * @param destination the destination to use for send operations that don't
+   * specify a destination
+   * @param hazelcastMQContext the context that this producer belongs to
+   */
+  public DefaultHazelcastMQProducer(String destination,
+      DefaultHazelcastMQContext hazelcastMQContext) {
+    this.destination = destination;
     this.hazelcastMQContext = hazelcastMQContext;
     this.config = hazelcastMQContext.getHazelcastMQInstance().getConfig();
-
+    
     this.idGenerator = config.getHazelcastInstance().getIdGenerator(
         "hazelcastmqproducer");
   }
+  
+  @Override
+  public void send(HazelcastMQMessage msg) {
+    send(destination, msg, timeToLive);
+  }
 
   @Override
-  public void send(String destination, byte[] body) {
+  public void send(HazelcastMQMessage msg, long timeToLive) {
+    if (destination == null) {
+      throw new HazelcastMQException(
+          "No destination configured for the producer.");
+    }
 
+    doSend(destination, msg, timeToLive);
+  }
+
+  @Override
+  public void send(String body) {
     // Construct a message
     HazelcastMQMessage msg = new HazelcastMQMessage();
     msg.setBody(body);
-
+    
+    send(msg);
+  }
+  
+  @Override
+  public void send(byte[] body) {
+    // Construct a message
+    HazelcastMQMessage msg = new HazelcastMQMessage();
+    msg.setBody(body);
+    
+    send(msg);
+  }
+  
+  @Override
+  public void send(String destination, byte[] body) {
+    // Construct a message
+    HazelcastMQMessage msg = new HazelcastMQMessage();
+    msg.setBody(body);
+    
     send(destination, msg);
   }
-
+  
   @Override
   public void send(String destination, String body) {
-    send(destination, body.getBytes(UTF_8));
+    // Construct a message
+    HazelcastMQMessage msg = new HazelcastMQMessage();
+    msg.setBody(body);
+    
+    send(destination, msg);
+  }
+  
+  @Override
+  public void send(String destination, HazelcastMQMessage msg) {
+    doSend(destination, msg, timeToLive);
   }
 
   @Override
-  public void send(String destination, HazelcastMQMessage msg) {
-
-    // Apply any producer specific overrides.
-    if (correlationId != null) {
-      msg.getHeaders().put(Headers.CORRELATION_ID, correlationId);
+  public void send(String destination, HazelcastMQMessage msg, long timeToLive) {
+    if (this.destination != null) {
+      throw new HazelcastMQException(
+          "Cannot override producer specified destination.");
     }
 
+    doSend(destination, msg, timeToLive);
+  }
+
+  /**
+   * Common send implementation that sends the message to the given destination.
+   *
+   * @param destination the destination to send to
+   * @param msg the message to send
+   * @param timeToLive the time to live for the message in milliseconds
+   */
+  protected void doSend(String destination, HazelcastMQMessage msg,
+      long timeToLive) {
+
+    // Apply any producer specific overrides.
     if (timeToLive > 0) {
       msg.getHeaders().put(Headers.EXPIRATION,
           String.valueOf(System.currentTimeMillis() + timeToLive));
     }
-
-    if (replyTo != null) {
-      msg.getHeaders().put(Headers.REPLY_TO, replyTo);
+    
+    if (destination == null) {
+      throw new HazelcastMQException("Destination is required when "
+          + "sending a message.");
     }
-
+    
     msg.setId("hazelcastmq-" + idGenerator.newId());
     msg.setDestination(destination);
-
+    
     Object msgData = config.getMessageConverter().fromMessage(msg);
-
+    
     BlockingQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
     ITopic<Object> topic = null;
 
@@ -77,7 +167,7 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     if (queue == null) {
       topic = hazelcastMQContext.resolveTopic(destination);
     }
-
+    
     if (queue != null) {
       if (!queue.offer(msgData)) {
         throw new HazelcastMQException(format(
@@ -92,44 +182,16 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
       throw new HazelcastMQException(format(
           "Destination cannot be resolved [%s].", destination));
     }
-
+    
   }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQProducer#setReplyTo(java.lang.String
-   * )
-   */
+  
   @Override
-  public HazelcastMQProducer setReplyTo(String destination) {
-    this.replyTo = destination;
-    return this;
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQProducer#setCorrelationID(java.
-   * lang.String)
-   */
-  @Override
-  public HazelcastMQProducer setCorrelationID(String id) {
-    this.correlationId = id;
-    return this;
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQProducer#setTimeToLive(long)
-   */
-  @Override
-  public HazelcastMQProducer setTimeToLive(long millis) {
+  public void setTimeToLive(long millis) {
     this.timeToLive = millis;
-    return this;
   }
-
+  
+  @Override
+  public long getTimeToLive() {
+    return timeToLive;
+  }
 }

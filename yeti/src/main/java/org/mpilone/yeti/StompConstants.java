@@ -20,12 +20,25 @@ public interface StompConstants {
    * The UTF-8 character set used for all conversions.
    */
   public final static Charset UTF_8 = Charset.forName("UTF-8");
+
   /**
    * The null terminator that must appear after each STOMP frame.
    */
   public static final char NULL_CHAR = '\0';
+
+  /**
+   * The colon character that separates header name and value.
+   */
   public static final char COLON_CHAR = ':';
+
+  /**
+   * The line feed character.
+   */
   public static final char LINE_FEED_CHAR = '\n';
+
+  /**
+   * The carriage return character.
+   */
   public static final char CARRIAGE_RETURN_CHAR = '\r';
 
   public static final String OCTET_92_92 = "" + (char) 92 + (char) 92;

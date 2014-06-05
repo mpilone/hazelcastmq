@@ -2,32 +2,33 @@
 
 HazelcastMQ provides a simple messaging layer on top of the basic Queue and Topic data 
 structures provided by Hazelcast [Hazelcast](http://www.hazelcast.com/), an in-memory 
-data grid. HazelcastMQ emphasizes simplicity over performance (although performance 
-should be good enough for the vast majority of use cases). 
+data grid. HazelcastMQ emphasizes simplicity and reliable clustering over 
+performance (although performance is extremely good).
 
 HazelcastMQ is divided into multiple components:
 * _hazelcastmq-core_: The core MQ library that provides a JMS 2.0-like API for sending
-and receiving messages. Core has no dependencies on JMS and can be used as a light
-weight messaging framework.
-* _hazelcastmq-jms_: A JMS 1.1 implementation which maps to HazelcastMQ Core. While 
+and receiving messages. Core has no dependencies on JMS and can be used directly 
+as a light weight messaging framework. Other messaging APIs can be layered on 
+top of the core API to provide compatibility with existing frameworks and tools.
+* _hazelcastmq-jms_: A JMS 1.1 implementation which layers on top of HazelcastMQ Core. While 
 not a full implementation of the specification, connections, sessions, producers, and 
 consumers on queues and topics are implemented. HazelcastMQ JMS can be used with 
-the [Spring Framework's](http://www.springsource.org/spring-framework) JmsTemplate or
+the [Spring Framework's](http://projects.spring.io/spring-framework/) JmsTemplate or
 [Apache Camel's](http://camel.apache.org/) JMS Component to provide a drop-in replacement
 for existing brokers.
 * _hazelcastmq-stomp_: A [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
 producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
-to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ STOMP Server is not
-required when using the Core or JMS facilities but may be used to support a wider 
-range of messaging endpoints.
+to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ STOMP may be 
+used to integrate into existing frameworks such as [Apache Camel's](http://camel.apache.org/)
+while not requiring any of the JMS complexity.
 * _yeti_: A [STOMP](http://stomp.github.com) server and client framework built 
-on [Netty](http://netty.io/) to make it simple to build STOMP interfaces for 
+on [Netty](http://netty.io/) to make it simple to build STOMP implementations for 
 existing brokers. Yeti borrows the best ideas from 
 [Stampy](https://github.com/mrstampy/Stampy) and 
-[Stilts](http://stilts.projectodd.org/stilts-stomp/) to provide a fast, Netty based 
+[Stilts](http://stilts.projectodd.org/stilts-stomp/) to provide fast, Netty based 
 STOMP frame codecs and frame handlers. Yeti is the core STOMP server 
-implementation used in HazelcastMQ STOMP however it has no direct dependency 
+implementation used by HazelcastMQ STOMP however it has no direct dependency 
 on Hazelcast/HazelcastMQ and may be split out into a separate project in the 
 future.
 
@@ -104,9 +105,10 @@ Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast
 
 ### Yeti, Really?
 The name Yeti came about because:
+
 1. All the cool variations of STOMP are already taken by other [implementations](http://stomp.github.io/implementations.html).
-2. It is a fun play on words with Netty Yeti STOMP.
-3. My daughter was watching Backyardigans and [this song](http://www.nickjr.com/kids-videos/backyardigans-the-yeti-stomp.html) gets stuck in your head.
+2. It is a fun play on words with "Netty Yeti STOMP".
+3. My daughter was watching Backyardigans and [this song](http://www.nickjr.com/kids-videos/backyardigans-the-yeti-stomp.html) gets stuck in your head (don't say I didn't warn you).
 
 ## Examples
 
@@ -117,14 +119,14 @@ the MQ instance is created at application startup using your DI framework of cho
     mqConfig.setHazelcastInstance(hz);
 
     HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
-    HazelcastMQContext mqContext = mqInstance.createContext();
+          .newHazelcastMQInstance(mqConfig); // (1)
+    HazelcastMQContext mqContext = mqInstance.createContext(); // (2)
 
     HazelcastMQMessage msg = new HazelcastMQMessage();
     msg.setContentAsString("Hello World!");
     
-    HazelcastMQProducer mqProducer = mqContext.createProducer();
-    mqProducer.send("/queue/example.dest", msg);
+    HazelcastMQProducer mqProducer = mqContext.createProducer(); // (3)
+    mqProducer.send("/queue/example.dest", msg); // (4)
     
     mqContext.close();
     mqInstance.shutdown();
@@ -137,7 +139,8 @@ JMS dependencies):
 3. Create a message producer or consumer
 4. Send or receive messages
 
-Using HazelcastMQ JMS is similar to using any JMS provider:
+Using HazelcastMQ JMS is a layer on the Core functionality and is similar to 
+using any JMS 1.1 provider:
 
 1. Create a connection factory
 2. Create a connection

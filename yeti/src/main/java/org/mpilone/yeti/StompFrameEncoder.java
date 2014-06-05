@@ -7,6 +7,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
 
 /**
+ * A STOMP frame encoder that converts {@link Frame} instances to raw bytes. The
+ * actual encoding is done via the {@link #encodeFrame(org.mpilone.yeti.Frame, io.netty.buffer.ByteBuf, boolean)
+ * } method which may be used directly to encode a frame to bytes without
+ * sending it over the wire.
  *
  * @author mpilone
  */

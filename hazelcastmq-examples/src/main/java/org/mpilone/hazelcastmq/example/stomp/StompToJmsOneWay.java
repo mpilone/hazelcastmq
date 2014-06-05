@@ -10,7 +10,6 @@ import org.mpilone.hazelcastmq.stomp.server.*;
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.client.StompClient;
-import org.mpilone.yeti.client.StompClientBuilder;
 import org.slf4j.*;
 
 import com.hazelcast.config.Config;
@@ -58,17 +57,17 @@ public class StompToJmsOneWay {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompServerConfig stompConfig = new HazelcastMQStompServerConfig(
+      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
-      HazelcastMQStompServer stompServer = new HazelcastMQStompServer(
-          stompConfig);
+      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
+          newHazelcastMQStompInstance(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
-          host("localhost").build();
+      StompClient stompClient = new StompClient("localhost", stompConfig.
+          getPort());
       stompClient.connect();
 
       // Send a message to a queue.

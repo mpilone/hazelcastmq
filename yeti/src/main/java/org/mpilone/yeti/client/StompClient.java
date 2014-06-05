@@ -15,6 +15,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
 /**
+ * <p>
+ * A simple STOMP client that uses Netty to connect to a remote host. The client
+ * builds a pipeline containing an internal {@link StompletFrameHandler} and
+ * {@link Stomplet} implementation to delegate all incoming frames to
+ * {@link FrameListener}s. An queuing frame listener implementation is provided
+ * to support synchronous, pull operations.
+ * </p>
  *
  * @author mpilone
  */
@@ -32,44 +39,113 @@ public class StompClient {
   private final List<FrameListener> receiptListeners;
   private final Map<String, FrameListener> subscriptionMap;
 
-  public StompClient() {
+  /**
+   * Constructs the client. The client will not connect until {@link #connect()
+   * } is called.
+   *
+   * @param host the host to connect to
+   * @param port the port to connect to
+   */
+  public StompClient(String host, int port) {
+    this(false, host, port);
+  }
+
+  /**
+   * Constructs the client. The client will not connect until {@link #connect()
+   * } is called.
+   *
+   * @param frameDebugEnabled true to enable frame debugging, false otherwise
+   * @param host the host to connect to
+   * @param port the port to connect to
+   */
+  public StompClient(boolean frameDebugEnabled, String host, int port) {
     this.connectedListener = new QueuingFrameListener();
     this.errorListeners = Collections.synchronizedList(
         new ArrayList<FrameListener>());
     this.receiptListeners = Collections.synchronizedList(
         new ArrayList<FrameListener>());
     this.subscriptionMap = new ConcurrentHashMap<>();
+
+    this.port = port;
+    this.host = host;
   }
 
+  /**
+   * Sets the host to connect to. The value will not be used until the next
+   * connect call.
+   *
+   * @param host the host to connect to
+   */
   public void setHost(String host) {
     this.host = host;
   }
 
+  /**
+   * Sets the port to connect to. The value will not be used until the next
+   * connect call.
+   *
+   * @param port the port to connect to
+   */
   public void setPort(int port) {
     this.port = port;
   }
 
+  /**
+   * Sets the frame debug flag to enable debugging output. The value will not be
+   * used until the next connect call.
+   *
+   * @param frameDebugEnabled true to enable debugging
+   */
   public void setFrameDebugEnabled(boolean frameDebugEnabled) {
     this.frameDebugEnabled = frameDebugEnabled;
   }
 
+  /**
+   * Adds a listener to be notified of {@link Command#ERROR} frames.
+   *
+   * @param listener the listener to be notified
+   */
   public void addErrorListener(FrameListener listener) {
     errorListeners.add(listener);
   }
 
+  /**
+   * Removes a listener to be notified of {@link Command#ERROR} frames.
+   *
+   * @param listener the listener to be removed
+   */
   public void removeErrorListener(FrameListener listener) {
     errorListeners.remove(listener);
   }
 
+  /**
+   * Adds a listener to be notified of {@link Command#RECEIPT} frames.
+   *
+   * @param listener the listener to be notified
+   */
   public void addReceiptListener(FrameListener listener) {
     receiptListeners.add(listener);
   }
 
+  /**
+   * Removes a listener to be notified of {@link Command#RECEIPT} frames.
+   *
+   * @param listener the listener to be removed
+   */
   public void removeReceiptListener(FrameListener listener) {
     receiptListeners.remove(listener);
   }
 
-  public void connect() throws InterruptedException {
+  /**
+   * Connects to the remote server by opening a network connection and then
+   * immediately sending the STOMP CONNECT frame. When the method returns, the
+   * client is fully connected (at the network and STOMP levels) and can
+   * immediately begin sending frames or subscribing to destinations.
+   *
+   * @throws InterruptedException if the connect operation is interrupted
+   * @throws StompException if the STOMP CONNECT frame fails
+   */
+  public void connect() throws InterruptedException, StompException {
     workerGroup = new NioEventLoopGroup();
 
     Bootstrap b = new Bootstrap();
@@ -86,11 +162,20 @@ public class StompClient {
 
     Frame response = connectedListener.poll(10, TimeUnit.SECONDS);
     if (response == null || response.getCommand() != Command.CONNECTED) {
-      throw new StompClientException(
+      throw new StompException(
           "Unexpected frame returned while connecting: " + response);
     }
   }
 
+  /**
+   * Creates the channel handler. By default a {@link ChannelInitializer} is
+   * created which will construct a pipeline of
+   * {@link StompFrameDecoder}, {@link StompFrameEncoder}, {@link FrameDebugHandler},
+   * and an internal implementation of {@link StompletFrameHandler}.
+   *
+   * @return the channel handler for channel (i.e. the server connection)
+   * construction
+   */
   protected ChannelHandler createHandler() {
     return new ChannelInitializer<SocketChannel>() {
       @Override
@@ -107,30 +192,62 @@ public class StompClient {
     };
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#SEND}.
+   *
+   * @param frame the frame to write to the remote server
+   */
   public void send(Frame frame) {
     validateCommand(frame, Command.SEND);
 
     channel.writeAndFlush(frame);
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#BEGIN}.
+   *
+   * @param frame the frame to write to the remote server
+   */
   public void begin(Frame frame) {
     validateCommand(frame, Command.BEGIN);
 
     channel.writeAndFlush(frame);
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#COMMIT}.
+   *
+   * @param frame the frame to write to the remote server
+   */
   public void commit(Frame frame) {
     validateCommand(frame, Command.COMMIT);
 
     channel.writeAndFlush(frame);
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#ABORT}.
+   *
+   * @param frame the frame to write to the remote server
+   */
   public void abort(Frame frame) {
     validateCommand(frame, Command.ABORT);
 
     channel.writeAndFlush(frame);
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#SUBSCRIBE}.
+   *
+   * @param frame the frame to write to the remote server
+   * @param listener the listener to be notified of messages received on this
+   * subscription
+   */
   public void subscribe(Frame frame, FrameListener listener) {
     validateCommand(frame, Command.SUBSCRIBE);
 
@@ -138,6 +255,12 @@ public class StompClient {
     subscriptionMap.put(frame.getHeaders().get(Headers.ID), listener);
   }
 
+  /**
+   * Writes the given frame to the remote server. The frame command must be
+   * {@link Command#UNSUBSCRIBE}.
+   *
+   * @param frame the frame to write to the remote server
+   */
   public void unsubscribe(Frame frame) {
     validateCommand(frame, Command.UNSUBSCRIBE);
 
@@ -145,13 +268,30 @@ public class StompClient {
     subscriptionMap.remove(frame.getHeaders().get(Headers.ID));
   }
 
-  private void validateCommand(Frame frame, Command requiredCommand) {
+  /**
+   * Validates that the command in the frame matches the required command.
+   *
+   * @param frame the frame to validate
+   * @param requiredCommand the required command
+   *
+   * @throws IllegalArgumentException if the frame command does not match
+   */
+  private void validateCommand(Frame frame, Command requiredCommand) throws
+      IllegalArgumentException {
     if (frame.getCommand() != requiredCommand) {
       throw new IllegalArgumentException(format("A %s command is required.",
           requiredCommand));
     }
   }
 
+  /**
+   * Disconnects from the remote server by issuing a {@link Command#DISCONNECT}
+   * frame and closing the network connection. This method blocks until the
+   * disconnect it complete. A receipt will be requested but the specification
+   * indicates that a server may not issue one on a disconnect request.
+   *
+   * @throws InterruptedException if the disconnect is interrupted
+   */
   public void disconnect() throws InterruptedException {
 
     if (channel.isActive()) {
@@ -164,7 +304,12 @@ public class StompClient {
         channel.close().sync();
       }
       finally {
-        workerGroup.shutdownGracefully();
+        try {
+          workerGroup.shutdownGracefully().get(10, TimeUnit.SECONDS);
+        }
+        catch (ExecutionException | TimeoutException ex) {
+          // ignore
+        }
 
         workerGroup = null;
         channel = null;
@@ -172,6 +317,10 @@ public class StompClient {
     }
   }
 
+  /**
+   * An internal Stomplet that dispatches incoming frames to
+   * {@link FrameListener}s.
+   */
   private class DispatchingStomplet extends ClientStomplet {
 
     @Override
@@ -214,10 +363,26 @@ public class StompClient {
     }
   }
 
+  /**
+   * A frame listener to be notified when a frame is received.
+   */
   public interface FrameListener {
+
+    /**
+     * Handles a received frame.
+     *
+     * @param frame the frame received
+     *
+     * @throws Exception if there is an error handling the frame
+     */
     void frameReceived(Frame frame) throws Exception;
   }
 
+  /**
+   * A frame listener that queues any frames received in an internal
+   * {@link BlockingQueue} to allow the frames to be received synchronously
+   * through a pull operation.
+   */
   public static class QueuingFrameListener implements FrameListener {
 
     /**
@@ -226,6 +391,10 @@ public class StompClient {
      */
     private final BlockingQueue<Frame> frameQueue;
 
+    /**
+     * Constructs the listener with a queue size of 50. If frames arrive faster
+     * than they are consumed, new frames will be dropped.
+     */
     public QueuingFrameListener() {
       this.frameQueue = new ArrayBlockingQueue<>(50);
     }

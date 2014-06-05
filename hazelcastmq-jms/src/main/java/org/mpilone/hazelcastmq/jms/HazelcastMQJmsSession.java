@@ -13,8 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A JMS session in HazelcastMQ.
- * 
+ * A JMS session in HazelcastMQ. A JMS session roughly maps to a
+ * {@link HazelcastMQContext} and delegates all operations to the context.
+  *
  * @author mpilone
  */
 class HazelcastMQJmsSession implements Session {
@@ -22,15 +23,7 @@ class HazelcastMQJmsSession implements Session {
   /**
    * The parent connection.
    */
-  private HazelcastMQJmsConnection connection;
-
-  private HazelcastMQJmsConfig config;
-
-  // /**
-  // * The ID generator used to generate unique IDs for temporary queues and
-  // * topics.
-  // */
-  // private IdGenerator idGenerator;
+  private final HazelcastMQJmsConnection connection;
 
   /**
    * The log for this class.
@@ -38,9 +31,15 @@ class HazelcastMQJmsSession implements Session {
   @SuppressWarnings("unused")
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private String id;
+  /**
+   * The ID of this session in the connection.
+   */
+  private final String id;
 
-  private HazelcastMQContext mqContext;
+  /**
+   * The MQ context backing the session and connection.
+   */
+  private final HazelcastMQContext mqContext;
 
   /**
    * Constructs the session.
@@ -53,22 +52,23 @@ class HazelcastMQJmsSession implements Session {
   public HazelcastMQJmsSession(HazelcastMQJmsConnection connection,
       boolean transacted) {
     this.connection = connection;
-    this.config = this.connection.getConfig();
+
+    HazelcastMQJmsConfig config = this.connection.getConfig();
     this.id = config.getIdGenerator().newId();
     this.mqContext = config.getHazelcastMQInstance().createContext(transacted);
 
     mqContext.setAutoStart(false);
   }
 
+  /**
+   * Returns the unique ID of this session.
+   *
+   * @return the ID of this session
+   */
   public String getId() {
     return id;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#close()
-   */
   @Override
   public void close() throws JMSException {
     stop();
@@ -78,52 +78,27 @@ class HazelcastMQJmsSession implements Session {
     connection.onSessionClosed(this);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#commit()
-   */
   @Override
   public void commit() throws JMSException {
     mqContext.commit();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createBrowser(javax.jms.Queue)
-   */
   @Override
   public QueueBrowser createBrowser(Queue arg0) throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createBrowser(javax.jms.Queue, java.lang.String)
-   */
   @Override
   public QueueBrowser createBrowser(Queue arg0, String arg1)
       throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createBytesMessage()
-   */
   @Override
   public BytesMessage createBytesMessage() throws JMSException {
     return new HazelcastMQJmsBytesMessage();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createConsumer(javax.jms.Destination)
-   */
   @Override
   public MessageConsumer createConsumer(Destination destination)
       throws JMSException {
@@ -148,12 +123,6 @@ class HazelcastMQJmsSession implements Session {
     return consumer;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createConsumer(javax.jms.Destination,
-   * java.lang.String)
-   */
   @Override
   public MessageConsumer createConsumer(Destination destination,
       String messageSelector) throws JMSException {
@@ -167,12 +136,6 @@ class HazelcastMQJmsSession implements Session {
     return createConsumer(destination);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createConsumer(javax.jms.Destination,
-   * java.lang.String, boolean)
-   */
   @Override
   public MessageConsumer createConsumer(Destination destination,
       String messageSelector, boolean noLocal) throws JMSException {
@@ -185,76 +148,39 @@ class HazelcastMQJmsSession implements Session {
     return createConsumer(destination, messageSelector);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createDurableSubscriber(javax.jms.Topic,
-   * java.lang.String)
-   */
   @Override
   public TopicSubscriber createDurableSubscriber(Topic topic, String arg1)
       throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createDurableSubscriber(javax.jms.Topic,
-   * java.lang.String, java.lang.String, boolean)
-   */
   @Override
   public TopicSubscriber createDurableSubscriber(Topic topic, String arg1,
       String arg2, boolean arg3) throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createMapMessage()
-   */
   @Override
   public MapMessage createMapMessage() throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createMessage()
-   */
   @Override
   public Message createMessage() throws JMSException {
     return new HazelcastMQJmsMessage();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createObjectMessage()
-   */
   @Override
   public ObjectMessage createObjectMessage() throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createObjectMessage(java.io.Serializable)
-   */
   @Override
   public ObjectMessage createObjectMessage(Serializable arg0)
       throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createProducer(javax.jms.Destination)
-   */
   @Override
   public MessageProducer createProducer(Destination destination)
       throws JMSException {
@@ -265,61 +191,31 @@ class HazelcastMQJmsSession implements Session {
     return producer;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createQueue(java.lang.String)
-   */
   @Override
   public Queue createQueue(String queueName) throws JMSException {
     return new HazelcastMQJmsQueue(queueName);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createStreamMessage()
-   */
   @Override
   public StreamMessage createStreamMessage() throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createTemporaryQueue()
-   */
   @Override
   public TemporaryQueue createTemporaryQueue() throws JMSException {
     return connection.createTemporaryQueue();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createTemporaryTopic()
-   */
   @Override
   public TemporaryTopic createTemporaryTopic() throws JMSException {
     return connection.createTemporaryTopic();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createTextMessage()
-   */
   @Override
   public TextMessage createTextMessage() throws JMSException {
     return new HazelcastMQJmsTextMessage();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createTextMessage(java.lang.String)
-   */
   @Override
   public TextMessage createTextMessage(String text) throws JMSException {
     TextMessage msg = createTextMessage();
@@ -327,21 +223,11 @@ class HazelcastMQJmsSession implements Session {
     return msg;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#createTopic(java.lang.String)
-   */
   @Override
   public Topic createTopic(String topicName) throws JMSException {
     return new HazelcastMQJmsTopic(topicName);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#getAcknowledgeMode()
-   */
   @Override
   public int getAcknowledgeMode() throws JMSException {
     if (getTransacted()) {
@@ -352,76 +238,46 @@ class HazelcastMQJmsSession implements Session {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#getMessageListener()
-   */
   @Override
   public MessageListener getMessageListener() throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#getTransacted()
-   */
   @Override
   public boolean getTransacted() throws JMSException {
     return mqContext.isTransacted();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#recover()
-   */
   @Override
   public void recover() throws JMSException {
     // no op
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#rollback()
-   */
   @Override
   public void rollback() throws JMSException {
     mqContext.rollback();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#run()
-   */
   @Override
   public void run() {
     // no op
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#setMessageListener(javax.jms.MessageListener)
-   */
   @Override
   public void setMessageListener(MessageListener arg0) throws JMSException {
     throw new UnsupportedOperationException();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Session#unsubscribe(java.lang.String)
-   */
   @Override
   public void unsubscribe(String arg0) throws JMSException {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Returns the JMS configuration for this session.
+   *
+   * @return the configuration for this session
+   */
   HazelcastMQJmsConfig getConfig() {
     return connection.getConfig();
   }

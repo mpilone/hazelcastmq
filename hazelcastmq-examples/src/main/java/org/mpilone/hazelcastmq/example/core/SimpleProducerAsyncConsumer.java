@@ -26,7 +26,7 @@ public class SimpleProducerAsyncConsumer implements HazelcastMQMessageListener {
    */
   @Override
   public void onMessage(HazelcastMQMessage msg) {
-    log.info("Received message: " + msg.getContentAsString());
+    log.info("Received message: " + msg.getBodyAsString());
   }
 
   public static void main(String[] args) throws Exception {
@@ -64,7 +64,7 @@ public class SimpleProducerAsyncConsumer implements HazelcastMQMessageListener {
       mqConsumer.setMessageListener(this);
 
       HazelcastMQMessage msg = new HazelcastMQMessage();
-      msg.setContentAsString("Hello World!");
+      msg.setBody("Hello World!");
 
       log.info("Sending message.");
       mqProducer.send(destination, msg);

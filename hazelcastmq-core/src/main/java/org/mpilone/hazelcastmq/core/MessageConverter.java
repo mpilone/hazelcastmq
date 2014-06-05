@@ -1,9 +1,9 @@
 package org.mpilone.hazelcastmq.core;
 
 /**
- * A converter responsible for converting a JMS message into a wire format to be
- * sent via the HazelcastMQ. It is assumed that the same converter
- * implementation will be used on both the producing and consuming side to
+ * A converter responsible for converting a HazelcastMQ message into a wire
+ * format to be sent via a Hazelcast queue or topic. It is assumed that the same
+ * converter * implementation will be used on both the producing and consuming side to
  * ensure that the bytes can be properly converted back into a message.
  * 
  * @author mpilone
@@ -11,8 +11,8 @@ package org.mpilone.hazelcastmq.core;
 public interface MessageConverter {
 
   /**
-   * Converts the given JMS message to a block of bytes.
-   * 
+   * Converts the given message to an object to be added to a queue or topic.
+    * 
    * @param message
    *          the message to convert
    * @return the converted message
@@ -22,11 +22,11 @@ public interface MessageConverter {
       throws HazelcastMQException;
 
   /**
-   * Converts the given block of bytes into a JMS message.
-   * 
+   * Converts the given object from a queue or topic into a message.
+    * 
    * @param data
    *          the data to convert
-   * @return the bytes as a message
+   * @return the new message
    * @throws HazelcastMQException if there is an error converting the message
    */
    HazelcastMQMessage toMessage(Object data) throws HazelcastMQException;

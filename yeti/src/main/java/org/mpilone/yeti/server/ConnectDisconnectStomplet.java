@@ -9,14 +9,19 @@ import org.mpilone.yeti.Stomplet.StompletRequest;
 import org.mpilone.yeti.Stomplet.StompletResponse;
 
 /**
- * A {@link Stomplet} implementation that handles the {@link Command#CONNECT}
- * and {@link Command#DISCONNECT} frames. The stomplet also enforces the correct
- * connection state before allowing any other frames to be processed.
+ * A server side {@link Stomplet} implementation that handles the
+ * {@link Command#CONNECT} and {@link Command#DISCONNECT} frames. The stomplet
+ * also enforces the correct connection state before allowing any other frames
+ * to be serviced.
  *
  * @author mpilone
  */
 public class ConnectDisconnectStomplet extends ServerStomplet {
 
+  /**
+   * The flag which indicates if the connection has been established to the
+   * remote host (at the STOMP level).
+   */
   private boolean connected = false;
 
   @Override

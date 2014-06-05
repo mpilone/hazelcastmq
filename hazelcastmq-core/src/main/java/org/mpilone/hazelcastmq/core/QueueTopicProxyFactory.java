@@ -7,21 +7,111 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.ITopic;
 import com.hazelcast.core.TransactionalQueue;
 
+/**
+ * A factory for constructing {@link IQueue} proxies to various underlying queue
+ * implementations. The proxy provides a common interface for various queues
+ * that do not implement the interface directly.
+ *
+ * @author mpilone
+ */
 public class QueueTopicProxyFactory {
 
+  /**
+   * Creates an {@link IQueue} proxy around a {@link TransactionalQueue}. This
+   * allows for common handling of queues regardless of if they are
+   * transactional or not. Ideally Hazelcast's transactional queue would
+   * directly implement IQueue but that isn't the case.
+   *
+   * @param <E> the type of objects in the queue
+   * @param queue the transaction queue to create the proxy around
+   *
+   * @return the proxy to the transactional queue
+   */
+  @SuppressWarnings("unchecked")
+  public static <E> IQueue<E> createQueueProxy(TransactionalQueue<E> queue) {
+
+    InvocationHandler handler = new TransactionalQueueInvocationHandler<>(
+        queue);
+
+    return (IQueue<E>) Proxy.newProxyInstance(
+        queue.getClass().getClassLoader(), new Class[]{IQueue.class},
+        handler);
+  }
+
+  /**
+   * Creates an {@link IQueue} proxy around a standard
+   * {@link ArrayBlockingQueue}. This allows for common handling of queues
+   * regardless of if they are standard Java queues or Hazelcast created queues.
+   *
+   * @param <E> the type of objects in the queue
+   * @param queue the blocking queue to create the proxy around
+   *
+   * @return the proxy to the blocking queue
+   */
+  @SuppressWarnings("unchecked")
+  public static <E> IQueue<E> createQueueProxy(final ArrayBlockingQueue queue) {
+
+    InvocationHandler handler = new AbstractQueueInvocationHandler<>(queue);
+
+    return (IQueue<E>) Proxy.newProxyInstance(
+        IQueue.class.getClassLoader(), new Class[]{IQueue.class},
+        handler);
+  }
+
+  /**
+   * Creates an {@link ITopic} proxy on the combination of a
+   * {@link TransactionalQueue} and an actual {@link ITopic} instance. The proxy
+   * will offer items to the transactional queue when they are published on the
+   * topic. All other topic methods are simply passed through to the underlying
+   * topic. By offering items to the queue on publish, a transactional topic can
+   * be simulated via the ITopic interface.
+   *
+   * @param <E> the type of items in the topic
+   * @param queue the transactional queue to offer all published objects
+   * @param topic the underlying topic to handle all other operations
+   *
+   * @return the proxy around the queue and topic
+   */
+  @SuppressWarnings("unchecked")
+  public static <E> ITopic<E> createTopicProxy(
+      final TransactionalQueue<E> queue, final ITopic<E> topic) {
+    InvocationHandler handler = new InvocationHandler() {
+      @Override
+      public Object invoke(Object proxy, Method method, Object[] args)
+          throws Throwable {
+
+        if (method.getName().equals("publish")) {
+          return queue.offer((E) args[0]);
+        }
+        else {
+          return method.invoke(topic, args);
+        }
+      }
+    };
+
+    return (ITopic<E>) Proxy.newProxyInstance(
+        ITopic.class.getClassLoader(), new Class[]{ITopic.class},
+        handler);
+  }
+
+  /**
+   * An invocation handler that maps all {@link IQueue} operations to a
+   * {@link TransactionalQueue} instance.
+   *
+   * @param <E> the type of objects in the queue
+   */
   private static class TransactionalQueueInvocationHandler<E> implements
       InvocationHandler {
 
-    private TransactionalQueue<E> delegate;
-
-    private final static Map<String, Method> METHOD_MAP = new HashMap<String, Method>();
+    private final TransactionalQueue<E> delegate;
+    private final static Map<String, Method> METHOD_MAP = new HashMap<>();
 
     static {
       try {
@@ -46,16 +136,15 @@ public class QueueTopicProxyFactory {
       }
     }
 
+    /**
+     * Constructs the handler which will map all operations to the given queue.
+     *
+     * @param queue the delegate queue
+     */
     public TransactionalQueueInvocationHandler(TransactionalQueue<E> queue) {
       this.delegate = queue;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.reflect.InvocationHandler#invoke(java.lang.Object,
-     * java.lang.reflect.Method, java.lang.Object[])
-     */
     @Override
     public Object invoke(Object proxy, Method method, Object[] args)
         throws Throwable {
@@ -73,46 +162,52 @@ public class QueueTopicProxyFactory {
     }
   }
 
-  private static class BlockingQueueInvocationHandler<E> implements
+  /**
+   * An invocation handler that maps all {@link IQueue} operations to a
+   * {@link ArrayBlockingQueue} instance.
+   *
+   * @param <E> the type of objects in the queue
+   */
+  private static class AbstractQueueInvocationHandler<E> implements
       InvocationHandler {
 
-    private BlockingQueue<E> delegate;
-
-    private final static Map<String, Method> METHOD_MAP = new HashMap<String, Method>();
+    private final ArrayBlockingQueue<E> delegate;
+    private final static Map<String, Method> METHOD_MAP = new HashMap<>();
 
     static {
       try {
         METHOD_MAP.put("offer_1",
-            BlockingQueue.class.getMethod("offer", Object.class));
-        METHOD_MAP.put("offer_3", BlockingQueue.class.getMethod("offer",
+            ArrayBlockingQueue.class.getMethod("offer", Object.class));
+        METHOD_MAP.put("offer_3", ArrayBlockingQueue.class.getMethod("offer",
             Object.class, long.class, TimeUnit.class));
-        METHOD_MAP.put("poll_0", BlockingQueue.class.getMethod("poll"));
+        METHOD_MAP.put("poll_0", ArrayBlockingQueue.class.getMethod("poll"));
         METHOD_MAP.put("poll_2",
-            BlockingQueue.class.getMethod("poll", long.class, TimeUnit.class));
+            ArrayBlockingQueue.class.getMethod("poll", long.class,
+                TimeUnit.class));
+        METHOD_MAP.put("clear_0", ArrayBlockingQueue.class.getMethod("clear"));
 
       }
       catch (NoSuchMethodException ex) {
-        throw new RuntimeException("Could not find method on blocking queue.",
+        throw new RuntimeException("Could not find method on AbstractQueue.",
             ex);
       }
     }
 
-    public BlockingQueueInvocationHandler(BlockingQueue<E> queue) {
+    /**
+     * Constructs the handler which will map all operations to the given queue.
+     *
+     * @param queue the delegate queue
+     */
+    public AbstractQueueInvocationHandler(ArrayBlockingQueue<E> queue) {
       this.delegate = queue;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.reflect.InvocationHandler#invoke(java.lang.Object,
-     * java.lang.reflect.Method, java.lang.Object[])
-     */
     @Override
     public Object invoke(Object proxy, Method method, Object[] args)
         throws Throwable {
 
-      Method delegateMethod = METHOD_MAP.get(method.getName() + "_"
-          + args.length);
+      int argCount = args == null ? 0 : args.length;
+      Method delegateMethod = METHOD_MAP.get(method.getName() + "_" + argCount);
 
       if (delegateMethod != null) {
         return delegateMethod.invoke(delegate, args);
@@ -122,49 +217,6 @@ public class QueueTopicProxyFactory {
             "Method [%s] is not supported.", method.getName()));
       }
     }
-  }
-
-  @SuppressWarnings("unchecked")
-  public static <E> IQueue<E> createQueueProxy(TransactionalQueue<E> queue) {
-
-    InvocationHandler handler = new TransactionalQueueInvocationHandler<E>(
-        queue);
-
-    return (IQueue<E>) Proxy.newProxyInstance(
-        queue.getClass().getClassLoader(), new Class[] { IQueue.class },
-        handler);
-  }
-
-  @SuppressWarnings("unchecked")
-  public static <E> IQueue<E> createQueueProxy(final BlockingQueue<E> queue) {
-
-    InvocationHandler handler = new BlockingQueueInvocationHandler<E>(queue);
-
-    return (IQueue<E>) Proxy.newProxyInstance(
-        queue.getClass().getClassLoader(), new Class[] { IQueue.class },
-        handler);
-  }
-
-  @SuppressWarnings("unchecked")
-  public static <E> ITopic<E> createTopicProxy(
-      final TransactionalQueue<E> queue, final ITopic<E> topic) {
-    InvocationHandler handler = new InvocationHandler() {
-      @Override
-      public Object invoke(Object proxy, Method method, Object[] args)
-          throws Throwable {
-
-        if (method.getName().equals("publish")) {
-          return queue.offer((E) args[0]);
-        }
-        else {
-          return method.invoke(topic, args);
-        }
-      }
-    };
-
-    return (ITopic<E>) Proxy.newProxyInstance(
-        queue.getClass().getClassLoader(), new Class[] { ITopic.class },
-        handler);
   }
 
 }

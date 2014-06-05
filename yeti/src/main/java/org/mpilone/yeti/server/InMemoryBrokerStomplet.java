@@ -12,6 +12,11 @@ import org.mpilone.yeti.Stomplet.WritableFrameChannel;
 
 
 /**
+ * A simple {@link Stomplet} implementation that has an in-memory broker to
+ * track subscriptions and supports sending messages to subscribers. This is a
+ * proof of concept implementation for demonstration and testing purposes but it
+ * is in no way production ready. This stomplet can be used to build a very
+ * simple STOMP server by just wiring up the Netty channel handlers.
  *
  * @author mpilone
  */
@@ -97,7 +102,8 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
   /**
    * A simple in-memory message broker that can track subscriptions and publish
    * messages to subscribers. This class is for demonstration and testing
-   * purposes only and should not be considered production usable.
+   * purposes only and should not be considered production usable. The
+   * destinations can be any string value.
    *
    * @author mpilone
    */
@@ -105,6 +111,17 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
 
     private final Map<String, List<Subscriber>> subscribers = new HashMap<>();
 
+    /**
+     * Creates a subscription with the given ID to the given destination. Any
+     * message frames received on the destination will be written to the frame
+     * channel.
+     *
+     * @param subscriptionId the client's ID of the subscription
+     * @param destination the destination to subscribe to
+     * @param channel the frame channel to handle incoming messages
+     *
+     * @return a generated unique broker ID for the subscription
+     */
     public synchronized String subscribe(String subscriptionId,
         String destination,
         WritableFrameChannel channel) {
@@ -120,6 +137,11 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
       return subscriber.getBrokerSubId();
     }
 
+    /**
+     * Removes the subscription from the broker.
+     *
+     * @param brokerSubId the unique broker ID for the subscription
+     */
     public synchronized void unsubscribe(String brokerSubId) {
       for (List<Subscriber> subs : subscribers.values()) {
         for (Iterator<Subscriber> iter = subs.iterator(); iter.hasNext();) {
@@ -132,6 +154,14 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
       }
     }
 
+    /**
+     * Publishes the given message body to the destination. Any subscribers to
+     * the destination will get the message (similar to a JMS Topic).
+     *
+     * @param destination the destination to publish to
+     * @param contentType the content type of the message body
+     * @param body the body of the message to publish
+     */
     public synchronized void publish(String destination, String contentType,
         byte[] body) {
 
@@ -149,6 +179,9 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
       }
     }
 
+    /**
+     * A subscriber in the in-memory broker.
+     */
     public static class Subscriber {
 
       private final String brokerSubId;
@@ -156,6 +189,14 @@ public class InMemoryBrokerStomplet extends ConnectDisconnectStomplet {
       private final WritableFrameChannel channel;
       private final String clientSubId;
 
+      /**
+       * Constructs the subscriber.
+       *
+       * @param brokerSubId the unique broker generated subscription ID
+       * @param clientSubId the client's subscription ID
+       * @param destination the destination subscribed to
+       * @param channel the channel to write message frames to
+       */
       public Subscriber(String brokerSubId, String clientSubId,
           String destination, WritableFrameChannel channel) {
         this.brokerSubId = brokerSubId;

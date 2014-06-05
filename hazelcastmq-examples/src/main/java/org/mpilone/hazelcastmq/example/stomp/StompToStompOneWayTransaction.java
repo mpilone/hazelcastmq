@@ -6,12 +6,12 @@ import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServer;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompServerConfig;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStomp;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompConfig;
+import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompInstance;
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.client.StompClient;
-import org.mpilone.yeti.client.StompClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,22 +58,22 @@ public class StompToStompOneWayTransaction {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompServerConfig stompConfig = new HazelcastMQStompServerConfig(
+      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
-      HazelcastMQStompServer stompServer = new HazelcastMQStompServer(
-          stompConfig);
+      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
+          newHazelcastMQStompInstance(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
-          host("localhost").build();
+      StompClient stompClient = new StompClient("localhost", stompConfig.
+          getPort());
       stompClient.connect();
 
       // Create a Stomp client to poll.
-      StompClient stompClient2 = StompClientBuilder.port(stompConfig.getPort()).
-          host("localhost").build();
+      StompClient stompClient2 = new StompClient("localhost", stompConfig.
+          getPort());
       stompClient2.connect();
 
       // Subscribe to a queue.

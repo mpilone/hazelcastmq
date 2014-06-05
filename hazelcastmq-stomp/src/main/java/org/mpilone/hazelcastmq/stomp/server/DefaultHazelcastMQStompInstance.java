@@ -1,12 +1,9 @@
 package org.mpilone.hazelcastmq.stomp.server;
 
 
-import java.io.IOException;
-
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.yeti.Stomplet;
 import org.mpilone.yeti.server.StompServer;
-import org.mpilone.yeti.server.StompServerBuilder;
 import org.slf4j.*;
 
 /**
@@ -16,18 +13,18 @@ import org.slf4j.*;
   * 
  * @author mpilone
  */
-public class HazelcastMQStompServer {
+public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance {
 
   /**
    * The log for this class.
    */
   private final Logger log = LoggerFactory.getLogger(
-      HazelcastMQStompServer.class);
+      DefaultHazelcastMQStompInstance.class);
 
   /**
    * The configuration of the STOMP server.
    */
-  private final HazelcastMQStompServerConfig config;
+  private final HazelcastMQStompConfig config;
 
   /**
    * The STOMP server that will relay messages into HazelcastMQ.
@@ -40,15 +37,11 @@ public class HazelcastMQStompServer {
    * 
    * @param config
    *          the stomper configuration
-   * @throws IOException
-   *           if the server socket could not be properly initialized
    */
-  public HazelcastMQStompServer(final HazelcastMQStompServerConfig config)
-      throws IOException {
+  DefaultHazelcastMQStompInstance(final HazelcastMQStompConfig config) {
     this.config = config;
-    this.stompServer = StompServerBuilder.port(this.config.getPort()).
-        frameDebug(false).stompletFactory(new HazelcastMQStompletFactory()).
-        build();
+    this.stompServer = new StompServer(this.config.getPort(),
+        new HazelcastMQStompletFactory());
 
     try {
       // Bind and start to accept incoming connections.
@@ -60,10 +53,7 @@ public class HazelcastMQStompServer {
     }
   }
 
-  /**
-   * Shuts down the server socket. This method will block until the server is
-   * shutdown completely.
-   */
+  @Override
   public void shutdown() {
     try {
       // Wait until the server socket is closed.
@@ -81,7 +71,7 @@ public class HazelcastMQStompServer {
    * 
    * @return the configuration given during construction
    */
-  public HazelcastMQStompServerConfig getConfig() {
+  public HazelcastMQStompConfig getConfig() {
     return config;
   }
 

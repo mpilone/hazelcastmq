@@ -15,9 +15,9 @@ import com.hazelcast.core.*;
 /**
  * The default and primary implementation of a HazelcastMQ consumer. This
  * consumer uses the converter returned by
- * {@link HazelcastMQConfig#getMessageConverter()} to convert all messages
- * received.
- * 
+ * {@link HazelcastMQConfig#getMessageConverter()} to convert messages from the
+ * raw Hazelcast object representation to a {@link HazelcastMQMessage}. 
+  *
  * @author mpilone
  */
 class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
@@ -25,7 +25,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static Logger log = LoggerFactory.getLogger(
+      DefaultHazelcastMQConsumer.class);
 
   /**
    * The parent context of this consumer.
@@ -63,7 +64,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The destination that this consumer will be reading messages from.
    */
-  private String destination;
+  private final String destination;
 
   /**
    * The listener that responds to queue events in Hazelcast when actively
@@ -74,13 +75,13 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The lock used for thread safety around all receive and shutdown operations.
    */
-  private ReentrantLock receiveLock;
+  private final ReentrantLock receiveLock;
 
   /**
    * The wait condition used when a receive call is made but the consumer isn't
    * active. The condition will be notified when the consumer is started.
    */
-  private Condition receiveCondition;
+  private final Condition receiveCondition;
 
   /**
    * The flag which indicates if the consumer has been closed.
@@ -116,13 +117,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     this.id = "hazelcastmqconsumer-" + String.valueOf(idGenerator.newId());
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQConsumer#setMessageListener(org
-   * .mpilone.hazelcastmq.core.HazelcastMQMessageHandler)
-   */
+ 
   @Override
   public void setMessageListener(HazelcastMQMessageListener messageListener) {
     this.messageListener = messageListener;
@@ -247,21 +242,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#getMessageListener()
-   */
   @Override
   public HazelcastMQMessageListener getMessageListener() {
     return messageListener;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQConsumer#close()
-   */
   @Override
   public void close() {
 
@@ -451,7 +436,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     public HzTopicListener(ITopic<Object> topic) {
 
       this.queue = QueueTopicProxyFactory
-          .createQueueProxy(new ArrayBlockingQueue<Object>(config
+          .createQueueProxy(new ArrayBlockingQueue<>(config
                   .getTopicMaxMessageCount()));
       this.msgTopic = topic;
 

@@ -62,7 +62,7 @@ public class ProducerConsumerLargeSend {
       log.info("Sending messages.");
       for (int i = 0; i < MESSAGE_COUNT; ++i) {
         HazelcastMQMessage msg = new HazelcastMQMessage();
-        msg.setContentAsString("Hello World " + i);
+        msg.setBody("Hello World " + i);
         mqProducer.send(destination, msg);
       }
 

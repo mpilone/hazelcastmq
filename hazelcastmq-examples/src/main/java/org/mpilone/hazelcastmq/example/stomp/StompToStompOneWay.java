@@ -2,28 +2,23 @@ package org.mpilone.hazelcastmq.example.stomp;
 
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.ConnectionFactory;
-
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
 import org.mpilone.hazelcastmq.stomp.server.*;
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.client.StompClient;
-import org.mpilone.yeti.client.StompClientBuilder;
 import org.slf4j.*;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * This example uses a Stomper STOMP server to accept a Stompee client
- * connection. The client then sends and receives a STOMP frame. The Stomper
- * server is backed by the HazelcastMQ {@link ConnectionFactory} which is backed
- * by a local Hazelcast instance.
- * 
+ * This example uses a HazelcastMQ STOMP server to accept a Yeti STOMP client
+ * connection. The client then sends and receives a STOMP frame. The server is
+ * backed by HazelcastMQ which is backed by a local Hazelcast instance.
+  * 
  * @author mpilone
- * 
  */
 public class StompToStompOneWay {
 
@@ -56,17 +51,17 @@ public class StompToStompOneWay {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompServerConfig stompConfig = new HazelcastMQStompServerConfig(
+      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
-      HazelcastMQStompServer stompServer = new HazelcastMQStompServer(
-          stompConfig);
+      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
+          newHazelcastMQStompInstance(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
 
       // Create a Stomp client.
-      StompClient stompClient = StompClientBuilder.port(stompConfig.getPort()).
-          host("localhost").build();
+      StompClient stompClient = new StompClient("localhost", stompConfig.
+          getPort());
       stompClient.connect();
 
       // Subscribe to a queue.

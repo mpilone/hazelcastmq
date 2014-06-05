@@ -3,6 +3,7 @@ package org.mpilone.yeti;
 import static org.mpilone.yeti.StompConstants.*;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.List;
 
 import io.netty.buffer.ByteBuf;
@@ -10,7 +11,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
 
 /**
- * TODO: enforce a maximum message size and header size
+ * A STOMP frame decoder that processes raw bytes into {@link Frame} instances.
+ *
+ * TODO: enforce a maximum frame size and header size
  *
  * @author mpilone
  */
@@ -97,10 +100,11 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
       data = new byte[bytesToRead];
       in.readBytes(data);
-
     }
-    // Look for the null terminator which could indicate an
-    // empty (heart-beat frame).
+
+    // Look for the null terminator.
+    // TODO: do we need to do this? Double check the spec but I think we
+    // should just gobble this up until we hit the expected end of message.
     else if ((bytesToRead = in.bytesBefore((byte) NULL_CHAR)) > -1) {
       bytesToSkip = 1;
 
@@ -158,11 +162,43 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
         headers.put(HEADER_BAD_REQUEST,
             "Frame must end with NULL character.");
       }
-      
+
       eob = true;
     }
 
     return eob;
+  }
+
+  /**
+   * Returns the number of bytes before the given sequence of characters. This
+   * method is similar to {@link ByteBuf#bytesBefore(int, int, byte) }
+   * but it supports a sequence of bytes rather than a single byte. NOTE: This
+   * method has not been tested and is currently not used.
+   *
+   * @param index the index to start from in the byte buffer
+   * @param in the buffer to scan
+   * @param seq the sequence of bytes to find
+   *
+   * @return the bytes before the sequence or -1 if the sequence is not found
+   */
+  private int bytesBefore(int index, ByteBuf in, byte[] seq) {
+
+    int bytesBefore = in.bytesBefore(index, in.readableBytes(), seq[0]);
+
+    // If we found the start of the sequence, check the rest of it.
+    if (bytesBefore > -1 && in.readableBytes() - bytesBefore >= seq.length) {
+      byte[] data = new byte[seq.length];
+      in.getBytes(bytesBefore, in.getBytes(bytesBefore + 1, data));
+
+      if (!Arrays.equals(seq, data)) {
+        bytesBefore = bytesBefore(bytesBefore + 1, in, seq);
+      }
+    }
+    else {
+      bytesBefore = -1;
+    }
+
+    return bytesBefore;
   }
 
   /**
@@ -174,6 +210,17 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    * @throws IOException if there is an error reading from the underlying stream
    */
   private boolean readHeaders(ByteBuf in) throws IOException {
+
+    // TODO: Make sure we can find the end of the headers before we start
+    // reading the headers. This will prevent multiple failed attempts and
+    // potentially improve performance. Unfortunately we can only scan for 
+    // a single byte so we would need to be smart about finding LF, CR,
+    // and/or NULL.
+//    if (bytesBefore(0, in, new byte[]{LINE_FEED_CHAR, LINE_FEED_CHAR}) == -1
+//        && bytesBefore(0, in, new byte[]{LINE_FEED_CHAR, CARRIAGE_RETURN_CHAR, LINE_FEED_CHAR})
+//        == -1) {
+//      return false;
+//    }
 
     headers = new DefaultHeaders();
 

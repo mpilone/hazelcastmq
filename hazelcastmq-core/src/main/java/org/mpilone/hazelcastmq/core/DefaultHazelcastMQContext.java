@@ -5,6 +5,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.hazelcast.core.*;
 import com.hazelcast.transaction.TransactionContext;
 
@@ -14,6 +17,12 @@ import com.hazelcast.transaction.TransactionContext;
  * @author mpilone
  */
 class DefaultHazelcastMQContext implements HazelcastMQContext {
+
+  /**
+   * The log for this class.
+   */
+  private final static Logger log = LoggerFactory.getLogger(
+      DefaultHazelcastMQContext.class);
 
   /**
    * The set of active temporary queues.
@@ -84,9 +93,9 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
     this.hazelcastMQInstance = hazelcastMQInstance;
     this.config = this.hazelcastMQInstance.getConfig();
-    this.consumerMap = new HashMap<String, DefaultHazelcastMQConsumer>();
-    this.temporaryQueues = new HashSet<String>();
-    this.temporaryTopics = new HashSet<String>();
+    this.consumerMap = new HashMap<>();
+    this.temporaryQueues = new HashSet<>();
+    this.temporaryTopics = new HashSet<>();
 
     HazelcastInstance hazelcast = this.config.getHazelcastInstance();
     IdGenerator idGenerator = hazelcast.getIdGenerator("hazelcastmqcontext");
@@ -125,14 +134,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
       consumer.stop();
     }
   }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see
-   * org.mpilone.hazelcastmq.core.HazelcastMQContext#createConsumer(java.lang
-   * .String)
-   */
+  
   @Override
   public HazelcastMQConsumer createConsumer(String destination) {
     DefaultHazelcastMQConsumer consumer = new DefaultHazelcastMQConsumer(
@@ -149,48 +151,33 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
     return consumer;
   }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#setAutoStart(boolean)
-   */
+ 
   @Override
   public void setAutoStart(boolean autoStart) {
     this.autoStart = autoStart;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#isAutoStart()
-   */
   @Override
   public boolean isAutoStart() {
     return autoStart;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#createProducer()
-   */
   @Override
   public HazelcastMQProducer createProducer() {
-    return new DefaultHazelcastMQProducer(this);
+    return createProducer(null);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#close()
-   */
+  @Override
+  public HazelcastMQProducer createProducer(String destination) {
+    return new DefaultHazelcastMQProducer(destination, this);
+  }
+
   @Override
   public void close() {
     stop();
 
     // Close all consumers
-    List<DefaultHazelcastMQConsumer> consumers = new ArrayList<DefaultHazelcastMQConsumer>(
+    List<DefaultHazelcastMQConsumer> consumers = new ArrayList<>(
         consumerMap.values());
     for (HazelcastMQConsumer consumer : consumers) {
       consumer.close();
@@ -207,11 +194,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#commit()
-   */
   @Override
   public void commit() {
     if (isTransacted()) {
@@ -222,11 +204,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#rollback()
-   */
   @Override
   public void rollback() {
     if (isTransacted()) {
@@ -238,21 +215,11 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#isTransacted()
-   */
   @Override
   public boolean isTransacted() {
     return txnContext != null;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.mpilone.hazelcastmq.core.HazelcastMQContext#start()
-   */
   @Override
   public void start() {
     if (active) {
@@ -285,6 +252,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     active = false;
   }
 
+  @Override
   public void destroyTemporaryDestination(String destination) {
     if (temporaryQueues.remove(destination)) {
       IQueue<Object> queue = resolveQueue(destination);
@@ -440,7 +408,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     /**
      * The latch which blocks until shutdown is complete.
      */
-    private CountDownLatch shutdownLatch;
+    private final CountDownLatch shutdownLatch;
 
     /**
      * The flag which indicates if the dispatcher should shutdown.
@@ -451,7 +419,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
      * A counting semaphore which adds permits when a consumer is ready for
      * dispatch. All permits are drained when a dispatch loop is started.
      */
-    private Semaphore consumerReadySemaphore;
+    private final Semaphore consumerReadySemaphore;
 
     /**
      * Constructs the dispatcher.
@@ -498,7 +466,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
       while (dispatched && !shutdown) {
         dispatched = false;
 
-        Set<String> consumerIds = new HashSet<String>(consumerMap.keySet());
+        Set<String> consumerIds = new HashSet<>(consumerMap.keySet());
         for (String id : consumerIds) {
           DefaultHazelcastMQConsumer consumer = consumerMap.get(id);
           if (consumer != null) {
@@ -532,9 +500,9 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
         shutdownLatch.await(1, TimeUnit.MINUTES);
       }
       catch (InterruptedException ex) {
-        // TODO log a warning
+        log.warn("Interrupted while shutting down. Shutdown may "
+            + "not be complete.", ex);
       }
     }
   }
-
 }

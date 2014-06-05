@@ -49,7 +49,7 @@ public class SimpleProducerConsumer {
           .createConsumer("/queue/example.dest");
 
       HazelcastMQMessage msg = new HazelcastMQMessage();
-      msg.setContentAsString("Hello World!");
+      msg.setBody("Hello World!");
 
       long startTime = System.currentTimeMillis();
 
@@ -62,7 +62,7 @@ public class SimpleProducerConsumer {
       long endTime = System.currentTimeMillis();
 
       log.info("Received message '{}' in {} milliseconds.",
-          msg.getContentAsString(), (endTime - startTime));
+          msg.getBodyAsString(), (endTime - startTime));
 
       mqConsumer.close();
       mqContext.stop();

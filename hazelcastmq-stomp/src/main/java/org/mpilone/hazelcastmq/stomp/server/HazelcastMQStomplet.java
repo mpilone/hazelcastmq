@@ -18,7 +18,7 @@ import org.mpilone.yeti.server.ConnectDisconnectStomplet;
  *
  * @author mpilone
  */
-public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
+class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
   private final String DEFAULT_CONTEXT_TXN_ID =
       "hazelcastmq-stomp-server-default";
@@ -26,7 +26,7 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
   /**
    * The configuration cached from the {@link #stomper} instance.
    */
-  private final HazelcastMQStompServerConfig config;
+  private final HazelcastMQStompConfig config;
 
   /**
    * The map of transaction ID to the transaction instance for all active client
@@ -40,7 +40,7 @@ public class HazelcastMQStomplet extends ConnectDisconnectStomplet {
    */
   private final Map<String, ClientSubscription> subscriptions;
 
-  public HazelcastMQStomplet(HazelcastMQStompServerConfig config) {
+  public HazelcastMQStomplet(HazelcastMQStompConfig config) {
 
     this.config = config;
     this.transactions = new HashMap<>();

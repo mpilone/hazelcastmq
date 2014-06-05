@@ -25,16 +25,28 @@ public class Frame {
    */
   private final byte[] body;
 
+  /**
+   * Constructs the frame.
+   *
+   * @param command the required frame command
+   * @param headers the optional headers
+   * @param body the optional body
+   */
   public Frame(Command command, Headers headers, byte[] body) {
+    if (command == null) {
+      throw new IllegalArgumentException("A command is required for all "
+          + "STOMP frames.");
+    }
+
     this.command = command;
     this.headers = headers == null ? new DefaultHeaders() : headers;
     this.body = body;
   }
 
   /**
-   * Returns the frame command or null if not set.
+   * Returns the frame command.
    * 
-   * @return the command or null
+   * @return the command
    */
   public Command getCommand() {
     return command;
@@ -48,8 +60,6 @@ public class Frame {
    * @return the frame headers
    */
   public Headers getHeaders() {
-    
-
     return headers;
   }
   /**

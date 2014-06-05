@@ -12,7 +12,7 @@ import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
  * 
  * @author mpilone
  */
-public class HazelcastMQStompServerConfig {
+public class HazelcastMQStompConfig {
   /**
    * The port to which the server will bind to listen for incoming connections.
    */
@@ -37,7 +37,7 @@ public class HazelcastMQStompServerConfig {
    * Constructs a configuration which will not have a connection factory set. A
    * connection factory must be set before constructing a stomper instance.
    */
-  public HazelcastMQStompServerConfig() {
+  public HazelcastMQStompConfig() {
     this(null);
   }
 
@@ -53,7 +53,7 @@ public class HazelcastMQStompServerConfig {
    *          the JMS connection factory to use for all message consumers and
    *          producers
    */
-  public HazelcastMQStompServerConfig(HazelcastMQInstance connectionFactory) {
+  public HazelcastMQStompConfig(HazelcastMQInstance connectionFactory) {
     this.hazelcastMQInstance = connectionFactory;
 
     frameConverter = new DefaultFrameConverter();

@@ -31,7 +31,7 @@ public class HazelcastMQConfig {
    * messages start getting dropped. Choose a value that is a balance between
    * memory usage and consumer performance. This value is per topic consumer.
    */
-  private int topicMaxMessageCount;
+  private int topicMaxMessageCount = 1000;
 
   /**
    * The executor service to spin up message listener consumers.
@@ -49,8 +49,6 @@ public class HazelcastMQConfig {
    * </ul>
    */
   public HazelcastMQConfig() {
-    messageConverter = new StompLikeMessageConverter();
-    topicMaxMessageCount = 1000;
   }
 
   /**

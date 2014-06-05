@@ -1,8 +1,10 @@
 package org.mpilone.yeti;
 
 /**
- * An exception related to STOMP frame processing.
- * 
+ * An exception related to STOMP frame processing. A client exception will be
+ * relayed to the connected STOMP client as an ERROR frame using the exceptions
+ * message and details.
+  *
  * @author mpilone
  */
 public class StompClientException extends RuntimeException {
