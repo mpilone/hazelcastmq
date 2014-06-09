@@ -1,5 +1,7 @@
 package org.mpilone.hazelcastmq.core;
 
+import static org.mpilone.hazelcastmq.core.HazelcastMQConstants.UTF_8;
+
 import java.io.Serializable;
 import java.nio.charset.Charset;
 
@@ -9,11 +11,6 @@ import java.nio.charset.Charset;
  * @author mpilone
  */
 public class HazelcastMQMessage implements Serializable {
-
-  /**
-   * The UTF-8 character set for easy reference.
-   */
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   /**
    * The body of the message.

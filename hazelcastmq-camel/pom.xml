@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<project
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>hazelcastmq-parent</artifactId>
+    <groupId>org.mpilone.hazelcastmq</groupId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>hazelcastmq-camel</artifactId>
+  <name>HazelcastMQ Camel</name>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <!-- Compile -->
+    <dependency>
+    <groupId>org.apache.camel</groupId>
+    <artifactId>camel-core</artifactId>
+    <version>2.13.1</version>
+</dependency>
+    <dependency>
+      <groupId>org.mpilone.hazelcastmq</groupId>
+      <artifactId>hazelcastmq-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+
+    <!-- Test -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

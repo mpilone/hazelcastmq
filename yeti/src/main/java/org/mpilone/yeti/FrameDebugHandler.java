@@ -1,9 +1,10 @@
 
 package org.mpilone.yeti;
 
+import static java.lang.String.format;
+
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.UUID;
+import java.util.*;
 
 import io.netty.channel.*;
 
@@ -60,8 +61,7 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
       Exception {
 
     if (debugInbound && msg instanceof Frame) {
-      System.out.printf("[%s] [%s] Inbound frame: %s\n", formatter.format(
-          new Date()), instanceId, msg);
+      logMessage(format("[%s] Inbound frame: %s", instanceId, msg));
     }
 
     super.channelRead(ctx, msg);
@@ -72,8 +72,7 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
       ChannelPromise promise) throws Exception {
 
     if (debugOutbound && msg instanceof Frame) {
-      System.out.printf("[%s] [%s] Outbound frame: %s\n", formatter.format(
-          new Date()), instanceId, msg);
+      logMessage(format("[%s] Outbound frame: %s", instanceId, msg));
     }
 
     super.write(ctx, msg, promise);
@@ -81,8 +80,20 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-    System.out.printf("[%s] [%s] Channel inactive.\n", new Date(), instanceId);
+    logMessage(format("[%s] Channel inactive.", instanceId));
     super.channelInactive(ctx);
+  }
+
+  /**
+   * Prints the given message to the logging system. The message will include
+   * the instance ID and any frame details. By default, this will be stdout.
+   * Subclasses should overload this method to write to a different logging
+   * system.
+   *
+   * @param msg the message to log
+   */
+  protected void logMessage(String msg) {
+    System.out.printf("[%s] \n", formatter.format(new Date()), msg);
   }
 
 }

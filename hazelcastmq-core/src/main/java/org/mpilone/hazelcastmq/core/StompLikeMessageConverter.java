@@ -1,12 +1,10 @@
 package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
+import static org.mpilone.hazelcastmq.core.HazelcastMQConstants.UTF_8;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 
 /**
  * A message converter that uses a STOMP (http://stomp.github.com/) like message
@@ -19,11 +17,6 @@ import java.nio.charset.Charset;
  * @author mpilone
  */
 public class StompLikeMessageConverter implements MessageConverter {
-
-  /**
-   * The UTF-8 character set used for all conversions.
-   */
-  private final static Charset UTF_8 = Charset.forName("UTF-8");
 
   private static final String MESSAGE_COMMAND = "HAZELCASTMQ-MESSAGE";
 

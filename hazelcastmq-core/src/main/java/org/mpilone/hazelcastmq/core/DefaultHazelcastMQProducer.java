@@ -69,7 +69,7 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
   
   @Override
   public void send(HazelcastMQMessage msg) {
-    send(destination, msg, timeToLive);
+    doSend(destination, msg, timeToLive);
   }
 
   @Override

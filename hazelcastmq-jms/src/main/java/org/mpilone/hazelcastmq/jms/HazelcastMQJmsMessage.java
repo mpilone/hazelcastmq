@@ -10,114 +10,81 @@ import javax.jms.*;
  * 
  * @author mpilone
  */
-class HazelcastMQJmsMessage implements Message {
+abstract class HazelcastMQJmsMessage implements Message {
+
+  private static final String HEADER_PREFIX_DESTINATION_TYPE = "HzMq-DestType-";
+  public static final String HEADER_JMS_EXPIRATION = "JMSExpiration";
+  public static final String HEADER_JMS_MESSAGE_ID = "JMSMessageID";
+  public static final String HEADER_JMS_PRIORITY = "JMSPriority";
+  public static final String HEADER_JMS_REDELIVERED = "JMSRedelivered";
+  public static final String HEADER_JMS_REPLY_TO = "JMSReplyTo";
+  public static final String HEADER_JMS_TIMESTAMP = "JMSTimestamp";
+  public static final String HEADER_JMS_TYPE = "JMSType";
+  public static final String HEADER_JMS_CORRELATION_ID = "JMSCorrelationID";
+  public static final String HEADER_JMS_DELIVERY_MODE = "JMSDeliveryMode";
+  public static final String HEADER_JMS_DESTINATION = "JMSDestination";
 
   /**
    * The user defined properties of the message.
    */
-  private Map<String, String> properties;
+  private final Map<String, String> properties;
 
   /**
    * The standard JMS headers of the message.
    */
-  private Map<String, String> headers;
+  private final Map<String, String> headers;
 
   /**
    * Constructs a message with no headers or properties.
    */
   public HazelcastMQJmsMessage() {
-    properties = new HashMap<String, String>();
-    headers = new HashMap<String, String>();
+    properties = new HashMap<>();
+    headers = new HashMap<>();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#acknowledge()
-   */
   @Override
   public void acknowledge() throws JMSException {
     // no op
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#clearBody()
-   */
   @Override
   public void clearBody() throws JMSException {
     // no op
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#clearProperties()
-   */
   @Override
   public void clearProperties() throws JMSException {
     properties.clear();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getBooleanProperty(java.lang.String)
-   */
   @Override
   public boolean getBooleanProperty(String name) throws JMSException {
     return Boolean.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getByteProperty(java.lang.String)
-   */
   @Override
   public byte getByteProperty(String name) throws JMSException {
     return Byte.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getDoubleProperty(java.lang.String)
-   */
   @Override
   public double getDoubleProperty(String name) throws JMSException {
     return Double.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getFloatProperty(java.lang.String)
-   */
   @Override
   public float getFloatProperty(String name) throws JMSException {
     return Float.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getIntProperty(java.lang.String)
-   */
   @Override
   public int getIntProperty(String name) throws JMSException {
     return Integer.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSCorrelationID()
-   */
   @Override
   public String getJMSCorrelationID() throws JMSException {
-    return getHeader("JMSCorrelationID", null);
+    return getHeader(HEADER_JMS_CORRELATION_ID, null);
   }
 
   /**
@@ -183,11 +150,6 @@ class HazelcastMQJmsMessage implements Message {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSCorrelationIDAsBytes()
-   */
   @Override
   public byte[] getJMSCorrelationIDAsBytes() throws JMSException {
     String jmsCorrelationID = getJMSCorrelationID();
@@ -204,224 +166,114 @@ class HazelcastMQJmsMessage implements Message {
     return null;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSDeliveryMode()
-   */
   @Override
   public int getJMSDeliveryMode() throws JMSException {
-    return getHeader("JMSDeliveryMode", DeliveryMode.NON_PERSISTENT);
+    return getHeader(HEADER_JMS_DELIVERY_MODE, DeliveryMode.NON_PERSISTENT);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSDestination()
-   */
   @Override
   public Destination getJMSDestination() throws JMSException {
-    return getDestinationHeader("JMSDestination");
+    return getDestinationHeader(HEADER_JMS_DESTINATION);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSExpiration()
-   */
   @Override
   public long getJMSExpiration() throws JMSException {
-    return getHeader("JMSExpiration", 0L);
+    return getHeader(HEADER_JMS_EXPIRATION, 0L);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSMessageID()
-   */
   @Override
   public String getJMSMessageID() throws JMSException {
-    return getHeader("JMSMessageID", null);
+    return getHeader(HEADER_JMS_MESSAGE_ID, null);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSPriority()
-   */
   @Override
   public int getJMSPriority() throws JMSException {
-    return getHeader("JMSPriority", 4);
+    return getHeader(HEADER_JMS_PRIORITY, 4);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSRedelivered()
-   */
   @Override
   public boolean getJMSRedelivered() throws JMSException {
     return Boolean
-        .valueOf(getHeader("JMSRedelivered", Boolean.FALSE.toString()));
+        .valueOf(getHeader(HEADER_JMS_REDELIVERED, Boolean.FALSE.toString()));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSReplyTo()
-   */
   @Override
   public Destination getJMSReplyTo() throws JMSException {
-    return getDestinationHeader("JMSReplyTo");
+    return getDestinationHeader(HEADER_JMS_REPLY_TO);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSTimestamp()
-   */
   @Override
   public long getJMSTimestamp() throws JMSException {
-    return getHeader("JMSTimestamp", 0L);
+    return getHeader(HEADER_JMS_TIMESTAMP, 0L);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getJMSType()
-   */
   @Override
   public String getJMSType() throws JMSException {
-    return getHeader("JMSType", "TextMessage");
+    return getHeader(HEADER_JMS_TYPE, "TextMessage");
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getLongProperty(java.lang.String)
-   */
   @Override
   public long getLongProperty(String name) throws JMSException {
     return Long.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getObjectProperty(java.lang.String)
-   */
   @Override
   public Object getObjectProperty(String name) throws JMSException {
     return properties.get(name);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getPropertyNames()
-   */
   @SuppressWarnings("rawtypes")
   @Override
   public Enumeration getPropertyNames() throws JMSException {
     return Collections.enumeration(properties.keySet());
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getShortProperty(java.lang.String)
-   */
   @Override
   public short getShortProperty(String name) throws JMSException {
     return Short.valueOf(getStringProperty(name));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#getStringProperty(java.lang.String)
-   */
   @Override
   public String getStringProperty(String name) throws JMSException {
     return properties.get(name);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#propertyExists(java.lang.String)
-   */
   @Override
   public boolean propertyExists(String name) throws JMSException {
     return properties.containsKey(name);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setBooleanProperty(java.lang.String, boolean)
-   */
   @Override
   public void setBooleanProperty(String name, boolean value)
       throws JMSException {
     properties.put(name, String.valueOf(value));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setByteProperty(java.lang.String, byte)
-   */
   @Override
   public void setByteProperty(String name, byte value) throws JMSException {
     properties.put(name, String.valueOf(value));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setDoubleProperty(java.lang.String, double)
-   */
   @Override
   public void setDoubleProperty(String name, double value) throws JMSException {
     properties.put(name, String.valueOf(value));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setFloatProperty(java.lang.String, float)
-   */
   @Override
   public void setFloatProperty(String name, float value) throws JMSException {
     properties.put(name, String.valueOf(value));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setIntProperty(java.lang.String, int)
-   */
   @Override
   public void setIntProperty(String name, int value) throws JMSException {
     properties.put(name, String.valueOf(value));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setJMSCorrelationID(java.lang.String)
-   */
   @Override
   public void setJMSCorrelationID(String correlationID) throws JMSException {
-    headers.put("JMSCorrelationID", correlationID);
+    headers.put(HEADER_JMS_CORRELATION_ID, correlationID);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setJMSCorrelationIDAsBytes(byte[])
-   */
   @Override
   public void setJMSCorrelationIDAsBytes(byte[] correlationID)
       throws JMSException {
@@ -434,30 +286,30 @@ class HazelcastMQJmsMessage implements Message {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setJMSDeliveryMode(int)
-   */
   @Override
   public void setJMSDeliveryMode(int deliveryMode) throws JMSException {
-    headers.put("JMSDeliveryMode", String.valueOf(deliveryMode));
+    headers.put(HEADER_JMS_DELIVERY_MODE, String.valueOf(deliveryMode));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.jms.Message#setJMSDestination(javax.jms.Destination)
-   */
   @Override
   public void setJMSDestination(Destination destination) throws JMSException {
-    setDestinationHeader(destination, "JMSDestination");
+    setDestinationHeader(destination, HEADER_JMS_DESTINATION);
   }
 
+  /**
+   * Sets the given header to the given destination while also setting an
+   * internal header used to track the type of the destination.
+   *
+   * @param destination the destination value to set or null to clear it
+   * @param headerName the name of the header to store the value in
+   *
+   * @throws JMSException if there is an error setting the header
+   */
   private void setDestinationHeader(Destination destination, String headerName)
       throws JMSException {
     if (destination == null) {
       headers.remove(headerName);
+      headers.remove(HEADER_PREFIX_DESTINATION_TYPE + headerName);
     }
     else {
       String dest;
@@ -479,7 +331,7 @@ class HazelcastMQJmsMessage implements Message {
         destType = "topic";
       }
       headers.put(headerName, dest);
-      headers.put("HZ" + headerName + "Type", destType);
+      headers.put(HEADER_PREFIX_DESTINATION_TYPE + headerName, destType);
     }
   }
 
@@ -521,7 +373,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSExpiration(long expiration) throws JMSException {
-    headers.put("JMSExpiration", String.valueOf(expiration));
+    headers.put(HEADER_JMS_EXPIRATION, String.valueOf(expiration));
   }
 
   /*
@@ -531,7 +383,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSMessageID(String messageID) throws JMSException {
-    headers.put("JMSMessageID", messageID);
+    headers.put(HEADER_JMS_MESSAGE_ID, messageID);
   }
 
   /*
@@ -541,7 +393,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSPriority(int priority) throws JMSException {
-    headers.put("JMSPriority", String.valueOf(priority));
+    headers.put(HEADER_JMS_PRIORITY, String.valueOf(priority));
   }
 
   /*
@@ -551,7 +403,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSRedelivered(boolean redelivered) throws JMSException {
-    headers.put("JMSRedelivered", Boolean.valueOf(redelivered).toString());
+    headers.put(HEADER_JMS_REDELIVERED, Boolean.valueOf(redelivered).toString());
   }
 
   /*
@@ -561,7 +413,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSReplyTo(Destination destination) throws JMSException {
-    setDestinationHeader(destination, "JMSReplyTo");
+    setDestinationHeader(destination, HEADER_JMS_REPLY_TO);
   }
 
   /*
@@ -571,7 +423,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSTimestamp(long timestamp) throws JMSException {
-    headers.put("JMSTimestamp", String.valueOf(timestamp));
+    headers.put(HEADER_JMS_TIMESTAMP, String.valueOf(timestamp));
   }
 
   /*
@@ -581,7 +433,7 @@ class HazelcastMQJmsMessage implements Message {
    */
   @Override
   public void setJMSType(String type) throws JMSException {
-    headers.put("JMSType", type);
+    headers.put(HEADER_JMS_TYPE, type);
   }
 
   /*

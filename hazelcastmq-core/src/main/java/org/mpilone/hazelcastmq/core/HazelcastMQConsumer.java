@@ -6,8 +6,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * <p>
  * A message consumer that will receive messages from a single destination. A
- * consumer must be started by calling {@link #start()} in order to start
- * receiving messages. A consumer will be automatically started if the
+ * consumer must be started by calling {@link HazelcastMQContext#start()} in
+ * order to start receiving messages. A consumer will be automatically started if the
  * {@link HazelcastMQContext} is set to auto start. Messages can be "pushed" by
  * registering a {@link HazelcastMQMessageListener} or they can be "pulled"
  * using the {@link #receive()} methods.

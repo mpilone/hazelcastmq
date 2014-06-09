@@ -1,6 +1,7 @@
 package org.mpilone.yeti.server;
 
 
+
 import org.mpilone.yeti.*;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -124,11 +125,10 @@ public class StompServer {
         ch.pipeline().addLast(new StompFrameEncoder());
 
         if (frameDebugEnabled) {
-          ch.pipeline().addLast(new FrameDebugHandler());
+          ch.pipeline().addLast(new FrameDebugHandler(true, true));
         }
 
         // Create a new stomplet instance for each client connection.
-        
         ch.pipeline().addLast(new StompletFrameHandler(stompletFactory.
             createStomplet()));
       }

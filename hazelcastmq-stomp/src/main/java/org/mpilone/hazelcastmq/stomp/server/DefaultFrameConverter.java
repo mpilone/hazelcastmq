@@ -8,9 +8,9 @@ import org.mpilone.yeti.FrameBuilder;
 
 /**
  * Converts a STOMP Frame to and from a {@link HazelcastMQMessage}. This
- * implementation follows the basic rules defined by ActiveMQ's implementation
- * found at http://activemq.apache.org/stomp.html.
- * 
+ * implementation simply does a 1 to 1 copy of the headers and body from a frame
+ * to a message.
+  *
  * @author mpilone
  */
 public class DefaultFrameConverter implements FrameConverter {

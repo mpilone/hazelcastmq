@@ -14,8 +14,9 @@
     -->
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-jms</module>
-    <module>yeti</module>
     <module>hazelcastmq-stomp</module>
+    <module>hazelcastmq-camel</module>
+    <module>yeti</module>
   </modules>
 
   <name>HazelcastMQ Parent</name>

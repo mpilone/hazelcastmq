@@ -15,6 +15,8 @@ import org.mpilone.yeti.StompClientException;
 import org.mpilone.yeti.server.ConnectDisconnectStomplet;
 
 /**
+ * A {@link Stomplet} implementation that map subscribe and send functionality
+ * to a {@link HazelcastMQInstance}.
  *
  * @author mpilone
  */
@@ -87,7 +89,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Check that this isn't an existing subscription ID.
     if (subscriptions.containsKey(id)) {
       throw new StompClientException(format(
-          "Subscription with id [%s] already exists.", id));
+          "Subscription with id [%s] already exists.", id), null, frame);
     }
 
     // Create the JMS components.
@@ -118,8 +120,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Check that it exists.
     if (subscription == null) {
       throw new StompClientException(format(
-          "Subscription with id [%s] not found.",
-          id));
+          "Subscription with id [%s] not found.", id), null, frame);
     }
 
     // Close the MQ components.
@@ -143,7 +144,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     ClientTransaction tx = transactions.remove(transactionId);
     if (tx == null) {
       throw new StompClientException(format("Transaction [%s] is not active.",
-          transactionId));
+          transactionId), null, frame);
     }
 
     tx.getContext().rollback();
@@ -166,7 +167,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     ClientTransaction tx = transactions.remove(transactionId);
     if (tx == null) {
       throw new StompClientException(format("Transaction [%s] is not active.",
-          transactionId));
+          transactionId), null, frame);
     }
 
     tx.getContext().commit();
@@ -189,7 +190,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     if (transactions.containsKey(transactionId)) {
       throw new StompClientException(format(
           "Transaction [%s] is already active.",
-          transactionId));
+          transactionId), null, frame);
     }
 
     // Create a transacted session and store it away for future commands.
@@ -225,7 +226,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     ClientTransaction tx = transactions.get(transactionId);
     if (tx == null) {
       throw new StompClientException(format("Transaction [%s] is not active.",
-          transactionId));
+          transactionId), null, frame);
     }
     HazelcastMQContext context = tx.getContext();
 
@@ -252,9 +253,9 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
       throws StompClientException {
     String value = frame.getHeaders().get(name);
     if (value == null) {
-      throw new StompClientException("Required header not found.", format(
-          "Header %s is required for the command %s.", name, frame.getCommand()),
-          frame);
+      throw new StompClientException(format(
+          "Header %s is required for the command %s.", name,
+          frame.getCommand()), null, frame);
     }
     return value;
   }
@@ -401,7 +402,5 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
         frameChannel.write(fb.build());
       }
     }
-
   }
-
 }

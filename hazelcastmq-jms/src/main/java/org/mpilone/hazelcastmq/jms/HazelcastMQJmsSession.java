@@ -167,7 +167,7 @@ class HazelcastMQJmsSession implements Session {
 
   @Override
   public Message createMessage() throws JMSException {
-    return new HazelcastMQJmsMessage();
+    return createTextMessage();
   }
 
   @Override

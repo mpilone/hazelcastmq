@@ -34,6 +34,7 @@ public class DefaultMessageConverter implements MessageConverter {
    */
   private final static Charset UTF_8 = Charset.forName("UTF-8");
 
+  @Override
   public HazelcastMQMessage fromJmsMessage(Message message) throws JMSException {
 
     HazelcastMQJmsMessage jmsMsg = (HazelcastMQJmsMessage) message;
@@ -81,7 +82,8 @@ public class DefaultMessageConverter implements MessageConverter {
     }
     else {
       throw new UnsupportedOperationException(
-          "Message type is not supported by this converter.");
+          format("Message type [%s] is not supported by this converter.",
+              message.getClass().getName()));
     }
 
     mqMsg.setBody(body);
