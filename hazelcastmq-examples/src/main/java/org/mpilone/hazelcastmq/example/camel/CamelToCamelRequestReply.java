@@ -1,8 +1,8 @@
 package org.mpilone.hazelcastmq.example.camel;
 
-import java.util.concurrent.TimeUnit;
-
 import org.apache.camel.CamelContext;
+import org.apache.camel.ExchangePattern;
+import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.mpilone.hazelcastmq.camel.*;
@@ -13,28 +13,28 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * An example of using the {@link HazelcastMQCamelComponent} to consume a
- * message from one HzMq queue and produce it to another in a one way operation.
+ * An example of using the {@link HazelcastMQCamelComponent} to produce a
+ * request and wait for a reply from the other end.
  *
  * @author mpilone
  */
-public class CamelToCamelOneWay {
+public class CamelToCamelRequestReply {
 
   /**
    * The log for this class.
    */
   private final static Logger log = LoggerFactory.getLogger(
-      CamelToCamelOneWay.class);
+      CamelToCamelRequestReply.class);
 
   public static void main(String[] args) throws Exception {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
-    new CamelToCamelOneWay();
+    new CamelToCamelRequestReply();
   }
 
-  public CamelToCamelOneWay() throws Exception {
+  public CamelToCamelRequestReply() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -64,29 +64,29 @@ public class CamelToCamelOneWay {
       camelContext.addRoutes(new RouteBuilder() {
         @Override
         public void configure() {
-          from("hazelcastmq:queue:primo.test")
-              .to("hazelcastmq:queue:secondo.test");
+          from("direct:primo.test")
+              .to(ExchangePattern.InOut, "hazelcastmq:queue:secondo.test");
+
+          from("hazelcastmq:queue:secondo.test").delay(1500)
+              .setBody(constant("Goodbye World!"));
         }
       });
 
       camelContext.start();
 
-      // Send a message to the first queue and the Camel route should move it to the second.
-      try (HazelcastMQContext mqContext = mqInstance.createContext()) {
-        HazelcastMQProducer mqProducer = mqContext.createProducer();
-        mqProducer.send("/queue/primo.test", "Hello World!");
+      // Create a Camel producer.
+      ProducerTemplate camelProducer = camelContext.createProducerTemplate();
+      camelProducer.start();
 
-        try (HazelcastMQConsumer mqConsumer =
-            mqContext.createConsumer("/queue/secondo.test")) {
-          HazelcastMQMessage msg = mqConsumer.receive(12, TimeUnit.SECONDS);
+      // Send a message to the direct endpoint.
+      String reply = (String) camelProducer.sendBody("direct:primo.test",
+          ExchangePattern.InOut, "Hello World!");
 
-          if (msg == null) {
-            log.warn("Did not get expected message!");
-          }
-          else {
-            log.info("Got message on second queue: " + msg.getBodyAsString());
-          }
-        }
+      if (reply == null) {
+        log.warn("Did not get expected message!");
+      }
+      else {
+        log.info("Got reply message: " + reply);
       }
       camelContext.stop();
     }
