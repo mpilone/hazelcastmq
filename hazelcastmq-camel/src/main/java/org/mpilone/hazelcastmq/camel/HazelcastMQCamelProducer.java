@@ -38,11 +38,9 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
     this.messageConverter = config.getMessageConverter();
     this.destination = endpoint.getDestination();
 
-    // TODO: load this from the config first, then allow the reply manager to
-    // fallback to temporary queue.
-    String replyToDestination = null;
-
-    this.replyManager = new ReplyManager(replyToDestination, config.
+    // Load the reply-to destination from the config first and then allow the
+    // reply manager to fallback to temporary queue.
+    this.replyManager = new ReplyManager(config.getReplyTo(), config.
         getHazelcastMQInstance());
   }
 
@@ -135,11 +133,8 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
     Message camelMsg = exchange.getIn();
     HazelcastMQMessage msg = messageConverter.fromCamelMessage(camelMsg);
 
-    // TODO: load this from the config.
-    int timeToLive = 0;
-
-    // TODO: load this from the config.
-    int replyTimeout = (int) TimeUnit.SECONDS.toMillis(20);
+    int timeToLive = config.getTimeToLive();
+    int requestTimeout = config.getRequestTimeout();
 
     BlockingQueue<HazelcastMQMessage> replyQueue = new ArrayBlockingQueue<>(1);
 
@@ -152,21 +147,21 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
 
     // Add the pending reply before sending the message to prevent a race
     // condition if the reply arrived before we're ready.
-    replyManager.addPendingReply(msg.getCorrelationId(), replyTimeout,
+    replyManager.addPendingReply(msg.getCorrelationId(), requestTimeout,
         replyQueue);
 
     // Send the message.
     mqProducer.send(msg, timeToLive);
 
     // Wait for the reply.
-    HazelcastMQMessage replyMsg = replyQueue.poll(replyTimeout,
+    HazelcastMQMessage replyMsg = replyQueue.poll(requestTimeout,
         TimeUnit.MILLISECONDS);
 
     if (replyMsg == null) {
       throw new RuntimeCamelException(format(
           "No reply received for correlation ID %s on reply to "
           + "destination %s after %d milliseconds.",
-          msg.getCorrelationId(), replyToDestination, replyTimeout));
+          msg.getCorrelationId(), replyToDestination, requestTimeout));
     }
     else if (replyMsg == ReplyManager.SENTINAL) {
       // This is expected if we're shutting down. No reply will be processed.

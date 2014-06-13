@@ -47,9 +47,8 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
     this.messageConverter = config.getMessageConverter();
     this.consumers = new ArrayList<>();
 
-    // TODO: add a configuration property for concurrent consumers.
-    int concurrentConsumers = 1;
-
+    // Create the number of consumers requested.
+    int concurrentConsumers = config.getConcurrentConsumers();
     for (int i = 0; i < concurrentConsumers; ++i) {
       this.consumers.add(new SingleThreadedConsumer(config, endpoint));
     }
