@@ -121,16 +121,19 @@ public class StompServer {
     return new ChannelInitializer<SocketChannel>() {
       @Override
       public void initChannel(SocketChannel ch) throws Exception {
-        ch.pipeline().addLast(new StompFrameDecoder());
-        ch.pipeline().addLast(new StompFrameEncoder());
+        ch.pipeline().addLast(StompFrameDecoder.class.getName(),
+            new StompFrameDecoder());
+        ch.pipeline().addLast(StompFrameEncoder.class.getName(),
+            new StompFrameEncoder());
 
         if (frameDebugEnabled) {
-          ch.pipeline().addLast(new FrameDebugHandler(true, true));
+          ch.pipeline().addLast(FrameDebugHandler.class.getName(),
+              new FrameDebugHandler(true, true));
         }
 
         // Create a new stomplet instance for each client connection.
-        ch.pipeline().addLast(new StompletFrameHandler(stompletFactory.
-            createStomplet()));
+        ch.pipeline().addLast(StompletFrameHandler.class.getName(),
+            new StompletFrameHandler(stompletFactory.createStomplet()));
       }
     };
   }

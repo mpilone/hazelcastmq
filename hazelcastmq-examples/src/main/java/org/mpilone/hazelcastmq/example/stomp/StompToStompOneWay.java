@@ -53,6 +53,7 @@ public class StompToStompOneWay {
       // Create a Stomp server.
       HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
+      stompConfig.setFrameDebugEnabled(true);
       HazelcastMQStompInstance stompServer = HazelcastMQStomp.
           newHazelcastMQStompInstance(stompConfig);
 

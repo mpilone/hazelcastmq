@@ -101,9 +101,8 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       data = new byte[bytesToRead];
       in.readBytes(data);
     }
-
     // Look for the null terminator.
-    // TODO: do we need to do this? Double check the spec but I think we
+    // I'm not sure we need to do this. Double check the spec but I think we
     // should just gobble this up until we hit the expected end of message.
     else if ((bytesToRead = in.bytesBefore((byte) NULL_CHAR)) > -1) {
       bytesToSkip = 1;
@@ -291,7 +290,8 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
     READ_COMMAND,
     READ_HEADERS,
-    READ_BODY;
+    READ_BODY,
+    DISCARD_FRAME;
   }
 
 }

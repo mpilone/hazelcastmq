@@ -33,7 +33,7 @@ public interface Stomplet {
 
   /**
    * Initializes the stomplet with the given context. This method will be called
-   * when a connection (at the network level) to a remote service has been
+   * when a connection (at the network layer) to a remote service has been
    * established.
    *
    * @param context the stomplet context
@@ -53,7 +53,7 @@ public interface Stomplet {
 
   /**
    * Destroys the stomplet and releases any resources. This method will be
-   * called when the connection (at the network level) to the remote service is
+   * called when the connection (at the network layer) to the remote service is
    * closed.
    */
   void destroy();
@@ -116,5 +116,19 @@ public interface Stomplet {
    */
   interface StompletContext {
 
+    /**
+     * Configures heartbeat handling for the Stomplet. If the remote endpoint
+     * does not send data within the {@code readInterval} it will be presumed
+     * dead and the connection closed. If this endpoint does not write data
+     * within the {@code writeInterval}, a new-line character will be written to
+     * keep the connection alive.
+     *
+     * @param readInterval the time in milliseconds that data must be read from
+     * the remote endpoint before it is considered dead or 0 to disable
+     * @param writeInterval the time in milliseconds that data must be written
+     * to     * the remote endpoint before a new-line character is generated or 0 to
+     * disable
+     */
+    public void configureHeartbeat(int readInterval, int writeInterval);
   }
 }

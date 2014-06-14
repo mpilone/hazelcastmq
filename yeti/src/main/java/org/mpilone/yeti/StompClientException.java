@@ -7,15 +7,26 @@ package org.mpilone.yeti;
   *
  * @author mpilone
  */
-public class StompClientException extends RuntimeException {
+public class StompClientException extends StompException {
 
   /**
    * Serialization ID.
    */
   private static final long serialVersionUID = 1L;
 
-  private Frame frame;
-  private String details;
+  /**
+   * Constructs the exception with a related frame that was being processed when
+   * the error occurred.
+   *
+   * @param message the short error message
+   * @param details the detailed error message to include in a response body
+   * @param frame the frame that was being processed when the error occurred
+   * @param cause the root cause exception
+   */
+  public StompClientException(String message, String details, Frame frame,
+      Throwable cause) {
+    super(message, details, frame, cause);
+  }
 
   /**
    * Constructs the exception with a related frame that was being processed when
@@ -26,29 +37,7 @@ public class StompClientException extends RuntimeException {
    * @param frame the frame that was being processed when the error occurred
    */
   public StompClientException(String message, String details, Frame frame) {
-    this(message);
-
-    this.frame = frame;
-    this.details = details;
-  }
-
-  /**
-   * Returns the frame that was being processed when the error occurred.
-   *
-   * @return the frame or null
-   */
-  public Frame getFrame() {
-    return frame;
-  }
-
-  /**
-   * Returns the detailed error description to return to the client as the body
-   * of the ERROR frame if possible.
-   *
-   * @return the detailed error message or null
-   */
-  public String getDetails() {
-    return details;
+    super(message, details, frame);
   }
 
   /**

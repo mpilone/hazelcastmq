@@ -9,9 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.mpilone.hazelcastmq.core.*;
-import org.mpilone.yeti.Frame;
-import org.mpilone.yeti.FrameBuilder;
-import org.mpilone.yeti.StompClientException;
+import org.mpilone.yeti.*;
 import org.mpilone.yeti.server.ConnectDisconnectStomplet;
 
 /**
@@ -42,7 +40,14 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
    */
   private final Map<String, ClientSubscription> subscriptions;
 
+  /**
+   * Constructs the stomplet with the given configuration.
+   *
+   * @param config the stomplet configuration
+   */
   public HazelcastMQStomplet(HazelcastMQStompConfig config) {
+
+    super(new StompVersion[]{StompVersion.VERSION_1_2});
 
     this.config = config;
     this.transactions = new HashMap<>();
@@ -55,6 +60,15 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     mqContext.start();
     transactions.put(DEFAULT_CONTEXT_TXN_ID,
         new ClientTransaction(DEFAULT_CONTEXT_TXN_ID, mqContext));
+  }
+
+  @Override
+  protected void postConnect(StompVersion version, Frame frame,
+      FrameBuilder connectedFrameBuilder) {
+    super.postConnect(version, frame, connectedFrameBuilder);
+
+    connectedFrameBuilder.header(org.mpilone.yeti.Headers.SERVER,
+        "HazelcastMQ");
   }
 
   @Override

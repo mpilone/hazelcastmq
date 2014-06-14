@@ -3,9 +3,11 @@ package org.mpilone.yeti;
 
 import static org.mpilone.yeti.StompConstants.UTF_8;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
+import java.util.concurrent.TimeUnit;
+
+import io.netty.buffer.*;
 import io.netty.channel.*;
+import io.netty.handler.timeout.*;
 
 /**
  * <p>
@@ -59,9 +61,7 @@ public class StompletFrameHandler extends SimpleChannelInboundHandler<Frame> {
 
   @Override
   public void channelActive(ChannelHandlerContext ctx) throws Exception {
-    // TODO: add support for setting up the heartbeat via the stomplet context.
-    stomplet.init(new Stomplet.StompletContext() {
-    });
+    stomplet.init(new StompletContextImpl(ctx.channel()));
   }
 
   @Override
@@ -132,9 +132,100 @@ public class StompletFrameHandler extends SimpleChannelInboundHandler<Frame> {
   }
 
   /**
+   * A channel handler that detects when the channel has not performed a read or
+   * write for a while. This is just a simple tagging extension for easy
+   * addition/removal from the pipeline.
+   */
+  private static class HeartbeatIdleHandler extends IdleStateHandler {
+
+    /**
+     * Constructs the handler.
+     *
+     * @param readerIdleTime the amount of time before a reader idle event is
+     * generated in milliseconds or 0 to disable
+     * @param writerIdleTime the amount of time before a writer idle event is
+     * generated in milliseconds or 0 to disable
+     */
+    public HeartbeatIdleHandler(int readerIdleTime, int writerIdleTime) {
+      super(readerIdleTime, writerIdleTime, 0, TimeUnit.MILLISECONDS);
+    }
+  }
+
+  /**
+   * A channel handler that listens for idle events from the
+   * {@link HeartbeatIdleHandler} and response appropriately. If the read thread
+   * is idle, the client will be assumed dead and the connection will be closed.
+   * If the write thread is idle, a new-line character will be sent.
+   */
+  private static class HeartbeatEventHandler extends ChannelDuplexHandler {
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws
+        Exception {
+      if (evt instanceof IdleStateEvent) {
+        IdleStateEvent e = (IdleStateEvent) evt;
+        if (e.state() == IdleState.READER_IDLE) {
+          //System.out.println(this + " READER_IDLE");
+
+          // Assume the remote host is dead. Close the connection.
+          ctx.close();
+        }
+        else if (e.state() == IdleState.WRITER_IDLE) {
+          //System.out.println(this + " WRITER_IDLE");
+
+          // Send a single new-line character to keep the connection alive.
+          ByteBuf out = Unpooled.buffer(1);
+          out.writeByte(StompConstants.LINE_FEED_CHAR);
+          ctx.writeAndFlush(out);
+        }
+      }
+    }
+  }
+
+  /**
+   * The implementation of the stomplet context.
+   */
+  protected class StompletContextImpl implements Stomplet.StompletContext {
+
+    private final Channel channel;
+
+    /**
+     * Constructs the context.
+     *
+     * @param channel the channel handling all IO for the somplet.
+     */
+    public StompletContextImpl(Channel channel) {
+      this.channel = channel;
+    }
+
+    @Override
+    public void configureHeartbeat(int readInterval, int writeInterval) {
+
+      // Remove any previous heartbeat configuration.
+      ChannelPipeline pipeline = channel.pipeline();
+      if (pipeline.get(HeartbeatEventHandler.class) != null) {
+        pipeline.remove(HeartbeatEventHandler.class);
+      }
+      if (pipeline.get(HeartbeatIdleHandler.class) != null) {
+        pipeline.remove(HeartbeatIdleHandler.class);
+      }
+
+      // Create the new handlers. We allow +/- 10% to cover network lag in
+      // the heartbeat messages.
+      ChannelHandler idleHandler = new HeartbeatIdleHandler((int) (readInterval
+          * 1.1), (int) (writeInterval * .9));
+      ChannelHandler eventHandler = new HeartbeatEventHandler();
+
+      // Add the new handlers to the head of the
+      pipeline.addFirst(HeartbeatEventHandler.class.getName(), eventHandler);
+      pipeline.addFirst(HeartbeatIdleHandler.class.getName(), idleHandler);
+    }
+  }
+
+  /**
    * The implementation of the stomplet request.
    */
-  protected class StompletRequestImpl implements Stomplet.StompletRequest {
+  private class StompletRequestImpl implements Stomplet.StompletRequest {
 
     private final Frame frame;
 
@@ -156,7 +247,7 @@ public class StompletFrameHandler extends SimpleChannelInboundHandler<Frame> {
   /**
    * The implementation of the stomplet response.
    */
-  protected class StompletResponseImpl implements Stomplet.StompletResponse {
+  private class StompletResponseImpl implements Stomplet.StompletResponse {
 
     private boolean finalResponse = false;
     private final Stomplet.WritableFrameChannel writableFrameChannel;

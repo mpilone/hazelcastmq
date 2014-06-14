@@ -31,22 +31,20 @@ public class StompException extends RuntimeException {
   }
 
   /**
-   * Returns the frame that was being processed when the error occurred.
+   * Constructs the exception with a related frame that was being processed when
+   * the error occurred.
    *
-   * @return the frame or null
+   * @param message the short error message
+   * @param details the detailed error message to include in a response body
+   * @param frame the frame that was being processed when the error occurred
+   * @param cause the root cause exception
    */
-  public Frame getFrame() {
-    return frame;
-  }
+  public StompException(String message, String details, Frame frame,
+      Throwable cause) {
+    this(message, cause);
 
-  /**
-   * Returns the detailed error description to return to the client as the body
-   * of the ERROR frame if possible.
-   *
-   * @return the detailed error message or null
-   */
-  public String getDetails() {
-    return details;
+    this.frame = frame;
+    this.details = details;
   }
 
   /**
@@ -79,6 +77,25 @@ public class StompException extends RuntimeException {
    */
   public StompException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  /**
+   * Returns the frame that was being processed when the error occurred.
+   *
+   * @return the frame or null
+   */
+  public Frame getFrame() {
+    return frame;
+  }
+
+  /**
+   * Returns the detailed error description to return to the client as the body
+   * of the ERROR frame if possible.
+   *
+   * @return the detailed error message or null
+   */
+  public String getDetails() {
+    return details;
   }
 
 }

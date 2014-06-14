@@ -1,4 +1,3 @@
-
 package org.mpilone.yeti.client;
 
 import static java.lang.String.format;
@@ -26,6 +25,11 @@ import io.netty.channel.socket.nio.NioSocketChannel;
  * @author mpilone
  */
 public class StompClient {
+
+  private static final int HEARTBEAT_CL_SEND = (int) TimeUnit.SECONDS.toMillis(
+      60);
+  private static final int HEARTBEAT_CL_RECV = (int) TimeUnit.SECONDS.toMillis(
+      60);
 
   private Channel channel;
   private NioEventLoopGroup workerGroup;
@@ -65,6 +69,7 @@ public class StompClient {
     this.receiptListeners = Collections.synchronizedList(
         new ArrayList<FrameListener>());
     this.subscriptionMap = new ConcurrentHashMap<>();
+    this.frameDebugEnabled = frameDebugEnabled;
 
     this.port = port;
     this.host = host;
@@ -139,7 +144,7 @@ public class StompClient {
   /**
    * Connects to the remote server by opening a network connection and then
    * immediately sending the STOMP CONNECT frame. When the method returns, the
-   * client is fully connected (at the network and STOMP levels) and can
+   * client is fully connected (at the network and STOMP layers) and can
    * immediately begin sending frames or subscribing to destinations.
    *
    * @throws InterruptedException if the connect operation is interrupted
@@ -158,12 +163,16 @@ public class StompClient {
     ChannelFuture f = b.connect(host, port).sync();
     channel = f.channel();
 
-    channel.writeAndFlush(FrameBuilder.connect("1.2", host).build());
+    Frame request = FrameBuilder.connect(StompVersion.VERSION_1_2, host)
+        .header(Headers.HEART_BEAT, format("%d,%d", HEARTBEAT_CL_SEND,
+                HEARTBEAT_CL_RECV)).build();
+
+    channel.writeAndFlush(request);
 
     Frame response = connectedListener.poll(10, TimeUnit.SECONDS);
-    if (response == null || response.getCommand() != Command.CONNECTED) {
-      throw new StompException(
-          "Unexpected frame returned while connecting: " + response);
+    if (response == null) {
+      channel.close().sync();
+      throw new StompException("Connect failure: CONNECTED frame not received.");
     }
   }
 
@@ -180,13 +189,16 @@ public class StompClient {
     return new ChannelInitializer<SocketChannel>() {
       @Override
       public void initChannel(SocketChannel ch) throws Exception {
-        ch.pipeline().addLast(new StompFrameDecoder());
-        ch.pipeline().addLast(new StompFrameEncoder());
+        ch.pipeline().addLast(StompFrameDecoder.class.getName(),
+            new StompFrameDecoder());
+        ch.pipeline().addLast(StompFrameEncoder.class.getName(),
+            new StompFrameEncoder());
 
         if (frameDebugEnabled) {
-          ch.pipeline().addLast(new FrameDebugHandler());
+          ch.pipeline().addLast(FrameDebugHandler.class.getName(),
+              new FrameDebugHandler(true, true));
         }
-        ch.pipeline().addLast(
+        ch.pipeline().addLast(StompletFrameHandler.class.getName(),
             new StompletFrameHandler(new DispatchingStomplet()));
       }
     };
@@ -326,6 +338,37 @@ public class StompClient {
     @Override
     protected void doConnected(StompletRequest req, StompletResponse res) throws
         Exception {
+
+      // Defaults.
+      int clSend = HEARTBEAT_CL_SEND; // cx
+      int clRecv = HEARTBEAT_CL_RECV; // cy
+      int srSend = 0; // sx
+      int srRecv = 0; // sy
+
+      // Parse the heartbeat header to get the server's values.
+      Frame frame = req.getFrame();
+      String heartbeat = frame.getHeaders().get(Headers.HEART_BEAT);
+      if (heartbeat != null) {
+        String[] values = heartbeat.trim().split(",");
+        if (values.length == 2) {
+          try {
+            srSend = Integer.parseInt(values[0]);
+            srRecv = Integer.parseInt(values[1]);
+          }
+          catch (NumberFormatException ex) {
+            throw new StompException(format("Invalid %s header value %s.",
+                Headers.HEART_BEAT, heartbeat), null, frame, ex);
+          }
+        }
+      }
+
+      int clientToServerInterval = srRecv == 0 ? 0 : Math.max(clSend, srRecv);
+      int serverToClientInterval = srSend == 0 ? 0 : Math.max(clRecv, srSend);
+
+      // Init the heartbeat in the stomplet context.
+      getStompletContext().configureHeartbeat(serverToClientInterval,
+          clientToServerInterval);
+
       connectedListener.frameReceived(req.getFrame());
     }
 

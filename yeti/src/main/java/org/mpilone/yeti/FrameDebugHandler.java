@@ -93,7 +93,7 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
    * @param msg the message to log
    */
   protected void logMessage(String msg) {
-    System.out.printf("[%s] \n", formatter.format(new Date()), msg);
+    System.out.printf("[%s] %s\n", formatter.format(new Date()), msg);
   }
 
 }

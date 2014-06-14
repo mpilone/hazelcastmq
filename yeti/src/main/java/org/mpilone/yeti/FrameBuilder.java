@@ -350,6 +350,19 @@ public class FrameBuilder {
    * Creates a frame builder and configures a standard {@link Command#CONNECTED}
    * frame.
    *
+   * @param version the highest version of the protocol in common with the
+   * client
+   *
+   * @return the frame builder
+   */
+  public static FrameBuilder connected(StompVersion version) {
+    return FrameBuilder.connected(version.getHeaderValue());
+  }
+
+  /**
+   * Creates a frame builder and configures a standard {@link Command#CONNECTED}
+   * frame.
+   *
    * @param acceptVersion the versions of the STOMP protocol the client supports
    * @param host the name of a virtual host that the client wishes to connect to
    *
@@ -358,6 +371,20 @@ public class FrameBuilder {
   public static FrameBuilder connect(String acceptVersion, String host) {
     return FrameBuilder.command(Command.CONNECT).
         header(Headers.ACCEPT_VERSION, acceptVersion).header(Headers.HOST, host);
+  }
+
+  /**
+   * Creates a frame builder and configures a standard {@link Command#CONNECTED}
+   * frame.
+   *
+   * @param acceptVersion the single version of the STOMP protocol the client
+   * supports
+   * @param host the name of a virtual host that the client wishes to connect to
+   *
+   * @return the frame builder
+   */
+  public static FrameBuilder connect(StompVersion acceptVersion, String host) {
+    return FrameBuilder.connect(acceptVersion.getHeaderValue(), host);
   }
 
   /**
