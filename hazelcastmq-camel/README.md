@@ -4,7 +4,7 @@ An [Apache Camel](http://camel.apache.org/) component implementation for
 HazelcastMQ supporting Camel's integration framework and Enterprise Integration 
 Patterns (EIP). The component supports configurable consumers and producers 
 including request/reply messaging and concurrent consumers. Unlike Camel's 
-existing JMS component, HazelcastMQ Camel has not dependency on the Spring 
+existing JMS component, HazelcastMQ Camel has no dependency on the Spring 
 Framework by building directly on HazelcastMQ Core.
 
 ## Features
