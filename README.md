@@ -57,9 +57,5 @@ And then adding the dependency:
     <dependency>
         <groupId>org.mpilone</groupId>
         <artifactId>hazelcastmq-core</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>X.X.X</version>
     </dependency>
-    
-If there is enough interest I could look at moving it to a standard public 
-Maven Repository.
-
