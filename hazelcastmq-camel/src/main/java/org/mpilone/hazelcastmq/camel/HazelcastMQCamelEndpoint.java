@@ -1,9 +1,7 @@
 
 package org.mpilone.hazelcastmq.camel;
 
-import org.apache.camel.Consumer;
-import org.apache.camel.Processor;
-import org.apache.camel.Producer;
+import org.apache.camel.*;
 import org.apache.camel.impl.DefaultEndpoint;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQContext;
@@ -71,7 +69,16 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
 
   @Override
   public Consumer createConsumer(Processor prcsr) throws Exception {
-    return new HazelcastMQCamelConsumer(this, prcsr);
+    Consumer c = new HazelcastMQCamelConsumer(this, prcsr);
+    configureConsumer(c);
+    return c;
+  }
+
+  @Override
+  public PollingConsumer createPollingConsumer() throws Exception {
+    PollingConsumer pc = new HazelcastMQCamelPollingConsumer(this);
+    configurePollingConsumer(pc);
+    return pc;
   }
 
   @Override
