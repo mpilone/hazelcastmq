@@ -27,6 +27,11 @@ public interface StompConstants {
   public static final char NULL_CHAR = '\0';
 
   /**
+   * The space character that will be ignored before a frame.
+   */
+  public static final char SPACE_CHAR = ' ';
+
+  /**
    * The colon character that separates header name and value.
    */
   public static final char COLON_CHAR = ':';

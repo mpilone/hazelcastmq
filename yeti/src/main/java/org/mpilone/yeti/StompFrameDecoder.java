@@ -2,12 +2,11 @@ package org.mpilone.yeti;
 
 import static org.mpilone.yeti.StompConstants.*;
 
-import java.io.*;
-import java.util.Arrays;
 import java.util.List;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.handler.codec.ReplayingDecoder;
 
 /**
@@ -36,51 +35,74 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    * Constructs the decoder with an initial state.
    */
   public StompFrameDecoder() {
-    super(DecoderState.READ_COMMAND);
+    super(DecoderState.READ_CONTROL_CHARS);
+
+    reset();
   }
 
   @Override
   protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out)
       throws Exception {
 
-    switch (state()) {
-      case READ_COMMAND:
-        if (readCommand(in)) {
-          checkpoint(DecoderState.READ_HEADERS);
-        }
-        break;
+    DecoderState nextState;
 
-      case READ_HEADERS:
-        if (readHeaders(in)) {
-          checkpoint(DecoderState.READ_BODY);
-        }
-        break;
+    try {
+      switch (state()) {
+        case READ_CONTROL_CHARS:
+          nextState = readControlChars(in);
+          checkpoint(nextState);
+          break;
 
-      case READ_BODY:
-        if (readBody(in)) {
-          out.add(new Frame(command, headers, body));
+        case READ_COMMAND:
+          nextState = readCommand(in);
+          if (nextState != null) {
+            checkpoint(nextState);
+          }
+          break;
 
-          // Reset to the inital state.
-          command = null;
-          headers = null;
-          body = null;
+        case READ_HEADERS:
+          nextState = readHeaders(in);
+          if (nextState != null) {
+            checkpoint(nextState);
+          }
+          break;
 
-          checkpoint(DecoderState.READ_COMMAND);
-        }
-        break;
+        case READ_BODY:
+          nextState = readBody(in);
+          if (nextState != null && nextState != DecoderState.READ_BODY) {
+            // The frame is done because we're moving to a new state.
+            out.add(buildFrame());
+            reset();
+            checkpoint(nextState);
+          }
+          break;
 
-      default:
-        // This should never happen unless there is a bug in the decoder.
-        throw new IllegalStateException("Unknown state: " + state());
+        case DISCARD_FRAME:
+          nextState = readAndDiscard(in);
+          checkpoint(nextState);
+          break;
+
+        default:
+          // This should never happen unless there is a bug in the decoder.
+          throw new IllegalStateException("Unknown state: " + state());
+      }
+    }
+    catch (Exception ex) {
+      out.add(buildFrame(ex));
+      reset();
+      checkpoint(DecoderState.DISCARD_FRAME);
     }
   }
 
   /**
-   * Reads a single line of UTF-8 text from the stream and returns once a new
-   * line character is found.
+   * Reads a single line of UTF-8 text from the stream and returns once an EOL
+   * is found. STOMP defines the EOL as a new line character with an optional
+   * leading carriage return character. The EOL character(s) will be removed
+   * from the returned data.
    *
-   * @return the line of text read or null if there is no line available in the
-   * buffer
+   * @param in the input buffer to read from
+   *
+   * @return the next decoder state or null if no checkpoint should be set
    */
   private String readLine(ByteBuf in) {
 
@@ -100,18 +122,8 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
       data = new byte[bytesToRead];
       in.readBytes(data);
+      in.skipBytes(bytesToSkip);
     }
-    // Look for the null terminator.
-    // I'm not sure we need to do this. Double check the spec but I think we
-    // should just gobble this up until we hit the expected end of message.
-    else if ((bytesToRead = in.bytesBefore((byte) NULL_CHAR)) > -1) {
-      bytesToSkip = 1;
-
-      data = new byte[bytesToRead];
-      in.readBytes(data);
-    }
-
-    in.skipBytes(bytesToSkip);
 
     if (data != null) {
       return new String(data, StompConstants.UTF_8);
@@ -123,16 +135,15 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
   /**
    * Reads the body of the frame using the content-length header if available.
-   * The body will be set in the frame after reading.
    *
-   * @param frame the partial frame that has been read to this point
+   * @param in the input buffer to read from
    *
-   * @throws IOException if there is an error reading from the underlying stream
+   * @return the next decoder state or null if no checkpoint should be set
    */
-  private boolean readBody(ByteBuf in) {
+  private DecoderState readBody(ByteBuf in) {
 
     int bytesToRead;
-    boolean eob = false;
+    DecoderState nextState = null;
 
     // See if we have a content-length header.
     if (headers.getHeaderNames().contains(Headers.CONTENT_LENGTH)) {
@@ -140,7 +151,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       bytesToRead = Integer.valueOf(headers.get(Headers.CONTENT_LENGTH));
 
       // If we don't have enough bytes yet we won't try to read anything.
-      if (in.readableBytes() < bytesToRead) {
+      if (in.readableBytes() < bytesToRead + 1) {
         bytesToRead = -1;
       }
     }
@@ -148,8 +159,13 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       bytesToRead = in.bytesBefore((byte) NULL_CHAR);
     }
 
+    // We want to avoid creating a new byte[] for the body for each call if the 
+    // full body isn't available yet. Therefore we'll simply not read anything
+    // if we don't have all the data we need yet.
     if (bytesToRead > -1) {
 
+      // An empty body is valid. If so, we'll just leave the body null
+      // in the frame.
       if (bytesToRead > 0) {
         byte[] data = new byte[bytesToRead];
         in.readBytes(data, 0, data.length);
@@ -158,93 +174,52 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
       // Sanity check that the frame ends appropriately.
       if (in.readByte() != NULL_CHAR) {
-        headers.put(HEADER_BAD_REQUEST,
-            "Frame must end with NULL character.");
+        throw new CorruptedFrameException("Frame must end with NULL character.");
       }
 
-      eob = true;
+      nextState = DecoderState.READ_CONTROL_CHARS;
     }
 
-    return eob;
+    return nextState;
   }
 
   /**
-   * Returns the number of bytes before the given sequence of characters. This
-   * method is similar to {@link ByteBuf#bytesBefore(int, int, byte) }
-   * but it supports a sequence of bytes rather than a single byte. NOTE: This
-   * method has not been tested and is currently not used.
+   * Reads the headers of the frame if available.
    *
-   * @param index the index to start from in the byte buffer
-   * @param in the buffer to scan
-   * @param seq the sequence of bytes to find
+   * @param in the input buffer to read from
    *
-   * @return the bytes before the sequence or -1 if the sequence is not found
+   * @return the next decoder state or null if no checkpoint should be set
    */
-  private int bytesBefore(int index, ByteBuf in, byte[] seq) {
+  private DecoderState readHeaders(ByteBuf in) {
 
-    int bytesBefore = in.bytesBefore(index, in.readableBytes(), seq[0]);
+    DecoderState nextState = DecoderState.READ_HEADERS;
+    String line;
 
-    // If we found the start of the sequence, check the rest of it.
-    if (bytesBefore > -1 && in.readableBytes() - bytesBefore >= seq.length) {
-      byte[] data = new byte[seq.length];
-      in.getBytes(bytesBefore, in.getBytes(bytesBefore + 1, data));
+    // Read as long as we haven't reached the end of the headers (i.e.
+    // the next state) and we have full lines to read.
+    while (nextState == DecoderState.READ_HEADERS && (line = readLine(in))
+        != null) {
 
-      if (!Arrays.equals(seq, data)) {
-        bytesBefore = bytesBefore(bytesBefore + 1, in, seq);
-      }
-    }
-    else {
-      bytesBefore = -1;
-    }
-
-    return bytesBefore;
-  }
-
-  /**
-   * Reads the headers of the frame if available. The headers will be set in the
-   * frame after reading.
-   *
-   * @param frame the partial frame that has been read to this point
-   *
-   * @throws IOException if there is an error reading from the underlying stream
-   */
-  private boolean readHeaders(ByteBuf in) throws IOException {
-
-    // TODO: Make sure we can find the end of the headers before we start
-    // reading the headers. This will prevent multiple failed attempts and
-    // potentially improve performance. Unfortunately we can only scan for 
-    // a single byte so we would need to be smart about finding LF, CR,
-    // and/or NULL.
-//    if (bytesBefore(0, in, new byte[]{LINE_FEED_CHAR, LINE_FEED_CHAR}) == -1
-//        && bytesBefore(0, in, new byte[]{LINE_FEED_CHAR, CARRIAGE_RETURN_CHAR, LINE_FEED_CHAR})
-//        == -1) {
-//      return false;
-//    }
-
-    headers = new DefaultHeaders();
-
-    // Read until we find a blank line (i.e. end of headers).
-    boolean eoh = false;
-    while (!eoh) {
-      String line = readLine(in);
-
-      if (line == null) {
-        break;
-      }
-      else if (line.isEmpty()) {
-        eoh = true;
+      if (line.isEmpty()) {
+        nextState = DecoderState.READ_BODY;
       }
       else {
         int pos = line.indexOf(COLON_CHAR);
         if (pos > 0) {
           String key = line.substring(0, pos);
-          String value = line.substring(pos + 1, line.length());
 
+          // The spec defines that only the first occurrance of a header
+          // should be preserved in a single frame.
           if (!headers.getHeaderNames().contains(key)) {
 
-            // Decode header value as per the spec. Is there a faster way
-            // to do this?
-            value = value.replace(OCTET_92_92, OCTET_92)
+            // Move past the colon delimiter.
+            pos++;
+
+            // Extract the value and decode header value as per the spec. Is
+            // there a faster way to do this than a bunch of individual
+            // replaces?
+            String value = pos >= line.length() ? null : line.substring(pos).
+                replace(OCTET_92_92, OCTET_92)
                 .replace(OCTET_92_99, OCTET_58)
                 .replace(OCTET_92_110, OCTET_10)
                 .replace(OCTET_92_114, OCTET_13);
@@ -252,35 +227,144 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
             headers.put(key, value);
           }
         }
+        else {
+          // Invalid frame. A header must contain a ':'.
+          throw new CorruptedFrameException("Header must contain a name and "
+              + "value separated by a colon character.");
+        }
       }
     }
 
-    return eoh;
+    return nextState;
   }
 
   /**
-   * Reads the command of the frame. The command will be set in the frame after
-   * reading.
+   * Reads the optional EOL (and other control characters) that are permitted
+   * between the end of one frame and the start of the next frame. When a
+   * non-control character is detected, the decoder state will be advanced.
    *
-   * @param frame the partial frame that has been read to this point
+   * @param in the input buffer to read from
    *
-   * @throws IOException if there is an error reading from the underlying stream
+   * @return the next decoder state or null if no checkpoint should be set
    */
-  private boolean readCommand(ByteBuf in) {
+  private DecoderState readControlChars(ByteBuf in) {
 
-    boolean eoc = false;
-    String line;
+    int pos;
+    DecoderState nextState = DecoderState.READ_CONTROL_CHARS;
+    for (pos = 0; pos < in.readableBytes() && nextState
+        == DecoderState.READ_CONTROL_CHARS; ) {
 
-    do {
-      line = readLine(in);
-    } while (line != null && line.isEmpty());
+      byte b = in.getByte(pos);
+
+      switch (b) {
+        // This is a little more lax than the spec which allows for only
+        // EOL character(s) between frames.
+        case ' ':
+        case CARRIAGE_RETURN_CHAR:
+        case LINE_FEED_CHAR:
+        case NULL_CHAR:
+          // ignore the character
+          pos++;
+          break;
+
+        default:
+          nextState = DecoderState.READ_COMMAND;
+          break;
+      }
+    }
+
+    in.skipBytes(pos);
+
+    return nextState;
+  }
+
+  /**
+   * Reads the command of the frame.
+   *
+   * @param in the input buffer to read from
+   *
+   * @return the next decoder state or null if no checkpoint should be set
+   */
+  private DecoderState readCommand(ByteBuf in) {
+
+    DecoderState nextState = null;
+    String line = readLine(in);
 
     if (line != null) {
       command = Command.valueOf(line);
-      eoc = true;
+      nextState = DecoderState.READ_HEADERS;
     }
 
-    return eoc;
+    return nextState;
+  }
+
+  /**
+   * Resets the command, headers, and body for the next frame.
+   */
+  private void reset() {
+    // Reset to the inital state.
+    command = null;
+    headers = new DefaultHeaders();
+    body = null;
+  }
+
+  /**
+   * Builds a frame using the currently read command, headers, and body. A
+   * header with the name {@link #HEADER_BAD_REQUEST} will be added indicating
+   * that the frame is probably not valid and should be handled appropriately.
+   *
+   * @param ex the exception that caused the frame to be considered invalid
+   *
+   * @return the new frame
+   */
+  private Frame buildFrame(Exception ex) {
+    headers.put(HEADER_BAD_REQUEST, ex.getMessage());
+
+    if (command == null) {
+      // If we don't have a command yet we'll have to default to something
+      // in order to construct a frame. I don't like this solution but I'm
+      // hesitent to relax the validation in the frame constructor or
+      // introduce another command type.
+      command = Command.ERROR;
+    }
+
+    return new Frame(command, headers, body);
+  }
+
+  /**
+   * Builds a frame using the currently read command, headers, and body.
+   *
+   * @return the new frame
+   */
+  private Frame buildFrame() {
+    return new Frame(command, headers, body);
+  }
+
+  /**
+   * Reads any bytes in the buffer and discards them. When a {@link #NULL_CHAR}
+   * is reached, the state will be reset for the start of the next frame. This
+   * method is normally only used when a bad frame has been detected and should
+   * be skipped; however in most cases if a bad frame is received a later
+   * handler will send an error frame and terminate the connection per the STOMP
+   * specification.
+   *
+   * @param in the input buffer to read from
+   *
+   * @return the next decoder state
+   */
+  private DecoderState readAndDiscard(ByteBuf in) {
+
+    DecoderState nextState = DecoderState.DISCARD_FRAME;
+
+    while (nextState == DecoderState.DISCARD_FRAME && in.readableBytes() > 0) {
+      byte b = in.readByte();
+
+      if (b == NULL_CHAR) {
+        nextState = DecoderState.READ_CONTROL_CHARS;
+      }
+    }
+
+    return nextState;
   }
 
   /**
@@ -288,6 +372,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    */
   enum DecoderState {
 
+    READ_CONTROL_CHARS,
     READ_COMMAND,
     READ_HEADERS,
     READ_BODY,
