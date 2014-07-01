@@ -4,11 +4,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
+import org.mpilone.yeti.StompFrameDecoder;
 import org.mpilone.yeti.client.StompClient;
 import org.mpilone.yeti.server.InMemoryBrokerStomplet;
 import org.mpilone.yeti.server.StompServer;
 
 /**
+ * An example Yeti STOMP server with multiple clients. The
+ * {@link InMemoryBrokerStomplet} is used to support simple message passing
+ * between connected clients.
  *
  * @author mpilone
  */
@@ -18,7 +22,8 @@ public class ServerClientApp {
 
     int port = 8090;
 
-    StompServer server = new StompServer(false, port,
+    StompServer server = new StompServer(false,
+        StompFrameDecoder.DEFAULT_MAX_FRAME_SIZE, port,
         new StompServer.ClassStompletFactory(InMemoryBrokerStomplet.class));
     server.start();
 

@@ -4,6 +4,7 @@
 
 - [hazelcast-camel] Direct implementation of a polling consumer.
 - [yeti] Improved the performance and error handling of the StompFrameDecoder.
+- [yeti] Implemented maximum frame size in the StompFrameDecoder.
 
 ## 2014-06-20, v1.0.0
 

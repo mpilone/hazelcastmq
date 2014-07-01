@@ -38,6 +38,7 @@ public class StompServer {
   private final StompletFactory stompletFactory;
   private final int port;
   private final boolean frameDebugEnabled;
+  private final int maxFrameSize;
 
   /**
    * Constructs the server which will bind on the given port and use the
@@ -47,7 +48,20 @@ public class StompServer {
    * @param stompletFactory the factory to create a new stomplet per client
    */
   public StompServer(int port, StompletFactory stompletFactory) {
-    this(false, port, stompletFactory);
+    this(StompFrameDecoder.DEFAULT_MAX_FRAME_SIZE, port, stompletFactory);
+  }
+
+  /**
+   * Constructs the server which will bind on the given port and use the
+   * stomplet factory to create new stomplet instances for client connections.
+   *
+   * @param maxFrameSize the maximum frame size in bytes
+   * @param port the port to bind to
+   * @param stompletFactory the factory to create a new stomplet per client
+   */
+  public StompServer(int maxFrameSize, int port,
+      StompletFactory stompletFactory) {
+    this(false, maxFrameSize, port, stompletFactory);
   }
 
   /**
@@ -55,14 +69,16 @@ public class StompServer {
    * stomplet factory to create new stomplet instances for client connections.
    *
    * @param frameDebugEnabled true to enable frame debugging
+   * @param maxFrameSize the maximum frame size in bytes
    * @param port the port to bind to
    * @param stompletFactory the factory to create a new stomplet per client
    */
-  public StompServer(boolean frameDebugEnabled, int port,
+  public StompServer(boolean frameDebugEnabled, int maxFrameSize, int port,
       StompletFactory stompletFactory) {
     this.frameDebugEnabled = frameDebugEnabled;
     this.port = port;
     this.stompletFactory = stompletFactory;
+    this.maxFrameSize = maxFrameSize;
   }
 
   /**
@@ -122,7 +138,7 @@ public class StompServer {
       @Override
       public void initChannel(SocketChannel ch) throws Exception {
         ch.pipeline().addLast(StompFrameDecoder.class.getName(),
-            new StompFrameDecoder());
+            new StompFrameDecoder(maxFrameSize));
         ch.pipeline().addLast(StompFrameEncoder.class.getName(),
             new StompFrameEncoder());
 

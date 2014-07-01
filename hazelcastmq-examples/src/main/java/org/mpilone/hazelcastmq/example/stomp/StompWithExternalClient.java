@@ -77,7 +77,6 @@ public class StompWithExternalClient {
 
       log.info("Shutting down Stomper.");
       stompServer.shutdown();
-      stompConfig.getExecutor().shutdown();
     }
     finally {
       hazelcast.getLifecycleService().shutdown();

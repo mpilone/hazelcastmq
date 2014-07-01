@@ -1,26 +1,32 @@
 package org.mpilone.yeti;
 
+import static java.lang.String.format;
 import static org.mpilone.yeti.StompConstants.*;
 
 import java.util.List;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.CorruptedFrameException;
-import io.netty.handler.codec.ReplayingDecoder;
+import io.netty.handler.codec.*;
 
 /**
  * A STOMP frame decoder that processes raw bytes into {@link Frame} instances.
- *
- * TODO: enforce a maximum frame size and header size
  *
  * @author mpilone
  */
 public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.DecoderState> {
 
+  /**
+   * The default maximum frame size in bytes. The default value is 128 KiB.
+   */
+  public static final int DEFAULT_MAX_FRAME_SIZE = 128 * 1024;
+
+  private int totalDecodedByteCount;
+  private int currentDecodedByteCount;
   private Command command;
   private DefaultHeaders headers;
   private byte[] body;
+  private int maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
 
   /**
    * A "magic" header that indicates that the frame was poorly formatted. If set
@@ -32,11 +38,21 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       getName() + "::BAD_REQUEST";
 
   /**
-   * Constructs the decoder with an initial state.
+   * Constructs the decoder with the default maximum frame size.
    */
   public StompFrameDecoder() {
+    this(DEFAULT_MAX_FRAME_SIZE);
+  }
+
+  /**
+   * Constructs the decoder with the given maximum frame size.
+   *
+   * @param maxFrameSize the maximum size of a single FRAME
+   */
+  public StompFrameDecoder(int maxFrameSize) {
     super(DecoderState.READ_CONTROL_CHARS);
 
+    this.maxFrameSize = maxFrameSize;
     reset();
   }
 
@@ -45,6 +61,9 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
       throws Exception {
 
     DecoderState nextState;
+
+    // Reset the bytes read for this single decode pass.
+    currentDecodedByteCount = 0;
 
     try {
       switch (state()) {
@@ -55,30 +74,29 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
         case READ_COMMAND:
           nextState = readCommand(in);
-          if (nextState != null) {
-            checkpoint(nextState);
-          }
+          checkpoint(nextState);
           break;
 
         case READ_HEADERS:
           nextState = readHeaders(in);
-          if (nextState != null) {
-            checkpoint(nextState);
-          }
+          checkpoint(nextState);
           break;
 
         case READ_BODY:
           nextState = readBody(in);
-          if (nextState != null && nextState != DecoderState.READ_BODY) {
-            // The frame is done because we're moving to a new state.
+          if (nextState != DecoderState.READ_BODY) {
+            // Found the end of the body. Build the frame and reset.
             out.add(buildFrame());
             reset();
-            checkpoint(nextState);
           }
+          checkpoint(nextState);
           break;
 
         case DISCARD_FRAME:
           nextState = readAndDiscard(in);
+          if (nextState != DecoderState.DISCARD_FRAME) {
+            reset();
+          }
           checkpoint(nextState);
           break;
 
@@ -86,8 +104,10 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
           // This should never happen unless there is a bug in the decoder.
           throw new IllegalStateException("Unknown state: " + state());
       }
+
+      totalDecodedByteCount += currentDecodedByteCount;
     }
-    catch (Exception ex) {
+    catch (CorruptedFrameException | TooLongFrameException ex) {
       out.add(buildFrame(ex));
       reset();
       checkpoint(DecoderState.DISCARD_FRAME);
@@ -95,23 +115,29 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
   }
 
   /**
+   * <p>
    * Reads a single line of UTF-8 text from the stream and returns once an EOL
    * is found. STOMP defines the EOL as a new line character with an optional
    * leading carriage return character. The EOL character(s) will be removed
-   * from the returned data.
+   * from the returned data. If no EOL character is found, this method does not
+   * read any data from the input buffer.
+   * </p>
+   * <p>
+   * This method checks for too long frames.
+   * </p>
    *
    * @param in the input buffer to read from
    *
-   * @return the next decoder state or null if no checkpoint should be set
+   * @return the next decoder state or null if no EOL is available in the buffer
    */
   private String readLine(ByteBuf in) {
 
     int bytesToRead;
     byte[] data = null;
-    int bytesToSkip = 0;
+    int bytesToSkip;
 
-    // Look for the line feed.
     if ((bytesToRead = in.bytesBefore((byte) LINE_FEED_CHAR)) > -1) {
+      // Found the line feed.
       bytesToSkip = 1;
 
       // Check (and ignore) optional carriage return.
@@ -120,9 +146,21 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
         bytesToRead--;
       }
 
+      // Check that the bytes we're about to read will not exceed the
+      // max frame size.
+      checkTooLongFrame(bytesToRead);
+
       data = new byte[bytesToRead];
       in.readBytes(data);
       in.skipBytes(bytesToSkip);
+
+      // Count the bytes read.
+      currentDecodedByteCount += bytesToRead;
+    }
+    else {
+      // No line feed. Make sure we're not buffering more than the max
+      // frame size.
+      checkTooLongFrame(in.readableBytes());
     }
 
     if (data != null) {
@@ -138,12 +176,12 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @param in the input buffer to read from
    *
-   * @return the next decoder state or null if no checkpoint should be set
+   * @return the next decoder state
    */
   private DecoderState readBody(ByteBuf in) {
 
     int bytesToRead;
-    DecoderState nextState = null;
+    DecoderState nextState = DecoderState.READ_BODY;
 
     // See if we have a content-length header.
     if (headers.getHeaderNames().contains(Headers.CONTENT_LENGTH)) {
@@ -158,6 +196,10 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
     else {
       bytesToRead = in.bytesBefore((byte) NULL_CHAR);
     }
+
+    // Make sure the buffer or the number of bytes to read is less than
+    // the max frame size.
+    checkTooLongFrame(bytesToRead == -1 ? in.readableBytes() : bytesToRead);
 
     // We want to avoid creating a new byte[] for the body for each call if the 
     // full body isn't available yet. Therefore we'll simply not read anything
@@ -177,6 +219,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
         throw new CorruptedFrameException("Frame must end with NULL character.");
       }
 
+      currentDecodedByteCount += bytesToRead;
       nextState = DecoderState.READ_CONTROL_CHARS;
     }
 
@@ -188,7 +231,7 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @param in the input buffer to read from
    *
-   * @return the next decoder state or null if no checkpoint should be set
+   * @return the next decoder state
    */
   private DecoderState readHeaders(ByteBuf in) {
 
@@ -283,11 +326,11 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    *
    * @param in the input buffer to read from
    *
-   * @return the next decoder state or null if no checkpoint should be set
+   * @return the next decoder state
    */
   private DecoderState readCommand(ByteBuf in) {
 
-    DecoderState nextState = null;
+    DecoderState nextState = DecoderState.READ_COMMAND;
     String line = readLine(in);
 
     if (line != null) {
@@ -306,6 +349,8 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
     command = null;
     headers = new DefaultHeaders();
     body = null;
+    currentDecodedByteCount = 0;
+    totalDecodedByteCount = 0;
   }
 
   /**
@@ -365,6 +410,30 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
     }
 
     return nextState;
+  }
+
+  /**
+   * Checks if the current frame is too long and generates a
+   * {@link TooLongFrameException} if decoding should stop. The total compared
+   * is the sum of the {@code expectedToRead},
+   * {@link #totalDecodedByteCount}, {@link #currentDecodedByteCount}.
+   *
+   * @param expectedToRead the number of bytes expected to be read in the
+   * current frame
+   *
+   * @throws TooLongFrameException if the current frame is larger than the
+   * configured maximum
+   */
+  private void checkTooLongFrame(int expectedToRead) throws
+      TooLongFrameException {
+
+    int total = expectedToRead + totalDecodedByteCount + currentDecodedByteCount;
+
+    if (total > maxFrameSize) {
+      throw new TooLongFrameException(format(
+          "Frame size [%d] is larger than the maximum frame size [%d]. "
+          + "Decoding will be aborted.", total, maxFrameSize));
+    }
   }
 
   /**

@@ -1,11 +1,7 @@
 package org.mpilone.hazelcastmq.stomp.server;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.yeti.StompFrameDecoder;
 
 /**
  * The configuration of the STOMP server.
@@ -13,10 +9,11 @@ import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
  * @author mpilone
  */
 public class HazelcastMQStompConfig {
+
+  private int maxFrameSize;
   private int port;
   private boolean frameDebugEnabled;
   private HazelcastMQInstance hazelcastMQInstance;
-  private ExecutorService executor; // may not be needed anymore
   private FrameConverter frameConverter;
 
   /**
@@ -33,32 +30,39 @@ public class HazelcastMQStompConfig {
    * <ul>
    * <li>port: 8032</li>
    * <li>frameConverter: {@link DefaultFrameConverter}</li>
-   * <li>executor: {@link Executors#newCachedThreadPool()}</li>
    * <li>frameDebugEnabled: false</li>
+   * <li>maxFrameSize: {@link StompFrameDecoder#DEFAULT_MAX_FRAME_SIZE}</li>
    * </ul>
    * 
-   * @param connectionFactory
-   *          the JMS connection factory to use for all message consumers and
-   *          producers
+   * @param mqInstance the HzMq instance to use for all message consumers and
+     *          producers
    */
-  public HazelcastMQStompConfig(HazelcastMQInstance connectionFactory) {
-    this.hazelcastMQInstance = connectionFactory;
+  public HazelcastMQStompConfig(HazelcastMQInstance mqInstance) {
+    this.hazelcastMQInstance = mqInstance;
 
     frameConverter = new DefaultFrameConverter();
     port = 8032;
-    executor = Executors.newCachedThreadPool(new ThreadFactory() {
+    maxFrameSize = StompFrameDecoder.DEFAULT_MAX_FRAME_SIZE;
+  }
 
-      private AtomicLong counter = new AtomicLong();
-      private ThreadFactory delegate = Executors.defaultThreadFactory();
+  /**
+   * Sets the maximum supported frame size in bytes. Frames larger than this
+   * size will be considered invalid and an invalid frame will be generated.
+   *
+   * @param maxFrameSize the maximum frame size in bytes
+   */
+  public void setMaxFrameSize(int maxFrameSize) {
+    this.maxFrameSize = maxFrameSize;
+  }
 
-      @Override
-      public Thread newThread(Runnable r) {
-        Thread t = delegate.newThread(r);
-        t.setName("hazelcastmq-stomper-" + counter.incrementAndGet());
-        t.setDaemon(true);
-        return t;
-      }
-    });
+  /**
+   * Returns the maximum supported frame size in bytes. Frames larger than this
+   * size will be considered invalid and an invalid frame will be generated.
+   *
+   * @return the maximum frame size in bytes
+   */
+  public int getMaxFrameSize() {
+    return maxFrameSize;
   }
 
   /**
@@ -117,25 +121,6 @@ public class HazelcastMQStompConfig {
    */
   public void setHazelcastMQInstance(HazelcastMQInstance mqInstance) {
     this.hazelcastMQInstance = mqInstance;
-  }
-
-  /**
-   * Returns executor service to spin up the server and client threads.
-   * 
-   * @return the executor to use for all server and client threads
-   */
-  public ExecutorService getExecutor() {
-    return executor;
-  }
-
-  /**
-   * Sets executor service to spin up the server and client threads.
-   *
-   * @param executor
-   *          the executor to set
-   */
-  public void setExecutor(ExecutorService executor) {
-    this.executor = executor;
   }
 
   /**

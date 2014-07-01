@@ -23,6 +23,7 @@ a separate project in the future.
 * STOMP client implementation support async and sync message receiption
 * Frame builder for fluent frame construction
 * Header encoding/decoding of special characters
+* Maximum frame size enforcement
 
 ## Not Implemented Yet
 * Most everything should be there
