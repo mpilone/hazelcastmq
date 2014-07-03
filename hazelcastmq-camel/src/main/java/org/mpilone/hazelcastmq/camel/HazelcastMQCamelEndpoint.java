@@ -4,7 +4,6 @@ package org.mpilone.hazelcastmq.camel;
 import org.apache.camel.*;
 import org.apache.camel.impl.DefaultEndpoint;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
-import org.mpilone.hazelcastmq.core.HazelcastMQContext;
 
 /**
  * <p>
@@ -21,7 +20,6 @@ import org.mpilone.hazelcastmq.core.HazelcastMQContext;
 public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
   private final String destination;
   private final HazelcastMQCamelConfig configuration;
-  private final HazelcastMQContext mqContext;
 
   /**
    * Constructs the endpoint.
@@ -38,28 +36,21 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
 
     this.destination = destination;
     this.configuration = config;
-    this.mqContext = configuration.getHazelcastMQInstance().createContext();
   }
 
   @Override
   protected void doStart() throws Exception {
     super.doStart();
-
-    mqContext.start();
   }
 
   @Override
   protected void doStop() throws Exception {
     super.doStop();
-
-      mqContext.stop();
   }
 
   @Override
   protected void doShutdown() throws Exception {
     super.doShutdown();
-
-    mqContext.close();
   }
 
   @Override
@@ -102,6 +93,37 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
    * @return the destination
    */
   String getDestination() {
+    return destination;
+  }
+
+  /**
+   * Converts a camel destination to a HazelcastMQ destination. For example, a
+   * destination of {@code queue:foo.bar} will be converted to
+   * {@code /queue/foo.bar}. If queue or topic is not specified, a queue will be
+   * used by default.
+   *
+   * @param camelDest the camel destination to convert
+   *
+   * @return the HazelcastMQ destination
+   */
+  public static String toHazelcastMQDestination(String camelDest) {
+    String destination = "/" + camelDest.replaceAll(":", "/");
+
+    if (!destination.startsWith(
+        org.mpilone.hazelcastmq.core.Headers.DESTINATION_QUEUE_PREFIX)
+        && !destination.startsWith(
+            org.mpilone.hazelcastmq.core.Headers.DESTINATION_TOPIC_PREFIX)
+        && !destination.startsWith(
+            org.mpilone.hazelcastmq.core.Headers.DESTINATION_TEMPORARY_QUEUE_PREFIX)
+        && !destination.startsWith(
+            org.mpilone.hazelcastmq.core.Headers.DESTINATION_TEMPORARY_TOPIC_PREFIX)) {
+
+      // Default to a queue if no destination prefix was specifed.
+      destination =
+          org.mpilone.hazelcastmq.core.Headers.DESTINATION_QUEUE_PREFIX
+          + destination;
+    }
+
     return destination;
   }
 

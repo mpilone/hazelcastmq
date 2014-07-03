@@ -6,7 +6,6 @@ import java.util.Map;
 import org.apache.camel.Endpoint;
 import org.apache.camel.impl.DefaultComponent;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
-import org.mpilone.hazelcastmq.core.Headers;
 
 /**
  * <p>
@@ -32,16 +31,8 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
   @Override
   protected Endpoint createEndpoint(String uri, String remaining,
       Map<String, Object> parameters) throws Exception {
-    String destination = "/" + remaining.replaceAll(":", "/");
-
-    if (!destination.startsWith(Headers.DESTINATION_QUEUE_PREFIX)
-        && !destination.startsWith(Headers.DESTINATION_TOPIC_PREFIX)
-        && !destination.startsWith(Headers.DESTINATION_TEMPORARY_QUEUE_PREFIX)
-        && !destination.startsWith(Headers.DESTINATION_TEMPORARY_TOPIC_PREFIX)) {
-
-      // Default to a queue if no destination prefix was specifed.
-      destination = Headers.DESTINATION_QUEUE_PREFIX + destination;
-    }
+    String destination = HazelcastMQCamelEndpoint.toHazelcastMQDestination(
+        remaining);
 
     // Must copy config so we do not have side effects.
     HazelcastMQCamelConfig config = getConfiguration().copy();

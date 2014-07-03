@@ -1,6 +1,7 @@
 package org.mpilone.hazelcastmq.camel;
 
 import static java.lang.String.format;
+import static org.mpilone.hazelcastmq.camel.HazelcastMQCamelEndpoint.toHazelcastMQDestination;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -20,10 +21,21 @@ import org.mpilone.hazelcastmq.core.*;
  */
 public class HazelcastMQCamelProducer extends DefaultProducer {
 
+  /**
+   * The header in the Camel "in" message that specifies the destination for the
+   * specific message being sent. If this value is set in the message, the
+   * destination configured for the endpoint will be ignored and the message
+   * specific destination will be used instead.
+   */
+  public static final String CAMEL_HZMQ_DESTINATION = "CamelHzMqDestination";
+
   private final HazelcastMQCamelConfig config;
   private final MessageConverter messageConverter;
   private final String destination;
   private final ReplyManager replyManager;
+
+  private HazelcastMQContext mqContext;
+  private HazelcastMQProducer mqProducer;
 
   /**
    * Constructs the producer which will produce messages to the given endpoint
@@ -48,12 +60,23 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
   protected void doStart() throws Exception {
     super.doStart();
 
+    if (mqContext == null) {
+      mqContext = config.getHazelcastMQInstance().createContext();
+      mqProducer = mqContext.createProducer();
+    }
+
     replyManager.start();
   }
 
   @Override
   protected void doStop() throws Exception {
     super.doStop();
+
+    if (mqContext != null) {
+      mqProducer = null;
+      mqContext.stop();
+      mqContext = null;
+    }
 
     replyManager.stop();
   }
@@ -68,16 +91,22 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
   @Override
   public void process(Exchange exchange) throws Exception {
 
-    try (HazelcastMQContext mqContext = config.getHazelcastMQInstance().
-        createContext()) {
+    Message camelMsg = exchange.getIn();
 
-      HazelcastMQProducer mqProducer = mqContext.createProducer(destination);
+    // Handle a message specific destination if set in the headers; otherwise
+    // use the destination configured in the endpoint.
+    String msgDest = camelMsg.getHeader(CAMEL_HZMQ_DESTINATION) != null ?
+        toHazelcastMQDestination(camelMsg.getHeader(CAMEL_HZMQ_DESTINATION).
+            toString()) : destination;
 
+    HazelcastMQMessage msg = messageConverter.fromCamelMessage(camelMsg);
+
+    try {
       if (exchange.getPattern().isOutCapable()) {
-        processInOut(exchange, mqProducer);
+        processInOut(msgDest, msg, exchange, mqProducer);
       }
       else {
-        processInOnly(exchange, mqProducer);
+        processInOnly(msgDest, msg, exchange, mqProducer);
       }
     }
     catch (Throwable e) {
@@ -89,17 +118,20 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
    * Processes an InOnly exchange by converting the message in the exchange and
    * sending it to the configured endpoint destination.
    *
+   * @param destination the destination to send the message to
+   * @param msg the HzMq message to be sent
    * @param exchange the exchange to process
    * @param mqProducer the producer to use for sending
    *
    * @throws Exception if there is an error producing the message to the
    * exchange
    */
-  private void processInOnly(Exchange exchange, HazelcastMQProducer mqProducer)
+  private void processInOnly(String destination, HazelcastMQMessage msg,
+      Exchange exchange, HazelcastMQProducer mqProducer)
       throws Exception {
-    Message camelMsg = exchange.getIn();
-    HazelcastMQMessage msg = messageConverter.fromCamelMessage(camelMsg);
-    mqProducer.send(msg);
+    int timeToLive = config.getTimeToLive();
+    
+    mqProducer.send(destination, msg, timeToLive);
   }
 
   /**
@@ -122,16 +154,17 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
    * debug in the event of a problem.
    * </p>
    *
+   * @param destination the destination to send the message to
+   * @param msg the HzMq message to be sent
    * @param exchange the exchange to process
    * @param mqProducer the producer to use for sending
    *
    * @throws Exception if there is an error producing the message to the
    * exchange
    */
-  private void processInOut(Exchange exchange, HazelcastMQProducer mqProducer) throws Exception {
-
-    Message camelMsg = exchange.getIn();
-    HazelcastMQMessage msg = messageConverter.fromCamelMessage(camelMsg);
+  private void processInOut(String destination, HazelcastMQMessage msg,
+      Exchange exchange, HazelcastMQProducer mqProducer)
+      throws Exception {
 
     int timeToLive = config.getTimeToLive();
     int requestTimeout = config.getRequestTimeout();
@@ -142,7 +175,7 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
 
     msg.setReplyTo(replyToDestination);
     if (msg.getCorrelationId() == null) {
-      msg.setCorrelationId("Camel-HzMq-" + UUID.randomUUID().toString());
+      msg.setCorrelationId("CamelHzMq-" + UUID.randomUUID().toString());
     }
 
     // Add the pending reply before sending the message to prevent a race
@@ -151,7 +184,7 @@ public class HazelcastMQCamelProducer extends DefaultProducer {
         replyQueue);
 
     // Send the message.
-    mqProducer.send(msg, timeToLive);
+    mqProducer.send(destination, msg, timeToLive);
 
     // Wait for the reply.
     HazelcastMQMessage replyMsg = replyQueue.poll(requestTimeout,

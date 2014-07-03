@@ -15,9 +15,46 @@ Framework by building directly on HazelcastMQ Core.
 
 ## Not Implemented Yet
 * Transactions
-* More advanced integration with Camel's asynchronous and polling patterns
+* More advanced integration with Camel's asynchronous patterns
 
-## Not Going to Work Any Time Soon
+## Endpoint Format
+
+The endpoint URI can specify if the destination is a queue or a topic such 
+as `hazelcastmq:queue:my.outgoing.orders` or 
+`hazelcastmq:topic:order.processed.event`. The destination will be transformed 
+into a standard HzMq destination such as `/queue/my.outgoing.orders` or 
+`/topic/order.processed.event`. If queue or topic is not specified, a queue 
+will be assumed.
+
+URI parameters can be used to customize the behavior of the endpoint. The 
+parameters are specified using normal URI parameter syntax such as:
+
+```
+hazelcastmq:queue:my.outgoing.orders?timeToLive=30000&requestTimeout=10000
+```
+
+## Endpoint Parameters
+
+Endpoint parameters are specified as URI parameters when defining the endpoint
+and can be used to customize the behavior of the endpoint for all messages 
+going in or out.
+
+Parameter | Type | Default | Description
+--------- | ---- | ------- | -----------
+concurrentConsumers | int | 1 | The number of concurrent consumers to use when consuming from an endpoint. This should always be set to 1 for topics or duplicate messages may be received.
+requestTimeout | int | 20000 | The number of milliseconds to wait for a reply when performing request/reply messaging.
+timeToLive | int | 0 | The number of milliseconds that a message will live after being produced by an endpoint. A value of 0 indicates that the message never expires.
+replyTo | String | null | The reply-to destination for all replies to messages produced by this endpoint. If not set and a request/reply message is sent, a unique temporary reply queue will be created. The reply queue should be exclusive to avoid having reply messages consumed by other endpoints.
+
+## Custom Message Headers
+
+Message headers can be used to customize the behavior of an endpoint on a 
+message by message basis.
+
+Header | Type | Description
+------ | -----| -----------
+CamelHzMqDestination | String | If specified, the destination name will be used rather than the destination configured in the endpoint. This allows for a single endpoint to produce messages to multiple destinations by setting different values for this header.
+
 
 ## Examples
 
@@ -45,7 +82,7 @@ application startup using your DI framework of choice.
     camelContext.addRoutes(new RouteBuilder() { // (4)
       @Override
       public void configure() {
-        from("hazelcastmq:queue:primo.test")
+        from("hazelcastmq:queue:primo.test?timeToLive=10000")
             .to("hazelcastmq:queue:secondo.test");
       }
     });
