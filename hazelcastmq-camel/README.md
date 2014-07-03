@@ -8,12 +8,14 @@ existing JMS component, HazelcastMQ Camel has no dependency on the Spring
 Framework by building directly on HazelcastMQ Core.
 
 ## Features
+
 * Configurable endpoint with producers and consumers
 * Request/reply messaging pattern via temporary or exclusive reply queues
 * Concurrent consumers
 * No dependencies beyond HazelcastMQ Core
 
 ## Not Implemented Yet
+
 * Transactions
 * More advanced integration with Camel's asynchronous patterns
 
@@ -55,6 +57,18 @@ Header | Type | Description
 ------ | -----| -----------
 CamelHzMqDestination | String | If specified, the destination name will be used rather than the destination configured in the endpoint. This allows for a single endpoint to produce messages to multiple destinations by setting different values for this header.
 
+## Message Conversion
+
+Messages are automatically converted from a HazelcastMQ message to a Camel 
+message and back again by the component using a MessageConverter 
+implementation. The DefaultMessageConverter simply copies all
+the header values and the message body. If the message has a content-type 
+header of "text/plain" the body is converted to a String when building the 
+Camel message otherwise the body will be a byte[].
+
+A custom message converter can be configured at the component level if custom
+conversion rules are needed. The message (including the body) can always be 
+converted or modified by the Camel route after message conversion if needed.
 
 ## Examples
 
@@ -97,7 +111,8 @@ HazelcastMQ Camel is configured like any other Camel component:
 4. Configure endpoints in routes
 5. Send exchanges to or receive exchanges from the endpoint
 
-### Consume and Producer Route
-A simple route can be setup to consume messages from one HazelcastMQ endpoint and produces them to another.
+### Consumer and Producer Route
+A simple route can be setup to consume messages from one HazelcastMQ endpoint 
+and produce them to another.
 
 View the [example](../hazelcastmq-examples/src/main/java/org/mpilone/hazelcastmq/example/camel/CamelToCamelOneWay.java).
