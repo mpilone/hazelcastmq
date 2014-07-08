@@ -124,8 +124,8 @@ public class HazelcastMQStompConfig {
   }
 
   /**
-   * The frame converter used to convert STOMP frames into JMS messages.
-   * 
+   * The frame converter used to convert STOMP frames into HazelcastMQ messages.
+    * 
    * @return the frame converter
    */
   public FrameConverter getFrameConverter() {
@@ -133,7 +133,7 @@ public class HazelcastMQStompConfig {
   }
 
   /**
-   * Sets the the frame converter used to convert STOMP frames into JMS
+   * Sets the the frame converter used to convert STOMP frames into HazelcastMQ
    * messages.
    *
    * @param frameConverter

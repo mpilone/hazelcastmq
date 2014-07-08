@@ -297,6 +297,16 @@ public class StompClient {
   }
 
   /**
+   * Returns true if the client is currently connected to the server and can
+   * send and receive frames.
+   *
+   * @return true if the client is connected
+   */
+  public boolean isConnected() {
+    return channel != null && channel.isActive();
+  }
+
+  /**
    * Disconnects from the remote server by issuing a {@link Command#DISCONNECT}
    * frame and closing the network connection. This method blocks until the
    * disconnect it complete. A receipt will be requested but the specification

@@ -106,7 +106,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
           "Subscription with id [%s] already exists.", id), null, frame);
     }
 
-    // Create the JMS components.
+    // Create the HazelcastMQ components.
     HazelcastMQContext session = config.getHazelcastMQInstance().createContext(
         false);
     HazelcastMQConsumer consumer = session.createConsumer(destination);

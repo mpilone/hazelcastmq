@@ -65,7 +65,7 @@ public class StompFrameEncoder extends MessageToByteEncoder<Frame> {
         && !frame.getHeaders().getHeaderNames().contains(Headers.CONTENT_LENGTH)) {
       out.writeBytes(Headers.CONTENT_LENGTH.getBytes(UTF_8));
       out.writeByte(COLON_CHAR);
-      out.writeInt(frame.getBody().length);
+      out.writeBytes(String.valueOf(frame.getBody().length).getBytes(UTF_8));
       out.writeByte(LINE_FEED_CHAR);
     }
 
