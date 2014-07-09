@@ -1,17 +1,15 @@
 package org.mpilone.yeti.client;
 
-import static java.lang.String.format;
-
-import java.util.*;
-import java.util.concurrent.*;
-
-import org.mpilone.yeti.*;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import java.util.*;
+import java.util.concurrent.*;
+import org.mpilone.yeti.*;
+
+import static java.lang.String.format;
 
 /**
  * <p>
@@ -317,25 +315,37 @@ public class StompClient {
   public void disconnect() throws InterruptedException {
 
     if (channel.isActive()) {
+      // Request a receipt even though we're never going to read it.
+      Frame frame = FrameBuilder.disconnect().header(Headers.RECEIPT,
+          "receipt-" + UUID.randomUUID().toString()).build();
+
+      channel.writeAndFlush(frame).sync();
+
+      closeAndShutdown();
+    }
+  }
+
+  /**
+   * Closes the underlying channel and shutsdown the worker group. This method
+   * is normally called automatically by the {@link #disconnect() } method after
+   * sending the disconnect frame.
+   *
+   * @throws InterruptedException if the close is interrupted
+   */
+  protected void closeAndShutdown() throws InterruptedException {
+    try {
+      channel.close().sync();
+    }
+    finally {
       try {
-        // Request a receipt even though we're never going to read it.
-        Frame frame = FrameBuilder.disconnect().header(Headers.RECEIPT,
-            "receipt-" + UUID.randomUUID().toString()).build();
-
-        channel.writeAndFlush(frame).sync();
-        channel.close().sync();
+        workerGroup.shutdownGracefully().get(10, TimeUnit.SECONDS);
       }
-      finally {
-        try {
-          workerGroup.shutdownGracefully().get(10, TimeUnit.SECONDS);
-        }
-        catch (ExecutionException | TimeoutException ex) {
-          // ignore
-        }
-
-        workerGroup = null;
-        channel = null;
+      catch (ExecutionException | TimeoutException ex) {
+        // ignore
       }
+
+      workerGroup = null;
+      channel = null;
     }
   }
 
