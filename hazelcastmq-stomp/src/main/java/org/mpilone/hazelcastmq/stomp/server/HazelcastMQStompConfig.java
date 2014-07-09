@@ -12,7 +12,6 @@ public class HazelcastMQStompConfig {
 
   private int maxFrameSize;
   private int port;
-  private boolean frameDebugEnabled;
   private HazelcastMQInstance hazelcastMQInstance;
   private FrameConverter frameConverter;
 
@@ -83,26 +82,6 @@ public class HazelcastMQStompConfig {
    */
   public int getPort() {
     return port;
-  }
-
-  /**
-   * Sets the flag which indicates if frame debugging is enabled at the STOMP
-   * frame handling level. The default is false.
-   *
-   * @param frameDebugEnabled true to enable
-   */
-  public void setFrameDebugEnabled(boolean frameDebugEnabled) {
-    this.frameDebugEnabled = frameDebugEnabled;
-  }
-
-  /**
-   * Returns the flag which indicates if frame debugging is enabled at the STOMP
-   * frame handling level. The default is false.
-   *
-   * @return true if enabled
-   */
-  public boolean isFrameDebugEnabled() {
-    return frameDebugEnabled;
   }
 
   /**

@@ -1,10 +1,7 @@
-package org.mpilone.yeti.example;
+package org.mpilone.yeti;
 
 import java.util.concurrent.TimeUnit;
 
-import org.mpilone.yeti.Frame;
-import org.mpilone.yeti.FrameBuilder;
-import org.mpilone.yeti.StompFrameDecoder;
 import org.mpilone.yeti.client.StompClient;
 import org.mpilone.yeti.server.InMemoryBrokerStomplet;
 import org.mpilone.yeti.server.StompServer;
@@ -19,11 +16,14 @@ import org.mpilone.yeti.server.StompServer;
 public class ServerClientApp {
 
   public static void main(String[] args) throws InterruptedException {
+    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
+    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
+    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
+    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
 
     int port = 8090;
 
-    StompServer server = new StompServer(false,
-        StompFrameDecoder.DEFAULT_MAX_FRAME_SIZE, port,
+    StompServer server = new StompServer(StompFrameDecoder.DEFAULT_MAX_FRAME_SIZE, port,
         new StompServer.ClassStompletFactory(InMemoryBrokerStomplet.class));
     server.start();
 

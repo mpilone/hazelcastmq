@@ -37,6 +37,7 @@ public class StompToJmsOneWay {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
+    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
 
     new StompToJmsOneWay();
   }

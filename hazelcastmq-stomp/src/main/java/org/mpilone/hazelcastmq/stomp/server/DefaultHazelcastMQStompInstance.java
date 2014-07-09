@@ -40,7 +40,7 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
    */
   DefaultHazelcastMQStompInstance(final HazelcastMQStompConfig config) {
     this.config = config;
-    this.stompServer = new StompServer(this.config.isFrameDebugEnabled(),
+    this.stompServer = new StompServer(
         this.config.getMaxFrameSize(),
         this.config.getPort(),
         new HazelcastMQStompletFactory());

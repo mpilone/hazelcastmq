@@ -37,7 +37,6 @@ public class StompServer {
 
   private final StompletFactory stompletFactory;
   private final int port;
-  private final boolean frameDebugEnabled;
   private final int maxFrameSize;
 
   /**
@@ -61,21 +60,6 @@ public class StompServer {
    */
   public StompServer(int maxFrameSize, int port,
       StompletFactory stompletFactory) {
-    this(false, maxFrameSize, port, stompletFactory);
-  }
-
-  /**
-   * Constructs the server which will bind on the given port and use the
-   * stomplet factory to create new stomplet instances for client connections.
-   *
-   * @param frameDebugEnabled true to enable frame debugging
-   * @param maxFrameSize the maximum frame size in bytes
-   * @param port the port to bind to
-   * @param stompletFactory the factory to create a new stomplet per client
-   */
-  public StompServer(boolean frameDebugEnabled, int maxFrameSize, int port,
-      StompletFactory stompletFactory) {
-    this.frameDebugEnabled = frameDebugEnabled;
     this.port = port;
     this.stompletFactory = stompletFactory;
     this.maxFrameSize = maxFrameSize;
@@ -141,11 +125,8 @@ public class StompServer {
             new StompFrameDecoder(maxFrameSize));
         ch.pipeline().addLast(StompFrameEncoder.class.getName(),
             new StompFrameEncoder());
-
-        if (frameDebugEnabled) {
           ch.pipeline().addLast(FrameDebugHandler.class.getName(),
-              new FrameDebugHandler(true, true));
-        }
+              new FrameDebugHandler());
 
         // Create a new stomplet instance for each client connection.
         ch.pipeline().addLast(StompletFrameHandler.class.getName(),

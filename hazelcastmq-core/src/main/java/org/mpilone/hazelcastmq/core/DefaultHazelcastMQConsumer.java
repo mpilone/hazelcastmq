@@ -308,6 +308,10 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
             msg = null;
           }
         }
+
+        if (log.isDebugEnabled() && msg != null) {
+          log.debug("Consumer received message {}", msg);
+        }
       }
       finally {
         receiveLock.unlock();

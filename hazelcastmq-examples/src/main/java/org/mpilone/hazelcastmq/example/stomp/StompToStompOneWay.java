@@ -31,6 +31,7 @@ public class StompToStompOneWay {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
+    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
 
     new StompToStompOneWay();
   }
@@ -53,7 +54,6 @@ public class StompToStompOneWay {
       // Create a Stomp server.
       HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
-      stompConfig.setFrameDebugEnabled(true);
       HazelcastMQStompInstance stompServer = HazelcastMQStomp.
           newHazelcastMQStompInstance(stompConfig);
 

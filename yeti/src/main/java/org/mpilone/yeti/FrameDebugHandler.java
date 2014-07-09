@@ -1,33 +1,39 @@
 
 package org.mpilone.yeti;
 
-import static java.lang.String.format;
-
-import java.text.SimpleDateFormat;
 import java.util.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.channel.*;
 
 /**
- * An inbound channel handler that prints frames to stdout for debugging
- * purposes. The handler shouldn't be used in a production environment.
+ * An inbound channel handler that logs all incoming and outgoing frames at the
+ * DEBUG level. Inbound and outbound frame logging can be individually disabled
+ * to reduce log output. If the DEBUG level of logging is not enabled, this
+ * handler does nothing.
  *
  * @author mpilone
  */
 public class FrameDebugHandler extends ChannelDuplexHandler {
 
+  /**
+   * The log for this class.
+   */
+  private final static Logger log = LoggerFactory.getLogger(
+      FrameDebugHandler.class);
+
   private final String instanceId;
   private boolean debugInbound;
   private boolean debugOutbound;
-  private final SimpleDateFormat formatter = new SimpleDateFormat(
-      "yyyy-MM-dd HH:mm:ss.SSS");
 
   /**
-   * Constructs the handler with an automatically generated instance ID and only
-   * inbound debugging enabled.
+   * Constructs the handler with an automatically generated instance ID and both
+   * inbound and outbound debugging enabled.
    */
   public FrameDebugHandler() {
-    this(true, false);
+    this(true, true);
   }
 
   /**
@@ -60,8 +66,9 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
   public void channelRead(ChannelHandlerContext ctx, Object msg) throws
       Exception {
 
-    if (debugInbound && msg instanceof Frame) {
-      logMessage(format("[%s] Inbound frame: %s", instanceId, msg));
+    if (log.isDebugEnabled() && debugInbound && msg instanceof Frame) {
+      log.debug("Frame read from [{}]: {}", ctx.channel().
+          remoteAddress(), msg);
     }
 
     super.channelRead(ctx, msg);
@@ -71,8 +78,9 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
   public void write(ChannelHandlerContext ctx, Object msg,
       ChannelPromise promise) throws Exception {
 
-    if (debugOutbound && msg instanceof Frame) {
-      logMessage(format("[%s] Outbound frame: %s", instanceId, msg));
+    if (log.isDebugEnabled() && debugOutbound && msg instanceof Frame) {
+      log.debug("Frame write to [{}]: {}",
+          ctx.channel().remoteAddress(), msg);
     }
 
     super.write(ctx, msg, promise);
@@ -80,20 +88,10 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-    logMessage(format("[%s] Channel inactive.", instanceId));
+    if (log.isDebugEnabled()) {
+      log.debug("Channel inactive for [{}].", ctx.channel().remoteAddress());
+    }
+
     super.channelInactive(ctx);
   }
-
-  /**
-   * Prints the given message to the logging system. The message will include
-   * the instance ID and any frame details. By default, this will be stdout.
-   * Subclasses should overload this method to write to a different logging
-   * system.
-   *
-   * @param msg the message to log
-   */
-  protected void logMessage(String msg) {
-    System.out.printf("[%s] %s\n", formatter.format(new Date()), msg);
-  }
-
 }

@@ -1,14 +1,16 @@
 package org.mpilone.hazelcastmq.example.stomp;
 
-import com.hazelcast.config.Config;
-import com.hazelcast.core.*;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.stomp.server.*;
 import org.mpilone.yeti.*;
 import org.mpilone.yeti.client.StompClient;
 import org.slf4j.*;
+
+import com.hazelcast.config.Config;
+import com.hazelcast.core.*;
 
 /**
  * This example uses a HazelcastMQ STOMP server to accept a Yeti STOMP client
@@ -66,6 +68,7 @@ public class StompToStompThreadedRequestReplyReconnect {
     System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
+    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
 
     new StompToStompThreadedRequestReplyReconnect();
   }
@@ -89,7 +92,6 @@ public class StompToStompThreadedRequestReplyReconnect {
       HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
           mqInstance);
       stompConfig.setPort(STOMP_PORT);
-      stompConfig.setFrameDebugEnabled(false);
       HazelcastMQStompInstance stompServer = HazelcastMQStomp.
           newHazelcastMQStompInstance(stompConfig);
 

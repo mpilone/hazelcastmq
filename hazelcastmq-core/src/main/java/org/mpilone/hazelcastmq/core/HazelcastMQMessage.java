@@ -231,4 +231,11 @@ public class HazelcastMQMessage implements Serializable {
   public String getReplyTo() {
     return getHeaders().get(Headers.REPLY_TO);
   }
+
+  @Override
+  public String toString() {
+    return "HazelcastMQMessage{" + "headers=" + headers + ", body="
+        + (body != null ? body.length + " bytes" : "null") + '}';
+  }
+
 }

@@ -156,7 +156,11 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     
     msg.setId("hazelcastmq-" + idGenerator.newId());
     msg.setDestination(destination);
-    
+
+    if (log.isDebugEnabled()) {
+      log.debug("Producer sending message {}", msg);
+    }
+
     Object msgData = config.getMessageConverter().fromMessage(msg);
     
     BlockingQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
@@ -167,7 +171,7 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     if (queue == null) {
       topic = hazelcastMQContext.resolveTopic(destination);
     }
-    
+
     if (queue != null) {
       if (!queue.offer(msgData)) {
         throw new HazelcastMQException(format(

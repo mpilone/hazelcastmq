@@ -1,15 +1,17 @@
 package org.mpilone.yeti.client;
 
+import static java.lang.String.format;
+
+import java.util.*;
+import java.util.concurrent.*;
+
+import org.mpilone.yeti.*;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import java.util.*;
-import java.util.concurrent.*;
-import org.mpilone.yeti.*;
-
-import static java.lang.String.format;
 
 /**
  * <p>
@@ -34,7 +36,6 @@ public class StompClient {
 
   private String host;
   private int port;
-  private boolean frameDebugEnabled;
 
   private final QueuingFrameListener connectedListener;
   private final List<FrameListener> errorListeners;
@@ -67,7 +68,6 @@ public class StompClient {
     this.receiptListeners = Collections.synchronizedList(
         new ArrayList<FrameListener>());
     this.subscriptionMap = new ConcurrentHashMap<>();
-    this.frameDebugEnabled = frameDebugEnabled;
 
     this.port = port;
     this.host = host;
@@ -91,16 +91,6 @@ public class StompClient {
    */
   public void setPort(int port) {
     this.port = port;
-  }
-
-  /**
-   * Sets the frame debug flag to enable debugging output. The value will not be
-   * used until the next connect call.
-   *
-   * @param frameDebugEnabled true to enable debugging
-   */
-  public void setFrameDebugEnabled(boolean frameDebugEnabled) {
-    this.frameDebugEnabled = frameDebugEnabled;
   }
 
   /**
@@ -191,11 +181,8 @@ public class StompClient {
             new StompFrameDecoder());
         ch.pipeline().addLast(StompFrameEncoder.class.getName(),
             new StompFrameEncoder());
-
-        if (frameDebugEnabled) {
-          ch.pipeline().addLast(FrameDebugHandler.class.getName(),
-              new FrameDebugHandler(true, true));
-        }
+        ch.pipeline().addLast(FrameDebugHandler.class.getName(),
+            new FrameDebugHandler());
         ch.pipeline().addLast(StompletFrameHandler.class.getName(),
             new StompletFrameHandler(new DispatchingStomplet()));
       }

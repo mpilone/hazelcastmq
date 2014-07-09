@@ -464,6 +464,9 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
       // Keep dispatching as long as one consumer had a successful dispatch.
       while (dispatched && !shutdown) {
+        log.debug("Initiating receive and dispatch on [{}] consumers.",
+            consumerMap.size());
+
         dispatched = false;
 
         Set<String> consumerIds = new HashSet<>(consumerMap.keySet());
