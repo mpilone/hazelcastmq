@@ -6,6 +6,7 @@ import static org.mpilone.yeti.StompConstants.*;
 import java.util.List;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufProcessor;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.*;
 
@@ -292,31 +293,38 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
    */
   private DecoderState readControlChars(ByteBuf in) {
 
-    int pos;
     DecoderState nextState = DecoderState.READ_CONTROL_CHARS;
-    for (pos = 0; pos < in.readableBytes() && nextState
-        == DecoderState.READ_CONTROL_CHARS; ) {
 
-      byte b = in.getByte(pos);
+    int index = in.forEachByte(new ByteBufProcessor() {
+      @Override
+      public boolean process(byte b) throws Exception {
+        switch (b) {
+          // This is a little more lax than the spec which allows for only
+          // EOL character(s) between frames.
+          case ' ':
+          case CARRIAGE_RETURN_CHAR:
+          case LINE_FEED_CHAR:
+          case NULL_CHAR:
+            // ignore the character
+            return true;
 
-      switch (b) {
-        // This is a little more lax than the spec which allows for only
-        // EOL character(s) between frames.
-        case ' ':
-        case CARRIAGE_RETURN_CHAR:
-        case LINE_FEED_CHAR:
-        case NULL_CHAR:
-          // ignore the character
-          pos++;
-          break;
-
-        default:
-          nextState = DecoderState.READ_COMMAND;
-          break;
+          default:
+            return false;
+        }
       }
-    }
+    });
 
-    in.skipBytes(pos);
+    if (index != -1) {
+      // A non-control character was found so we skip up to that index and
+      // move to the next state.
+      in.readerIndex(index);
+      nextState = DecoderState.READ_COMMAND;
+    }
+    else {
+      // Discard all available bytes because we couldn't find a
+      // non-control character.
+      in.readerIndex(in.writerIndex());
+    }
 
     return nextState;
   }
@@ -401,12 +409,18 @@ public class StompFrameDecoder extends ReplayingDecoder<StompFrameDecoder.Decode
 
     DecoderState nextState = DecoderState.DISCARD_FRAME;
 
-    while (nextState == DecoderState.DISCARD_FRAME && in.readableBytes() > 0) {
-      byte b = in.readByte();
+    int byteCount = in.bytesBefore((byte) NULL_CHAR);
 
-      if (b == NULL_CHAR) {
-        nextState = DecoderState.READ_CONTROL_CHARS;
-      }
+    if (byteCount > -1) {
+      // Skip all the bytes including the null character and move to the next
+      // state.
+      in.skipBytes(byteCount + 1);
+      nextState = DecoderState.READ_CONTROL_CHARS;
+    }
+    else {
+      // Clear the buffer, discarding all the data before the future null
+      // character.
+      in.readerIndex(in.writerIndex());
     }
 
     return nextState;

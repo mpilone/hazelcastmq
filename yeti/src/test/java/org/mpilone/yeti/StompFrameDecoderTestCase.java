@@ -263,6 +263,40 @@ public class StompFrameDecoderTestCase {
     Frame actualFrame = (Frame) actual;
     assertEquals(Command.CONNECT, actualFrame.getCommand());
   }
+  /**
+   * Tests decoding a frame that has a lot of trailing EOL characters.
+   */
+  @Test
+  public void testDecodeFrame_TrailingEOLs() {
+
+    EmbeddedChannel ec = new EmbeddedChannel(new StompFrameDecoder());
+
+    final byte[] body = "This is the body.".getBytes(UTF_8);
+
+    ByteBuf buf = Unpooled.buffer();
+
+    buf.writeBytes(Command.CONNECT.name().getBytes(UTF_8));
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeBytes("header1:value1".getBytes(UTF_8));
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeBytes(body);
+    buf.writeByte(NULL_CHAR);
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeByte(CARRIAGE_RETURN_CHAR);
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeByte(LINE_FEED_CHAR);
+    buf.writeByte(CARRIAGE_RETURN_CHAR);
+    buf.writeByte(LINE_FEED_CHAR);
+    ec.writeInbound(buf);
+
+    Object actual = ec.readInbound();
+    assertNotNull(actual);
+    assertTrue(actual instanceof Frame);
+
+    Frame actualFrame = (Frame) actual;
+    assertEquals(Command.CONNECT, actualFrame.getCommand());
+  }
 
   /**
    * Tests decoding a frame when half the header arrives in one write and it is

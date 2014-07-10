@@ -14,6 +14,9 @@ for the content-length rather than a String number.
 StompServer. It is now enabled by default and can be control via a logger 
 configuration.
 - [hazelcast-core] Added debug logging for sent and received messages.
+- [yeti] Fixed a bug where EOL characters immediately after a frame cause a 
+frame decoder exception because the proper index was not used in the incoming 
+channel buffer.
 
 ## 2014-06-20, v1.0.0
 

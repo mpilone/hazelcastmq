@@ -177,6 +177,8 @@ public class StompClient {
     return new ChannelInitializer<SocketChannel>() {
       @Override
       public void initChannel(SocketChannel ch) throws Exception {
+//        ch.pipeline().addLast(LoggingHandler.class.getName(),
+//            new LoggingHandler(LogLevel.INFO));
         ch.pipeline().addLast(StompFrameDecoder.class.getName(),
             new StompFrameDecoder());
         ch.pipeline().addLast(StompFrameEncoder.class.getName(),
@@ -307,9 +309,9 @@ public class StompClient {
           "receipt-" + UUID.randomUUID().toString()).build();
 
       channel.writeAndFlush(frame).sync();
-
-      closeAndShutdown();
     }
+
+    closeAndShutdown();
   }
 
   /**
@@ -321,7 +323,9 @@ public class StompClient {
    */
   protected void closeAndShutdown() throws InterruptedException {
     try {
-      channel.close().sync();
+      if (channel.isActive()) {
+        channel.close().sync();
+      }
     }
     finally {
       try {
