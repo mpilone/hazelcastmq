@@ -52,6 +52,21 @@ public class HazelcastMQConfig {
   }
 
   /**
+   * Constructs the configuration with the following defaults:
+   * <ul>
+   * <li>messageConverter: {@link NoOpMessageConverter}</li>
+   * <li>topicMaxMessageCount: 1000</li>
+   * <li>executor: {@link Executors#newCachedThreadPool()} (lazy
+   * initialized)</li>
+   * </ul>
+   *
+   * @param hzInstance the Hazelcast instances to use for all queues and topic
+   * operations
+   */
+  public HazelcastMQConfig(HazelcastInstance hzInstance) {
+  }
+
+  /**
    * Returns the message converter to use for converter HazelcastMQ messages
    * into and out of the objects/data sent into Hazelcast. The default is the
    * {@link NoOpMessageConverter} so the original {@link HazelcastMQMessage} is

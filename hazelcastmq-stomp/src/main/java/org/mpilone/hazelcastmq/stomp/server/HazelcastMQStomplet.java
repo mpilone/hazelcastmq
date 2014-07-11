@@ -1,4 +1,3 @@
-
 package org.mpilone.hazelcastmq.stomp.server;
 
 import static java.lang.String.format;
@@ -47,7 +46,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
    */
   public HazelcastMQStomplet(HazelcastMQStompConfig config) {
 
-    super(new StompVersion[]{StompVersion.VERSION_1_2});
+    super(new StompVersion[]{StompVersion.VERSION_1_1, StompVersion.VERSION_1_2});
 
     this.config = config;
     this.transactions = new HashMap<>();

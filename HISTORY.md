@@ -2,8 +2,8 @@
 
 ## SNAPSHOT, v1.1.0
 
-- [hazelcast-camel] Direct implementation of a polling consumer.
-- [hazelcast-camel] Added support for per message destination selection via a 
+- [hazelcastmq-camel] Direct implementation of a polling consumer.
+- [hazelcastmq-camel] Added support for per message destination selection via a 
 message header.
 - [yeti] Improved the performance and error handling of the StompFrameDecoder.
 - [yeti] Implemented maximum frame size in the StompFrameDecoder.
@@ -13,10 +13,11 @@ for the content-length rather than a String number.
 - [yeti] Removed flag for enabling frame debugging from the StompClient and 
 StompServer. It is now enabled by default and can be control via a logger 
 configuration.
-- [hazelcast-core] Added debug logging for sent and received messages.
+- [hazelcastmq-core] Added debug logging for sent and received messages.
 - [yeti] Fixed a bug where EOL characters immediately after a frame cause a 
 frame decoder exception because the proper index was not used in the incoming 
 channel buffer.
+- [hazelcastmq-stomp] Enabled STOMP 1.1 protocol support.
 
 ## 2014-06-20, v1.0.0
 
