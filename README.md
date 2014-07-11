@@ -8,7 +8,10 @@ on the core features of Hazelcast such as scalability and resilience while
 maintaining a small footprint and few dependencies. HazelcastMQ can be easily
 embedded in a single JVM or clustered across a huge number of nodes.
 
-HazelcastMQ is divided into multiple components:
+HazelcastMQ is divided into multiple components that can be used independently 
+depending on your integration needs:
+
+![Hazelcast Components](/docs/HazelcastMQComponents.png?raw=true "Hazelcast Components")
 
 * [hazelcastmq-core](hazelcastmq-core/README.md): The core MQ library that 
 provides a JMS 2.0-like API for sending and receiving messages.
@@ -24,10 +27,6 @@ producers and consumers.
 * [yeti](yeti/README.md): A [STOMP](http://stomp.github.com) server and client framework built 
 on [Netty](http://netty.io/) to make it simple to build STOMP implementations for 
 existing brokers.
-
-## Rationale
-
-Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast-jms-provider.html) for now.
 
 ## Examples
 
@@ -59,3 +58,7 @@ And then adding the dependency:
         <artifactId>hazelcastmq-core</artifactId>
         <version>X.X.X</version>
     </dependency>
+
+## Background
+
+Refer to my [initial blog post](http://mikepilone.blogspot.com/2013/01/hazelcast-jms-provider.html).

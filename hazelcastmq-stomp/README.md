@@ -8,7 +8,7 @@ used to integrate into existing frameworks such as [Apache Camel's](http://camel
 while not requiring any of the JMS complexity.
 
 ## Features
-* STOMP 1.2 protocol (which is mostly backward compatible to 1.1)
+* STOMP 1.1 and 1.2 protocols
 * Sending and subscribing
 * Multiple clients on single server
 * Queue and Topic send/receive

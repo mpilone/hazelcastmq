@@ -18,7 +18,7 @@ import com.hazelcast.core.*;
  * thread simulating a backend. The client then sends a bunch of request frames
  * and waits for replies. For each request/reply frame, the frontend client will
  * connect and disconnect to simulate a lot of client turnover. The server is
- * backed by HazelcastMQ which is backed * by a local Hazelcast instance.
+ * backed by HazelcastMQ which is backed by a local Hazelcast instance.
  *
  * @author mpilone
  */
@@ -73,6 +73,11 @@ public class StompToStompThreadedRequestReplyReconnect {
     new StompToStompThreadedRequestReplyReconnect();
   }
 
+  /**
+   * Constructs and executes the example.
+   *
+   * @throws Exception if there is an unexpected error
+   */
   public StompToStompThreadedRequestReplyReconnect() throws Exception {
 
     // Create a Hazelcast instance.
@@ -107,7 +112,7 @@ public class StompToStompThreadedRequestReplyReconnect {
       for (int i = 0; i < 50; ++i) {
 
         // Create a Stomp client.
-        CloseableStompClient stompClient = new CloseableStompClient("localhost",
+        StompClient stompClient = new StompClient("localhost",
             STOMP_PORT);
         stompClient.connect();
 
@@ -135,7 +140,6 @@ public class StompToStompThreadedRequestReplyReconnect {
 
         // Shutdown the client.
         stompClient.disconnect();
-//        stompClient.closeAndShutdown();
       }
 
       // Shutdown the backend worker.
@@ -154,18 +158,9 @@ public class StompToStompThreadedRequestReplyReconnect {
 
   }
 
-  private static class CloseableStompClient extends StompClient {
-
-    public CloseableStompClient(String host, int port) {
-      super(host, port);
-    }
-
-    @Override
-    protected void closeAndShutdown() throws InterruptedException {
-      super.closeAndShutdown();
-    }
-  }
-
+  /**
+   * Simulates a backend worker that operates in a different thread or process.
+   */
   private static class Backend implements Runnable {
 
     private transient boolean shutdown;
