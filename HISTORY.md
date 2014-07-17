@@ -19,6 +19,7 @@ frame decoder exception because the proper index was not used in the incoming
 channel buffer. This should allow the Yeti client to be used with ActiveMQ 
 STOMP.
 - [hazelcastmq-stomp] Enabled STOMP 1.1 protocol support.
+- [hazelcastmq-core] Upgraded to Hazelcast 3.2.3.
 
 ## 2014-06-20, v1.0.0
 

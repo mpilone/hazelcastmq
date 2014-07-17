@@ -21,7 +21,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hazelcast.version>3.2</hazelcast.version>
+    <hazelcast.version>3.2.3</hazelcast.version>
     <slf4j.version>1.7.2</slf4j.version>
     <junit.version>4.11</junit.version>
     
