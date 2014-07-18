@@ -1,6 +1,9 @@
 # HazelcastMQ History
 
-## SNAPSHOT, v1.1.0
+## SNAPSHOT, v1.2.0
+
+
+## 2014-07-17, v1.1.0
 
 - [hazelcastmq-camel] Direct implementation of a polling consumer.
 - [hazelcastmq-camel] Added support for per message destination selection via a 
