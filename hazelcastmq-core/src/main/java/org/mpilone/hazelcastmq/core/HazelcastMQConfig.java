@@ -64,6 +64,7 @@ public class HazelcastMQConfig {
    * operations
    */
   public HazelcastMQConfig(HazelcastInstance hzInstance) {
+    setHazelcastInstance(hzInstance);
   }
 
   /**

@@ -28,6 +28,22 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
 
   private HazelcastMQCamelConfig configuration;
 
+  /**
+   * Constructs the component with no configuration. A default configuration
+   * will be used if one is not set before adding the component to the context.
+   */
+  public HazelcastMQCamelComponent() {
+  }
+
+  /**
+   * Constructs the component with the given configuration.
+   *
+   * @param configuration the component configuration
+   */
+  public HazelcastMQCamelComponent(HazelcastMQCamelConfig configuration) {
+    this.configuration = configuration;
+  }
+
   @Override
   protected Endpoint createEndpoint(String uri, String remaining,
       Map<String, Object> parameters) throws Exception {
@@ -67,5 +83,14 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
    */
   public void setConfiguration(HazelcastMQCamelConfig configuration) {
     this.configuration = configuration;
+  }
+
+  @Override
+  public void start() throws Exception {
+    if (configuration == null) {
+      this.configuration = new HazelcastMQCamelConfig();
+    }
+
+    super.start();
   }
 }

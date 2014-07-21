@@ -25,6 +25,17 @@ public class HazelcastMQCamelConfig implements Cloneable {
 
   /**
    * <p>
+   * Constructs the configuration with reasonable defaults. This is a
+   * convenience method for
+   * {@link #HazelcastMQCamelConfig(org.mpilone.hazelcastmq.core.HazelcastMQInstance) HazelcastMQCamelConfig(null)}.
+   * </p>
+   */
+  public HazelcastMQCamelConfig() {
+    this(null);
+  }
+
+  /**
+   * <p>
    * Constructs the configuration with the following defaults.
    * </p>
    * <ul>
@@ -34,8 +45,12 @@ public class HazelcastMQCamelConfig implements Cloneable {
    * <li>timeToLive: 0</li>
    * <li>replyTo: null</li>
    * </ul>
+   *
+   * @param hazelcastMQInstance the HazelcastMQ instance to use for all
+   * messaging operations
    */
-  public HazelcastMQCamelConfig() {
+  public HazelcastMQCamelConfig(HazelcastMQInstance hazelcastMQInstance) {
+    this.hazelcastMQInstance = hazelcastMQInstance;
     messageConverter = new DefaultMessageConverter();
     concurrentConsumers = 1;
     requestTimeout = 20000;
