@@ -14,10 +14,6 @@
 
   <name>HazelcastMQ Examples</name>
 
-  <properties>
-    <spring.version>3.2.0.RELEASE</spring.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.mpilone.hazelcastmq</groupId>
@@ -37,6 +33,11 @@
     <dependency>
       <groupId>org.mpilone.hazelcastmq</groupId>
       <artifactId>hazelcastmq-camel</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.mpilone.hazelcastmq</groupId>
+      <artifactId>hazelcastmq-spring</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

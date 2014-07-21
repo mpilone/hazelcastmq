@@ -2,6 +2,9 @@
 
 ## SNAPSHOT, v1.2.0
 
+- [hazelcastmq-examples] Upgraded to Spring 3.2.10
+- [hazelcastmq-spring] New component to support better integration with Spring.
+- [hazelcastmq-spring] New Hazelcast transaction manager and proxy.
 
 ## 2014-07-17, v1.1.0
 
