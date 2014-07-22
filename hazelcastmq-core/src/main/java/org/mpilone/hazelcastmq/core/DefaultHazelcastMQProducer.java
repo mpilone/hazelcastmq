@@ -2,13 +2,9 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
-import java.util.concurrent.BlockingQueue;
+import org.slf4j.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.hazelcast.core.ITopic;
-import com.hazelcast.core.IdGenerator;
+import com.hazelcast.core.*;
 
 /**
  * The default implementation of a producer.
@@ -163,7 +159,7 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
 
     Object msgData = config.getMessageConverter().fromMessage(msg);
     
-    BlockingQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
+    IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
     ITopic<Object> topic = null;
 
     // Only resolve the topic if we couldn't resolve it as a queue. This is a

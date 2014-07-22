@@ -1,5 +1,6 @@
 package org.mpilone.hazelcastmq.example.spring.tx;
 
+import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.mpilone.hazelcastmq.example.spring.tx.support.*;
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastInstanceProxyFactory;
 import org.springframework.context.annotation.*;
@@ -13,12 +14,15 @@ import com.hazelcast.core.HazelcastInstance;
  *
  * @author mpilone
  */
-public class TransactionAware {
+public class TransactionAware extends ExampleApp {
 
   public static void main(String[] args) {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "warn");
+    TransactionAware app = new TransactionAware();
+    app.runExample();
+  }
+
+  @Override
+  protected void start() {
 
     // Run the business methods.
     try (AnnotationConfigApplicationContext springContext =

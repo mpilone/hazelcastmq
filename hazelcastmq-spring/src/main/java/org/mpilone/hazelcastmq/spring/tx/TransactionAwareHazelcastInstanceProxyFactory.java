@@ -1,15 +1,13 @@
 
 package org.mpilone.hazelcastmq.spring.tx;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.slf4j.*;
 import org.springframework.util.Assert;
 
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IQueue;
 
 /**
  * <p>
@@ -38,12 +36,14 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
       TransactionAwareHazelcastInstanceProxyFactory.class);
 
   private HazelcastInstance targetHazelcastInstance;
+  private boolean synchedLocalTransactionAllowed;
 
   /**
    * Constructs the proxy factory with no target Hazelcast instance. An instance
    * must be set before attempting to create a proxy.
    */
   public TransactionAwareHazelcastInstanceProxyFactory() {
+    this(null);
   }
 
   /**
@@ -54,7 +54,67 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
    */
   public TransactionAwareHazelcastInstanceProxyFactory(
       HazelcastInstance targetHazelcastInstance) {
+    this(targetHazelcastInstance, false);
+  }
+
+  /**
+   * Constructs the proxy factory.
+   *
+   * @param targetHazelcastInstance the Hazelcast instance to wrap with the
+   * proxy
+   * @param synchedLocalTransactionAllowed true to allow synchronization with
+   * non-Hazelcast main transactions; false to only allow transaction
+   * participation when the main Spring managed transaction is a Hazelcast
+   * transaction
+   *
+   * @see #setSynchedLocalTransactionAllowed(boolean)
+   */
+  public TransactionAwareHazelcastInstanceProxyFactory(
+      HazelcastInstance targetHazelcastInstance,
+      boolean synchedLocalTransactionAllowed) {
     this.targetHazelcastInstance = targetHazelcastInstance;
+    this.synchedLocalTransactionAllowed = synchedLocalTransactionAllowed;
+  }
+
+
+  /**
+   * <p>
+   * Set whether to allow for a local Hazelcast transaction that is synchronized
+   * with a Spring-managed transaction (where the main transaction might be a
+   * JDBC-based one for a specific DataSource, for example), with the Hazelcast
+   * transaction committing right after the main transaction. If not allowed,
+   * the given HazelcastInstance needs to handle transaction enlistment
+   * underneath the covers (via a
+   * {@link HazelcastTransactionManager for example}).
+   * </p>
+   *
+   * <p>
+   * Default is "false": If not within a managed transaction that encompasses
+   * the underlying HazelcastInstance, standard distributed objects will be
+   * returned. Turn this flag on to allow participation in any Spring-managed
+   * transaction, with a local Hazelcast transaction synchronized with the main
+   * transaction.
+   * </p>
+   *
+   * @param synchedLocalTransactionAllowed true to enable synchronization with
+   * any local transaction; false to allow for participation only if the   * main
+   * transaction is a Hazelcast managed transaction
+   */
+  public void setSynchedLocalTransactionAllowed(
+      boolean synchedLocalTransactionAllowed) {
+    this.synchedLocalTransactionAllowed = synchedLocalTransactionAllowed;
+  }
+
+  /**
+   * Returns true if a local Hazelcast transaction is allowed to synchronize
+   * with the main Spring-managed transaction that is not a Hazelcast
+   * transaction.
+   *
+   * @return true if synchronization is allowed, false if not
+   * @see #setSynchedLocalTransactionAllowed(boolean)
+   */
+  public boolean isSynchedLocalTransactionAllowed() {
+    return synchedLocalTransactionAllowed;
   }
 
   /**
@@ -92,7 +152,8 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
     return (HazelcastInstance) Proxy.newProxyInstance(HazelcastInstance.class.
         getClassLoader(), new Class[]{HazelcastInstance.class,
           TransactionAwareHazelcastInstanceProxy.class},
-        new TransactionAwareHazelcastInstanceProxyImpl(targetHazelcastInstance));
+        new TransactionAwareHazelcastInstanceProxyImpl(targetHazelcastInstance,
+            synchedLocalTransactionAllowed));
   }
 
   /**
@@ -103,9 +164,10 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
    * through to the target instance.
    */
   private static class TransactionAwareHazelcastInstanceProxyImpl implements
-      InvocationHandler {
+      InvocationHandler, TransactionAwareHazelcastInstanceProxy {
 
     private final HazelcastInstance targetHazelcastInstance;
+    private final boolean synchedLocalTransactionAllowed;
 
     /**
      * Constructs the proxy implementation that will wrap the given instance.
@@ -114,8 +176,10 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
      * wraps
      */
     public TransactionAwareHazelcastInstanceProxyImpl(
-        HazelcastInstance targetHazelcastInstance) {
+        HazelcastInstance targetHazelcastInstance,
+        boolean synchedLocalTransactionAllowed) {
       this.targetHazelcastInstance = targetHazelcastInstance;
+      this.synchedLocalTransactionAllowed = synchedLocalTransactionAllowed;
     }
 
     @Override
@@ -124,17 +188,24 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
 
       switch (method.getName()) {
         case "getTargetHazelcastInstance":
-          return targetHazelcastInstance;
+          return getTargetHazelcastInstance();
+
+        case "isSynchedLocalTransactionAllowed":
+          return isSynchedLocalTransactionAllowed();
 
         case "getQueue":
-          return HazelcastUtils.getQueue((String) args[0],
-              targetHazelcastInstance);
+          IQueue<?> queue = HazelcastUtils.getTransactionalQueue(
+              (String) args[0],
+              targetHazelcastInstance, synchedLocalTransactionAllowed);
+
+          return queue != null ? queue : method.invoke(targetHazelcastInstance,
+              args);
 
           // TODO: we only support a transactional queue at this point.
         // Add support for more types in the future.
 
         case "newTransactionContext":
-          // Hazelcast bind the transaction context to the thread
+          // Hazelcast binds the transaction context to the thread
           // automatically so if there is a Spring managed transaction this
           // transaction context is going to be the same one and cause issues.
           // It isn't a good idea to mix Spring and manual transaction
@@ -150,6 +221,17 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
           return method.invoke(targetHazelcastInstance, args);
       }
     }
+
+    @Override
+    public HazelcastInstance getTargetHazelcastInstance() {
+      return targetHazelcastInstance;
+    }
+
+    @Override
+    public boolean isSynchedLocalTransactionAllowed() {
+      return synchedLocalTransactionAllowed;
+    }
+
   }
 
   /**
@@ -164,5 +246,16 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
      * @return the target Hazelcast instance
      */
     HazelcastInstance getTargetHazelcastInstance();
+
+    /**
+     * Returns true if a local Hazelcast transaction is allowed to synchronize
+     * with the main Spring-managed transaction that is not a Hazelcast
+     * transaction.
+     *
+     * @return true if synchronization is allowed, false if not
+     * @see
+     * TransactionAwareHazelcastInstanceProxyFactory#setSynchedLocalTransactionAllowed(boolean)
+     */
+    boolean isSynchedLocalTransactionAllowed();
   }
 }

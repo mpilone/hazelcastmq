@@ -26,8 +26,10 @@ public class TransactionAwareConfig {
 
   @Bean
   public HazelcastInstance transactionAwareHazelcast() {
-    return new TransactionAwareHazelcastInstanceProxyFactory(hazelcast()).
-        create();
+    TransactionAwareHazelcastInstanceProxyFactory factory =
+        new TransactionAwareHazelcastInstanceProxyFactory(hazelcast(), true);
+
+    return factory.create();
   }
 
   @Bean

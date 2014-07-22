@@ -23,7 +23,15 @@ public class BusinessServiceUsingUtils extends BusinessService {
   @Override
   protected IQueue<String> getQueue(String name,
       HazelcastInstance hazelcastInstance) {
-    return HazelcastUtils.getQueue(name, hazelcastInstance);
+    IQueue<String> queue = HazelcastUtils.getTransactionalQueue(name,
+        hazelcastInstance, true);
+
+    if (queue == null) {
+      // No active transaction. Get a non-transactional queue.
+      queue = hazelcastInstance.getQueue(name);
+    }
+
+    return queue;
   }
 
 

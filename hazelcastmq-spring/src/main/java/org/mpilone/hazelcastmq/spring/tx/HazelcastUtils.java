@@ -3,6 +3,7 @@ import org.mpilone.hazelcastmq.core.QueueTopicProxyFactory;
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastInstanceProxyFactory.TransactionAwareHazelcastInstanceProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.NestedTransactionNotSupportedException;
 import org.springframework.transaction.support.*;
 
 import com.hazelcast.core.*;
@@ -40,8 +41,12 @@ public class HazelcastUtils {
   /**
    * <p>
    * Returns a queue that will be bound to the current transaction if there is
-   * an active transaction. If there is no active transaction, a normal,
-   * non-transaction queue is returned.
+   * an active Hazelcast transaction. If there is no active transaction, null is
+   * returned. The {@code synchedLocalTransactionAllowed} can be used to allow
+   * transaction synchronization with any active transaction, even if it isn't a
+   * Hazelcast transaction. This is useful for synchronizing a Hazelcast
+   * transaction to a different PlatformTransactionManager such as a JDBC
+   * transaction.
    * </p>
    * <p>
    * WARNING: Hazelcast defines two different interfaces for a transactional
@@ -55,26 +60,30 @@ public class HazelcastUtils {
    * @param <E> the type of the items in the queue
    * @param name the name of the queue to get
    * @param hazelcastInstance the Hazelcast instance to get the queue from
+   * @param synchedLocalTransactionAllowed true to allow a new Hazelcast
+   * transaction to be started and synchronized with any existing transaction;
+   * false to only return the transactional object if a top-level Hazelcast
+   * transaction is active
    *
-   * @return the queue which may be transactional if there is an active
-   * transaction
+   * @return the transactional queue if there is an active Hazelcast transaction
+   * or an active transaction to synchronize to and
+   * synchedLocalTransactionAllowed is true; null otherwise
    */
-  public static <E> IQueue<E> getQueue(String name,
-      HazelcastInstance hazelcastInstance) {
+  public static <E> IQueue<E> getTransactionalQueue(String name,
+      HazelcastInstance hazelcastInstance,
+      boolean synchedLocalTransactionAllowed) {
 
-    HazelcastTransactionContextHolder conHolder =
-        getHazelcastTransactionContextHolder(hazelcastInstance);
+    TransactionContext transactionContext =
+        getHazelcastTransactionContext(hazelcastInstance,
+            synchedLocalTransactionAllowed);
 
-    if (conHolder != null) {
-      TransactionalQueue targetQueue = conHolder.getTransactionContext().
-          getQueue(name);
-
+    if (transactionContext != null) {
+      TransactionalQueue targetQueue = transactionContext.getQueue(name);
       return QueueTopicProxyFactory.createQueueProxy(targetQueue);
     }
     else {
-      // No transaction to synchronize to so we just use a normal,
-      // non-transaction data structure.
-      return hazelcastInstance.getQueue(name);
+      // No transaction to synchronize to.
+      return null;
     }
   }
 
@@ -90,8 +99,9 @@ public class HazelcastUtils {
    * @return the transaction context holder if a transaction is active, null
    * otherwise
    */
-  private static HazelcastTransactionContextHolder getHazelcastTransactionContextHolder(
-      HazelcastInstance hazelcastInstance) {
+  private static TransactionContext getHazelcastTransactionContext(
+      HazelcastInstance hazelcastInstance,
+      boolean synchedLocalTransactionAllowed) {
 
     HazelcastTransactionContextHolder conHolder =
         (HazelcastTransactionContextHolder) TransactionSynchronizationManager.
@@ -103,15 +113,19 @@ public class HazelcastUtils {
       // someone already requested a transactional resource or the transaction
       // is being managed at the top level by HazelcastTransactionManager.
 
-//      conHolder.requested();
       if (!conHolder.hasTransactionContext()) {
-//				logger.debug("Fetching resumed JDBC Connection from DataSource");
-//				conHolder.setConnection(dataSource.getConnection());
-        throw new UnsupportedOperationException("Trying to resume a Hazelcast "
-            + "transaction? Can't do that.");
+        // I think this means we are synchronized with the transaction but
+        // we don't have a transactional context because the transaction was
+        // suspended. I don't see how we can do this with Hazelcast because
+        // it binds the transaction context to the thread and doesn't
+        // supported nested transactions. Maybe I'm missing something.
+
+        throw new NestedTransactionNotSupportedException("Trying to resume a "
+            + "Hazelcast transaction? Can't do that.");
       }
     }
-    else if (TransactionSynchronizationManager.isSynchronizationActive()) {
+    else if (TransactionSynchronizationManager.isSynchronizationActive()
+        && synchedLocalTransactionAllowed) {
       // No holder or no transaction context but we want to be
       // synchronized to the transaction.
       if (conHolder == null) {
@@ -131,7 +145,7 @@ public class HazelcastUtils {
           new HazelcastTransactionSynchronization(conHolder, hazelcastInstance));
     }
 
-    return conHolder;
+    return conHolder != null ? conHolder.getTransactionContext() : null;
   }
 
   /**
