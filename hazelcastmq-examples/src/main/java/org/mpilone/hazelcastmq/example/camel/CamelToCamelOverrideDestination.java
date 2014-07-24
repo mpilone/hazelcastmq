@@ -2,11 +2,11 @@ package org.mpilone.hazelcastmq.example.camel;
 
 import java.util.concurrent.TimeUnit;
 
-import org.apache.camel.CamelContext;
-import org.apache.camel.ProducerTemplate;
+import org.apache.camel.*;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.mpilone.hazelcastmq.camel.*;
 import org.mpilone.hazelcastmq.core.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.slf4j.*;
 
 import com.hazelcast.config.Config;
@@ -18,7 +18,7 @@ import com.hazelcast.core.*;
  *
  * @author mpilone
  */
-public class CamelToCamelOverrideDestination {
+public class CamelToCamelOverrideDestination extends ExampleApp {
 
   /**
    * The log for this class.
@@ -27,18 +27,15 @@ public class CamelToCamelOverrideDestination {
       CamelToCamelOverrideDestination.class);
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
-
-    new CamelToCamelOverrideDestination();
+    CamelToCamelOverrideDestination app = new CamelToCamelOverrideDestination();
+    app.runExample();
   }
 
-  public CamelToCamelOverrideDestination() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
-    config.setProperty("hazelcast.logging.type", "slf4j");
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 

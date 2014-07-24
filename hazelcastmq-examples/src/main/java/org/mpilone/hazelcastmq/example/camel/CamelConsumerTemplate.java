@@ -5,6 +5,7 @@ import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.mpilone.hazelcastmq.camel.*;
 import org.mpilone.hazelcastmq.core.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.slf4j.*;
 
 import com.hazelcast.config.Config;
@@ -17,7 +18,7 @@ import com.hazelcast.core.*;
  *
  * @author mpilone
  */
-public class CamelConsumerTemplate {
+public class CamelConsumerTemplate extends ExampleApp {
 
   /**
    * The log for this class.
@@ -26,18 +27,16 @@ public class CamelConsumerTemplate {
       CamelConsumerTemplate.class);
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
 
-    new CamelConsumerTemplate();
+    CamelConsumerTemplate app = new CamelConsumerTemplate();
+    app.runExample();
   }
 
-  public CamelConsumerTemplate() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
-    config.setProperty("hazelcast.logging.type", "slf4j");
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 

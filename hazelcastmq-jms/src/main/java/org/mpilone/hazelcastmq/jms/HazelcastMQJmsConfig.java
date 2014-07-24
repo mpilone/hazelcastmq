@@ -1,9 +1,5 @@
 package org.mpilone.hazelcastmq.jms;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
@@ -29,11 +25,6 @@ public class HazelcastMQJmsConfig {
    */
   private int topicMaxMessageCount;
 
-  /**
-   * The executor service to spin up message listener consumers.
-   */
-  private ExecutorService executor;
-
   private HazelcastMQInstance hazelcastMQInstance;
 
   private IdGenerator idGenerator;
@@ -41,9 +32,9 @@ public class HazelcastMQJmsConfig {
   /**
    * Constructs the configuration with the following defaults:
    * <ul>
-   * <li>messageConverter: {@link StompLikeMessageConverter}</li>
+   * <li>messageConverter: {@link DefaultMessageConverter}</li>
+   * <li>idGenerator: {@link AtomicLongIdGenerator}</li>
    * <li>topicMaxMessageCount: 1000</li>
-   * <li>executor: {@link Executors#newCachedThreadPool()}</li>
    * </ul>
    */
   public HazelcastMQJmsConfig() {
@@ -98,32 +89,6 @@ public class HazelcastMQJmsConfig {
     this.topicMaxMessageCount = topicMaxMessageCount;
   }
 
-  /**
-   * Returns the executor that will be used to create message consumer threads
-   * when a message listener is active.
-   * 
-   * @return the executor service
-   */
-  public ExecutorService getExecutor() {
-    if (executor == null) {
-      executor = Executors.newCachedThreadPool(new ThreadFactory() {
-
-        private AtomicLong counter = new AtomicLong();
-        private ThreadFactory delegate = Executors.defaultThreadFactory();
-
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread t = delegate.newThread(r);
-          t.setName("hazelcastmq-" + counter.incrementAndGet());
-          t.setDaemon(true);
-          return t;
-        }
-      });
-    }
-
-    return executor;
-  }
-
   public void setHazelcastMQInstance(HazelcastMQInstance hazelcastMQInstance) {
     this.hazelcastMQInstance = hazelcastMQInstance;
   }
@@ -134,14 +99,6 @@ public class HazelcastMQJmsConfig {
     }
 
     return hazelcastMQInstance;
-  }
-
-  /**
-   * 
-   * @param executor
-   */
-  public void setExecutor(ExecutorService executor) {
-    this.executor = executor;
   }
 
 }

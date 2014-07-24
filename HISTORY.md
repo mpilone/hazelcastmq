@@ -4,9 +4,10 @@
 
 - [hazelcastmq-examples] Upgraded to Spring 3.2.10
 - [hazelcastmq-spring] New component to support better integration with Spring.
-- [hazelcastmq-spring] Prototype of a Hazelcast transaction manager and proxy.
+- [hazelcastmq-spring] Prototype of a Hazelcast/HazelcastMQ transaction manager and proxy.
 - [hazelcastmq-camel, hazelcastmq-core] Bug fixes in the configuration classes 
   and additional convenience constructors.
+- [hazelcastmq-core] Upgraded to Hazelcast 3.2.4.
 
 ## 2014-07-17, v1.1.0
 

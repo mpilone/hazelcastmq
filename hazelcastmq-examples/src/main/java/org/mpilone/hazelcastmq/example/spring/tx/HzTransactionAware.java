@@ -1,5 +1,7 @@
 package org.mpilone.hazelcastmq.example.spring.tx;
 
+import org.mpilone.hazelcastmq.example.spring.tx.support.hz.TransactionAwareConfig;
+import org.mpilone.hazelcastmq.example.spring.tx.support.hz.BusinessService;
 import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.mpilone.hazelcastmq.example.spring.tx.support.*;
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastInstanceProxyFactory;
@@ -14,10 +16,10 @@ import com.hazelcast.core.HazelcastInstance;
  *
  * @author mpilone
  */
-public class TransactionAware extends ExampleApp {
+public class HzTransactionAware extends ExampleApp {
 
   public static void main(String[] args) {
-    TransactionAware app = new TransactionAware();
+    HzTransactionAware app = new HzTransactionAware();
     app.runExample();
   }
 

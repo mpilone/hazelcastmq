@@ -1,5 +1,7 @@
 
-package org.mpilone.hazelcastmq.example.spring.tx.support;
+package org.mpilone.hazelcastmq.example.spring.tx.support.hz;
+
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,21 @@ public class BusinessService {
     this.hazelcastInstance = hazelcastInstance;
   }
 
+  /**
+   * Sleeps for the given duration.
+   *
+   * @param duration the amount of time to sleep
+   * @param unit the unit of the duration
+   */
+  protected void sleep(long duration, TimeUnit unit) {
+    try {
+      Thread.sleep(unit.toMillis(duration));
+    }
+    catch (InterruptedException ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   @Transactional
   public void processWithTransaction() {
       IQueue<String> demoQueue = getQueue("demo.queue",
@@ -41,12 +58,7 @@ public class BusinessService {
 
     log.info("Sleeping.");
 
-    try {
-      Thread.sleep(5000);
-    }
-    catch (InterruptedException ex) {
-      throw new RuntimeException(ex);
-    }
+    sleep(5, TimeUnit.SECONDS);
 
     log.info("Done.");
   }
@@ -60,12 +72,7 @@ public class BusinessService {
 
     log.info("Sleeping.");
 
-    try {
-      Thread.sleep(5000);
-    }
-    catch (InterruptedException ex) {
-      throw new RuntimeException(ex);
-    }
+    sleep(5, TimeUnit.SECONDS);
 
     log.info("Done.");
   }
@@ -81,12 +88,7 @@ public class BusinessService {
 
     log.info("Sleeping.");
 
-    try {
-      Thread.sleep(5000);
-    }
-    catch (InterruptedException ex) {
-      throw new RuntimeException(ex);
-    }
+    sleep(5, TimeUnit.SECONDS);
 
     log.info("Throwing exception in transaction.");
     throw new RuntimeException("Better roll back.");

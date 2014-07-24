@@ -1,26 +1,26 @@
 
 package org.mpilone.hazelcastmq.example.spring.tx;
 
+import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.ExampleApp;
-import org.mpilone.hazelcastmq.example.spring.tx.support.BusinessService;
-import org.mpilone.hazelcastmq.example.spring.tx.support.TransactionManagerConfig;
-import org.mpilone.hazelcastmq.spring.tx.HazelcastTransactionManager;
+import org.mpilone.hazelcastmq.example.spring.tx.support.hzmq.BusinessService;
+import org.mpilone.hazelcastmq.example.spring.tx.support.hzmq.TransactionManagerConfig;
+import org.mpilone.hazelcastmq.spring.tx.HazelcastMQTransactionManager;
 import org.springframework.context.annotation.*;
 
-import com.hazelcast.core.HazelcastInstance;
 
 
 /**
- * An example of using the {@link HazelcastTransactionManager} to manage the
- * transactions of a single {@link HazelcastInstance} by integrating into the
+ * An example of using the {@link HazelcastMQTransactionManager} to manage the
+ * transactions of a single {@link HazelcastMQInstance} by integrating into the
  * Spring transaction management framework.
  *
  * @author mpilone
  */
-public class TransactionManager extends ExampleApp {
+public class HzMqTransactionManager extends ExampleApp {
 
   public static void main(String[] args) {
-    TransactionManager app = new TransactionManager();
+    HzMqTransactionManager app = new HzMqTransactionManager();
     app.runExample();
   }
 
@@ -33,8 +33,7 @@ public class TransactionManager extends ExampleApp {
 
       // Run the business methods.
       BusinessService businessService =
-          (BusinessService) springContext.getBean(
-              "businessService");
+          (BusinessService) springContext.getBean("businessService");
       businessService.processWithTransaction();
       businessService.processWithoutTransaction();
       try {

@@ -1,11 +1,13 @@
 
-package org.mpilone.hazelcastmq.example.spring.tx.support;
+package org.mpilone.hazelcastmq.example.spring.tx.support.hz;
 
+import org.mpilone.hazelcastmq.example.spring.tx.support.NoopTransactionManager;
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastInstanceProxyFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
@@ -21,7 +23,10 @@ public class TransactionAwareConfig {
 
   @Bean(destroyMethod = "shutdown")
   public HazelcastInstance hazelcast() {
-    return Hazelcast.newHazelcastInstance();
+    Config config = new Config();
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
+
+    return Hazelcast.newHazelcastInstance(config);
   }
 
   @Bean

@@ -128,6 +128,12 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
   protected void doBegin(Object transaction, TransactionDefinition definition)
       throws TransactionException {
 
+    if (definition.getIsolationLevel()
+        != TransactionDefinition.ISOLATION_DEFAULT) {
+      throw new InvalidIsolationLevelException(
+          "Hazelcast does not support an isolation level concept");
+    }
+
     HazelcastTransactionObject txObject =
         (HazelcastTransactionObject) transaction;
     TransactionContext con = null;
@@ -276,8 +282,7 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
      * Returns true if the context holder was created for the current
      * transaction and false if it existed prior to the transaction.
      *
-     * @param transactionContextHolder the transaction context resource holder
-     * @param true if the holder was created for this transaction, false if it
+     * @return true if the holder was created for this transaction, false if it
      * already existed
      */
     private boolean isNewTransactionContextHolder() {

@@ -1,5 +1,5 @@
 
-package org.mpilone.hazelcastmq.example.spring.tx.support;
+package org.mpilone.hazelcastmq.example.spring.tx.support.hz;
 
 import org.mpilone.hazelcastmq.spring.tx.HazelcastUtils;
 
