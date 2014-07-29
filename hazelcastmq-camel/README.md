@@ -55,7 +55,7 @@ message by message basis.
 
 Header | Type | Description
 ------ | -----| -----------
-CamelHzMqDestination | String | If specified, the destination name will be used rather than the destination configured in the endpoint. This allows for a single endpoint to produce messages to multiple destinations by setting different values for this header.
+CamelHzMqDestination | String | If specified, the destination name will be used rather than the destination configured in the endpoint. This allows for a single endpoint to produce messages to multiple destinations by setting different values for this header. Values should be in Camel endpoint syntax such as `queue:foo.bar` or `topic:foo.bar`.
 
 ## Message Conversion
 

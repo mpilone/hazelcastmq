@@ -107,7 +107,11 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
    * @return the HazelcastMQ destination
    */
   public static String toHazelcastMQDestination(String camelDest) {
-    String destination = "/" + camelDest.replaceAll(":", "/");
+    String destination = camelDest.replaceAll(":", "/");
+
+    if (!destination.startsWith("/")) {
+      destination = "/" + destination;
+    }
 
     if (!destination.startsWith(
         org.mpilone.hazelcastmq.core.Headers.DESTINATION_QUEUE_PREFIX)
@@ -121,7 +125,7 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
       // Default to a queue if no destination prefix was specifed.
       destination =
           org.mpilone.hazelcastmq.core.Headers.DESTINATION_QUEUE_PREFIX
-          + destination;
+          + camelDest;
     }
 
     return destination;

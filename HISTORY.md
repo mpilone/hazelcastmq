@@ -8,6 +8,7 @@
 - [hazelcastmq-camel, hazelcastmq-core] Bug fixes in the configuration classes 
   and additional convenience constructors.
 - [hazelcastmq-core] Upgraded to Hazelcast 3.2.4.
+- [hazelcastmq-camel] Relaxed the Camel endpoint destination type parsing to support leading colons and forward-slash separators.
 
 ## 2014-07-17, v1.1.0
 
