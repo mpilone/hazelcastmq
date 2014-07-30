@@ -1,17 +1,19 @@
 package org.mpilone.hazelcastmq.spring.tx;
 
+import static java.lang.String.format;
+
 import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastInstanceProxyFactory.TransactionAwareHazelcastInstanceProxy;
-import org.slf4j.*;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.transaction.*;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.*;
 
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.logging.*;
 import com.hazelcast.transaction.*;
 
 /**
@@ -41,7 +43,7 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       HazelcastTransactionManager.class);
 
   private HazelcastInstance hazelcastInstance;
@@ -152,9 +154,9 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
             newTransactionContext(txOps);
         newCon.beginTransaction();
 
-        if (log.isDebugEnabled()) {
-          log.debug("Acquired TransactionContext [" + newCon
-              + "] for Hazelcast transaction");
+        if (log.isFinestEnabled()) {
+          log.finest(format("Acquired TransactionContext [%s]"
+              + " for Hazelcast transaction.", newCon));
         }
         txObject.setTransactionContextHolder(
             new HazelcastTransactionContextHolder(newCon), true);
@@ -186,9 +188,9 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
     TransactionContext con = txObject.getTransactionContextHolder().
         getTransactionContext();
 
-    if (status.isDebug()) {
-      log.debug("Committing Hazelcast transaction on TransactionContext ["
-          + con + "]");
+    if (status.isDebug() && log.isFinestEnabled()) {
+      log.finest(format("Committing Hazelcast transaction on "
+          + "TransactionContext [%s].", con));
     }
 
     try {
@@ -208,9 +210,9 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
     TransactionContext con = txObject.getTransactionContextHolder().
         getTransactionContext();
 
-    if (status.isDebug()) {
-      log.debug("Rolling back Hazelcast transaction on TransactionContext ["
-          + con + "]");
+    if (status.isDebug() && log.isFinestEnabled()) {
+      log.finest(format("Rolling back Hazelcast transaction on "
+          + "TransactionContext [%s].", con));
     }
 
     try {
@@ -234,9 +236,9 @@ public class HazelcastTransactionManager extends AbstractPlatformTransactionMana
 
       TransactionSynchronizationManager.unbindResource(this.hazelcastInstance);
 
-      if (log.isDebugEnabled()) {
-        log.debug("Releasing Hazelcast Transaction [" + con
-            + "] after transaction");
+      if (log.isFinestEnabled()) {
+        log.finest(format("Releasing Hazelcast Transaction [%s] "
+            + "after transaction.", con));
       }
 
       HazelcastUtils.releaseTransactionContext(con, this.hazelcastInstance);

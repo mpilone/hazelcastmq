@@ -6,11 +6,10 @@ import java.io.Serializable;
 
 import javax.jms.*;
 
-import org.mpilone.hazelcastmq.core.HazelcastMQConsumer;
-import org.mpilone.hazelcastmq.core.HazelcastMQContext;
-import org.mpilone.hazelcastmq.core.HazelcastMQProducer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.core.*;
+
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * A JMS session in HazelcastMQ. A JMS session roughly maps to a
@@ -29,7 +28,7 @@ class HazelcastMQJmsSession implements Session {
    * The log for this class.
    */
   @SuppressWarnings("unused")
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final ILogger log = Logger.getLogger(getClass());
 
   /**
    * The ID of this session in the connection.

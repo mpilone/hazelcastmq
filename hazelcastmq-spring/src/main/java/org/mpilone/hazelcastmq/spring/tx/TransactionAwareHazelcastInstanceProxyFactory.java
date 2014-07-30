@@ -3,11 +3,11 @@ package org.mpilone.hazelcastmq.spring.tx;
 
 import java.lang.reflect.*;
 
-import org.slf4j.*;
 import org.springframework.util.Assert;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IQueue;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * <p>
@@ -32,7 +32,7 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       TransactionAwareHazelcastInstanceProxyFactory.class);
 
   private HazelcastInstance targetHazelcastInstance;
@@ -210,7 +210,7 @@ public class TransactionAwareHazelcastInstanceProxyFactory {
           // transaction context is going to be the same one and cause issues.
           // It isn't a good idea to mix Spring and manual transaction
           // management until Hazelcast supports non-thread bound transactions.
-          log.warn("Calling 'newTransactionContext' on a "
+          log.warning("Calling 'newTransactionContext' on a "
               + "TransactionAwareHazelcastInstanceProxy. The transaction "
               + "context returned may be managed by Spring and therefore "
               + "cause conflicts with the platform transaction manager.");

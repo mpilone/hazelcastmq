@@ -1,17 +1,16 @@
 package org.mpilone.hazelcastmq.spring.tx;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 
 import javax.sql.DataSource;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.spring.tx.TransactionAwareHazelcastMQInstanceProxyFactory.TransactionAwareHazelcastMQInstanceProxy;
-import org.slf4j.*;
-import org.springframework.transaction.IllegalTransactionStateException;
-import org.springframework.transaction.NestedTransactionNotSupportedException;
+import org.springframework.transaction.*;
 import org.springframework.transaction.support.*;
+
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 
 /**
@@ -148,7 +147,7 @@ public class HazelcastMQUtils {
     /**
      * The log for this class.
      */
-    private static final Logger log = LoggerFactory.getLogger(
+    private static final ILogger log = Logger.getLogger(
         HazelcastMQTransactionSynchronization.class);
 
     /**
@@ -167,32 +166,32 @@ public class HazelcastMQUtils {
 
     @Override
     public void afterCommit() {
-      log.debug("In HazelcastMQTransactionSynchronization::afterCommit");
+      log.finest("In HazelcastMQTransactionSynchronization::afterCommit");
       super.afterCommit();
     }
 
     @Override
     public void afterCompletion(int status) {
-      log.debug("In HazelcastMQTransactionSynchronization::afterCompletion");
+      log.finest("In HazelcastMQTransactionSynchronization::afterCompletion");
       super.afterCompletion(status);
     }
 
     @Override
     public void beforeCommit(boolean readOnly) {
-      log.debug("In HazelcastMQTransactionSynchronization::beforeCommit");
+      log.finest("In HazelcastMQTransactionSynchronization::beforeCommit");
       super.beforeCommit(readOnly);
     }
 
     @Override
     public void beforeCompletion() {
-      log.debug("In HazelcastMQTransactionSynchronization::beforeCompletion");
+      log.finest("In HazelcastMQTransactionSynchronization::beforeCompletion");
       super.beforeCompletion();
     }
 
     @Override
     protected void processResourceAfterCommit(
         HazelcastMQContextHolder resourceHolder) {
-      log.debug("In HazelcastMQTransactionSynchronization::"
+      log.finest("In HazelcastMQTransactionSynchronization::"
           + "processResourceAfterCommit");
 
       super.processResourceAfterCommit(resourceHolder);
@@ -210,7 +209,7 @@ public class HazelcastMQUtils {
     protected void releaseResource(
         HazelcastMQContextHolder resourceHolder,
         HazelcastMQInstance resourceKey) {
-      log.debug("In HazelcastMQTransactionSynchronization::"
+      log.finest("In HazelcastMQTransactionSynchronization::"
           + "releaseResource");
 
       super.releaseResource(resourceHolder, resourceKey);

@@ -2,12 +2,12 @@ package org.mpilone.hazelcastmq.spring.tx;
 
 import java.lang.reflect.*;
 
-import org.mpilone.hazelcastmq.core.HazelcastMQContext;
-import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
-import org.slf4j.*;
+import org.mpilone.hazelcastmq.core.*;
 import org.springframework.util.Assert;
 
 import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * <p>
@@ -32,7 +32,7 @@ public class TransactionAwareHazelcastMQInstanceProxyFactory {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       TransactionAwareHazelcastMQInstanceProxyFactory.class);
 
   private HazelcastMQInstance targetHazelcastMQInstance;

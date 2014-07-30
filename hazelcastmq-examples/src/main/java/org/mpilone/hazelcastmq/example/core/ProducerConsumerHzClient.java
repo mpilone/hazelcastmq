@@ -2,48 +2,41 @@ package org.mpilone.hazelcastmq.example.core;
 
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-
 import org.mpilone.hazelcastmq.core.*;
-import org.slf4j.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
+import com.hazelcast.logging.*;
 
 /**
  * Example of subscribing to a queue and sending a message to the queue. The
  * producer will be running in a full Hz data node while the consumer will be
  * running as a client only node.
  */
-public class ProducerConsumerHzClient {
+public class ProducerConsumerHzClient extends ExampleApp {
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static ILogger log = Logger.getLogger(
+      ProducerConsumerHzClient.class);
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
-    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
-
-    new ProducerConsumerHzClient();
+    ProducerConsumerHzClient app = new ProducerConsumerHzClient();
+    app.runExample();
   }
 
-  /**
-   * Constructs the example.
-   * 
-   * @throws JMSException
-   */
-  public ProducerConsumerHzClient() throws Exception {
+  @Override
+  protected void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
     config.getNetworkConfig().setPort(6071);
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
 
     try {
-      // Setup the connection factory.
+      // Setup the MQ instance.
       HazelcastMQConfig mqConfig = new HazelcastMQConfig();
       mqConfig.setHazelcastInstance(hz);
 

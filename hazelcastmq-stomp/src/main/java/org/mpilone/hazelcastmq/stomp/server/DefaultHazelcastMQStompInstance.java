@@ -4,7 +4,9 @@ package org.mpilone.hazelcastmq.stomp.server;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.yeti.Stomplet;
 import org.mpilone.yeti.server.StompServer;
-import org.slf4j.*;
+
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * A STOMP server backed by {@link HazelcastMQ}. The server is started
@@ -18,7 +20,7 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(
+  private final ILogger log = Logger.getLogger(
       DefaultHazelcastMQStompInstance.class);
 
   /**
@@ -50,7 +52,7 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
       stompServer.start();
     }
     catch (InterruptedException ex) {
-      log.warn("Interrupted while starting up. "
+      log.warning("Interrupted while starting up. "
           + "Startup may not be complete.", ex);
     }
   }
@@ -62,7 +64,7 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
      stompServer.stop();
     }
     catch (InterruptedException ex) {
-      log.warn("Interrupted while shutting down. "
+      log.warning("Interrupted while shutting down. "
           + "Shutdown may not be complete.", ex);
     }
   }

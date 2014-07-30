@@ -2,9 +2,9 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
-import org.slf4j.*;
-
 import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * The default implementation of a producer.
@@ -16,7 +16,7 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       DefaultHazelcastMQProducer.class);
 
   /**
@@ -153,8 +153,8 @@ class DefaultHazelcastMQProducer implements HazelcastMQProducer {
     msg.setId("hazelcastmq-" + idGenerator.newId());
     msg.setDestination(destination);
 
-    if (log.isDebugEnabled()) {
-      log.debug("Producer sending message {}", msg);
+    if (log.isFinestEnabled()) {
+      log.finest(format("Producer sending message %s", msg));
     }
 
     Object msgData = config.getMessageConverter().fromMessage(msg);

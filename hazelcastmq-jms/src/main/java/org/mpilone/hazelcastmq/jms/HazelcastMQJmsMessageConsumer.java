@@ -4,11 +4,11 @@ import java.util.concurrent.TimeUnit;
 
 import javax.jms.*;
 
-import org.mpilone.hazelcastmq.core.HazelcastMQConsumer;
-import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
-import org.mpilone.hazelcastmq.core.HazelcastMQMessageListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.core.*;
+import org.mpilone.hazelcastmq.jms.MessageConverter;
+
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * A JMS message consumer that can consume from a HazelcastMQ queue or topic.
@@ -45,7 +45,7 @@ abstract class HazelcastMQJmsMessageConsumer implements MessageConsumer {
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final ILogger log = Logger.getLogger(getClass());
 
   /**
    * The parent session.

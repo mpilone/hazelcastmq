@@ -1,45 +1,42 @@
 package org.mpilone.hazelcastmq.example.core;
 
+import static java.lang.String.format;
+
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-
 import org.mpilone.hazelcastmq.core.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.*;
 
 /**
  * Example of subscribing to a queue and sending a large number of message
  * through the queue.
  */
-public class ProducerConsumerLargeSend {
+public class ProducerConsumerLargeSend extends ExampleApp {
 
   /**
    * The number of messages to push through the queue.
    */
   private static final int MESSAGE_COUNT = 2000;
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final ILogger log = Logger.getLogger(getClass());
 
   public static void main(String[] args) throws Exception {
-    new ProducerConsumerLargeSend();
+    ProducerConsumerLargeSend app = new ProducerConsumerLargeSend();
+    app.runExample();
   }
 
-  /**
-   * Constructs the example.
-   * 
-   * @throws JMSException
-   */
-  public ProducerConsumerLargeSend() throws Exception {
+  @Override
+  protected void start() throws Exception {
 
     String destination = "/queue/example.dest";
 
     // Create a Hazelcast instance.
     Config config = new Config();
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
 
     try {
@@ -77,8 +74,8 @@ public class ProducerConsumerLargeSend {
 
       long endTime = System.currentTimeMillis();
 
-      log.info("Sent {} and received {} messages in {} milliseconds "
-          + "(serially).", MESSAGE_COUNT, receivedCount, (endTime - startTime));
+      log.info(format("Sent %d and received %d messages in %d milliseconds "
+          + "(serially).", MESSAGE_COUNT, receivedCount, (endTime - startTime)));
 
       mqConsumer.close();
       mqContext.stop();
@@ -86,7 +83,7 @@ public class ProducerConsumerLargeSend {
       mqInstance.shutdown();
     }
     finally {
-      hz.getLifecycleService().shutdown();
+      hz.shutdown();
     }
   }
  

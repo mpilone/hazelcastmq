@@ -2,15 +2,12 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
 
 import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * The default and primary implementation of a HazelcastMQ consumer. This
@@ -25,7 +22,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       DefaultHazelcastMQConsumer.class);
 
   /**
@@ -303,14 +300,16 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
           if (expirationTime != 0
               && expirationTime <= System.currentTimeMillis()) {
-            log.info("Dropping message [{}] because it has expired.",
-                msg.getId());
+            if (log.isFinestEnabled()) {
+              log.finest(format("Dropping message [%s] because it has expired.",
+                  msg.getId()));
+            }
             msg = null;
           }
         }
 
-        if (log.isDebugEnabled() && msg != null) {
-          log.debug("Consumer received message {}", msg);
+        if (log.isFinestEnabled() && msg != null) {
+          log.finest(format("Consumer received message %s", msg));
         }
       }
       finally {
@@ -470,7 +469,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       // This is important to prevent slow message handlers from blocking topic
       // distribution in Hazelcast.
       if (!queue.offer(hzMsg.getMessageObject())) {
-        log.warn(format("In-memory message buffer full for topic [%s]. "
+        log.warning(format("In-memory message buffer full for topic [%s]. "
             + "Messages will be lost. Consider increaing the speed of "
             + "the consumer or the message buffer.", msgTopic.getName()));
         return;

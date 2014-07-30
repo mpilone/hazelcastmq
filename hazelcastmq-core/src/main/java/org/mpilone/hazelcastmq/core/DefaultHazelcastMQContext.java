@@ -1,14 +1,12 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import static java.lang.String.format;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.*;
+import java.util.concurrent.*;
 
 import com.hazelcast.core.*;
+import com.hazelcast.logging.*;
 import com.hazelcast.transaction.TransactionContext;
 
 /**
@@ -21,7 +19,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
+  private final static ILogger log = Logger.getLogger(
       DefaultHazelcastMQContext.class);
 
   /**
@@ -464,8 +462,10 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
       // Keep dispatching as long as one consumer had a successful dispatch.
       while (dispatched && !shutdown) {
-        log.debug("Initiating receive and dispatch on [{}] consumers.",
-            consumerMap.size());
+        if (log.isFinestEnabled()) {
+          log.finest(format("Initiating receive and dispatch on "
+              + "[%d] consumers.", consumerMap.size()));
+        }
 
         dispatched = false;
 
@@ -503,7 +503,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
         shutdownLatch.await(1, TimeUnit.MINUTES);
       }
       catch (InterruptedException ex) {
-        log.warn("Interrupted while shutting down. Shutdown may "
+        log.warning("Interrupted while shutting down. Shutdown may "
             + "not be complete.", ex);
       }
     }

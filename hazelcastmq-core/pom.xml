@@ -20,23 +20,11 @@
   <dependencies>
     <dependency>
       <groupId>com.hazelcast</groupId>
-      <artifactId>hazelcast-client</artifactId>
+      <artifactId>hazelcast</artifactId>
       <version>${hazelcast.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>${slf4j.version}</version>
     </dependency>
 
     <!-- Runtime -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <version>${slf4j.version}</version>
-      <scope>runtime</scope>
-      <optional>true</optional>
-    </dependency>
 
     <!-- Test -->
     <dependency>
