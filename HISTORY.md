@@ -10,6 +10,7 @@
 - [hazelcastmq-core] Upgraded to Hazelcast 3.2.4.
 - [hazelcastmq-camel] Relaxed the Camel endpoint destination type parsing to support leading colons and forward-slash separators.
 - [hazelcastmq-core] Removed dependency on slf4j as Hazelcast's logging abstraction and configuration is now used.
+- [hazelcastmq-example] Added a Camel async request/reply example.
 
 ## 2014-07-17, v1.1.0
 
