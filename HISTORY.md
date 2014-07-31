@@ -1,6 +1,8 @@
 # HazelcastMQ History
 
-## SNAPSHOT, v1.2.0
+## SNAPSHOT, v1.3.0
+
+## 2014-07-30, v1.2.0
 
 - [hazelcastmq-examples] Upgraded to Spring 3.2.10
 - [hazelcastmq-spring] New component to support better integration with Spring.

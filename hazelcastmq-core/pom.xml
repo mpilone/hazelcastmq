@@ -7,7 +7,7 @@
   <parent>
     <artifactId>hazelcastmq-parent</artifactId>
     <groupId>org.mpilone.hazelcastmq</groupId>
-    <version>1.2.0</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
   
   <artifactId>hazelcastmq-core</artifactId>
