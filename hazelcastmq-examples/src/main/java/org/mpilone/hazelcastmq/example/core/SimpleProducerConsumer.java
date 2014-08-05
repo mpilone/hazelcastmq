@@ -1,34 +1,36 @@
 package org.mpilone.hazelcastmq.example.core;
 
+import static java.lang.String.format;
+
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-
 import org.mpilone.hazelcastmq.core.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.*;
 
 /**
  * Example of subscribing to a queue and sending a message to the queue.
  */
-public class SimpleProducerConsumer {
+public class SimpleProducerConsumer extends ExampleApp {
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static ILogger log = Logger.getLogger(
+      SimpleProducerConsumer.class);
 
   public static void main(String[] args) throws Exception {
-    new SimpleProducerConsumer();
+    SimpleProducerConsumer app = new SimpleProducerConsumer();
+    app.runExample();
   }
 
   /**
    * Constructs the example.
    * 
-   * @throws JMSException
+   * @throws Exception if the example fails
    */
-  public SimpleProducerConsumer() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -61,8 +63,8 @@ public class SimpleProducerConsumer {
 
       long endTime = System.currentTimeMillis();
 
-      log.info("Received message '{}' in {} milliseconds.",
-          msg.getBodyAsString(), (endTime - startTime));
+      log.info(format("Received message '%s' in %d milliseconds.",
+          msg.getBodyAsString(), (endTime - startTime)));
 
       mqConsumer.close();
       mqContext.stop();

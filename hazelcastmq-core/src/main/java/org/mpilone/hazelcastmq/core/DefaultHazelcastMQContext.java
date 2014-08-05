@@ -3,7 +3,7 @@ package org.mpilone.hazelcastmq.core;
 import static java.lang.String.format;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
 
 import com.hazelcast.core.*;
 import com.hazelcast.logging.*;
@@ -11,7 +11,7 @@ import com.hazelcast.transaction.TransactionContext;
 
 /**
  * Default and primary implementation of the HazelcastMQ context.
- * 
+ *
  * @author mpilone
  */
 class DefaultHazelcastMQContext implements HazelcastMQContext {
@@ -42,13 +42,18 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * The flag which indicates if the context is active, that is, if the context
    * has been started.
    */
-  private boolean active;
+  private boolean started;
 
   /**
-   * The flag which indicates if the context will be auto started when the first
+   * The flag that indicates if the context will be auto started when the first
    * consumer is created. Defaults to true.
    */
   private boolean autoStart = true;
+
+  /**
+   * The flag that indicates if the context has been closed.
+   */
+  private boolean closed = false;
 
   /**
    * The HazelcastMQ configuration for this context.
@@ -75,16 +80,44 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * The dispatcher which calls consumers that are ready to push a message to
    * message listeners. This is the primary "push" thread of this context.
    */
-  private MessageListenerDispatcher messageListenerDispatcher;
+  private final MessageListenerDispatcher messageListenerDispatcher;
+
+  /**
+   * The main lock in the context which is used to synchronize thread access to
+   * the start, stop, and close operations during message dispatch.
+   */
+  private final ReentrantLock contextLock;
+
+  /**
+   * The condition that signals that a message may be ready for synchronous
+   * (i.e. polling) receive calls. This condition is managed by the {@link #getContextLock()
+   * }.
+   */
+  private final Condition receiveReadyCondition;
+
+  /**
+   * The condition that signals that a message may be ready for asynchronous
+   * (i.e. push) dispatch. This condition is not managed by any lock and can be
+   * used independently.
+   */
+  private final Condition dispatchReadyCondition;
+
+  /**
+   * Returns true if the context is started (i.e. running) and should therefore
+   * be dispatching messages.
+   *
+   * @return true if the context is started
+   */
+  public boolean isStarted() {
+    return started;
+  }
 
   /**
    * Constructs the context which may be transacted. The context is a child of
    * the given HazelcastMQ instance.
-   * 
-   * @param transacted
-   *          true to create a transacted context, false otherwise
-   * @param hazelcastMQInstance
-   *          the parent MQ instance
+   *
+   * @param transacted true to create a transacted context, false otherwise
+   * @param hazelcastMQInstance the parent MQ instance
    */
   public DefaultHazelcastMQContext(boolean transacted,
       DefaultHazelcastMQInstance hazelcastMQInstance) {
@@ -94,45 +127,60 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     this.consumerMap = new HashMap<>();
     this.temporaryQueues = new HashSet<>();
     this.temporaryTopics = new HashSet<>();
-
-    HazelcastInstance hazelcast = this.config.getHazelcastInstance();
-    IdGenerator idGenerator = hazelcast.getIdGenerator("hazelcastmqcontext");
-    this.id = "hazelcastmqcontext-" + String.valueOf(idGenerator.newId());
+    this.id = "hzmqcontext-" + UUID.randomUUID().toString();
+    this.contextLock = new ReentrantLock();
+    this.receiveReadyCondition = this.contextLock.newCondition();
+    this.dispatchReadyCondition = new StatefulCondition();
 
     if (transacted) {
+      HazelcastInstance hazelcast = this.config.getHazelcastInstance();
       txnContext = hazelcast.newTransactionContext();
       txnContext.beginTransaction();
     }
+
+    messageListenerDispatcher = new MessageListenerDispatcher();
+    config.getExecutor().execute(messageListenerDispatcher);
   }
 
   /**
-   * Called by child consumers when the consumer is ready to push a message to a
-   * {@link HazelcastMQMessageListener}. The consumer will be queued and handled
-   * in the message dispatch thread.
-   * 
-   * @param id
-   *          the ID of the consumer ready for dispatch
+   * Returns the main lock in the context which is used to synchronize thread
+   * access to the start, stop, and close operations during message dispatch.
    */
-  void onConsumerDispatchReady(String id) {
-    if (messageListenerDispatcher != null) {
-      messageListenerDispatcher.onConsumerDispatchReady(id);
-    }
+  ReentrantLock getContextLock() {
+    return contextLock;
+  }
+
+  /**
+   * Returns the condition that signals that a message may be ready for
+   * synchronous (i.e. polling) receive calls. This condition is managed by the {@link #getContextLock()
+   * } therefore the lock must be obtained before using the condition.
+   *
+   * @return the receive ready condition
+   */
+  Condition getReceiveReadyCondition() {
+    return receiveReadyCondition;
+  }
+
+  /**
+   * Returns the condition that signals that a message may be ready for
+   * asynchronous (i.e. push) dispatch. This condition is not managed by any
+   * lock and can be used outside of a lock by any number of threads.
+   *
+   * @return the dispatch ready condition
+   */
+  Condition getDispatchReadyCondition() {
+    return dispatchReadyCondition;
   }
 
   /**
    * Called by child consumers when the consumer is closed.
-   * 
-   * @param id
-   *          the ID of the consumer being closed
+   *
+   * @param id the ID of the consumer being closed
    */
   void onConsumerClose(String id) {
-    DefaultHazelcastMQConsumer consumer = consumerMap.remove(id);
-
-    if (consumer != null) {
-      consumer.stop();
-    }
+    consumerMap.remove(id);
   }
-  
+
   @Override
   public HazelcastMQConsumer createConsumer(String destination) {
     DefaultHazelcastMQConsumer consumer = new DefaultHazelcastMQConsumer(
@@ -140,16 +188,13 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
     consumerMap.put(consumer.getId(), consumer);
 
-    if (autoStart && !active) {
+    if (autoStart && !started) {
       start();
-    }
-    else if (active) {
-      consumer.start();
     }
 
     return consumer;
   }
- 
+
   @Override
   public void setAutoStart(boolean autoStart) {
     this.autoStart = autoStart;
@@ -172,33 +217,55 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   @Override
   public void close() {
-    stop();
-
-    // Close all consumers
-    List<DefaultHazelcastMQConsumer> consumers = new ArrayList<>(
-        consumerMap.values());
-    for (HazelcastMQConsumer consumer : consumers) {
-      consumer.close();
+    if (closed) {
+      return;
     }
 
-    // Destroy all temporary queues
-    for (String destination : temporaryQueues) {
-      destroyTemporaryDestination(destination);
-    }
+    contextLock.lock();
+    try {
+      this.closed = true;
 
-    // Destroy all temporary topics
-    for (String destination : temporaryTopics) {
-      destroyTemporaryDestination(destination);
+      // Stop dispatching.
+      stop();
+
+      // Close the message dispatcher.
+      messageListenerDispatcher.close();
+
+      // Close all consumers
+      List<DefaultHazelcastMQConsumer> consumers = new ArrayList<>(
+          consumerMap.values());
+      for (HazelcastMQConsumer consumer : consumers) {
+        consumer.close();
+      }
+
+      // Destroy all temporary queues
+      for (String destination : temporaryQueues) {
+        destroyTemporaryDestination(destination);
+      }
+
+      // Destroy all temporary topics
+      for (String destination : temporaryTopics) {
+        destroyTemporaryDestination(destination);
+      }
+    }
+    finally {
+      contextLock.unlock();
     }
   }
 
   @Override
   public void commit() {
     if (isTransacted()) {
-      txnContext.commitTransaction();
+      contextLock.lock();
+      try {
+        txnContext.commitTransaction();
 
-      txnContext = config.getHazelcastInstance().newTransactionContext();
-      txnContext.beginTransaction();
+        txnContext = config.getHazelcastInstance().newTransactionContext();
+        txnContext.beginTransaction();
+      }
+      finally {
+        contextLock.unlock();
+      }
     }
   }
 
@@ -206,10 +273,16 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   public void rollback() {
     if (isTransacted()) {
 
-      txnContext.rollbackTransaction();
+      contextLock.lock();
+      try {
+        txnContext.rollbackTransaction();
 
-      txnContext = config.getHazelcastInstance().newTransactionContext();
-      txnContext.beginTransaction();
+        txnContext = config.getHazelcastInstance().newTransactionContext();
+        txnContext.beginTransaction();
+      }
+      finally {
+        contextLock.unlock();
+      }
     }
   }
 
@@ -220,38 +293,37 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   @Override
   public void start() {
-    if (active) {
+    if (started) {
       return;
     }
 
-    messageListenerDispatcher = new MessageListenerDispatcher();
-    config.getExecutor().execute(messageListenerDispatcher);
-
-    for (DefaultHazelcastMQConsumer consumer : consumerMap.values()) {
-      consumer.start();
+    contextLock.lock();
+    try {
+      started = true;
     }
-
-    active = true;
+    finally {
+      contextLock.unlock();
+    }
   }
 
   @Override
   public void stop() {
-    if (!active) {
+    if (!started) {
       return;
     }
 
-    for (DefaultHazelcastMQConsumer consumer : consumerMap.values()) {
-      consumer.stop();
+    contextLock.lock();
+    try {
+      started = false;
     }
-
-    messageListenerDispatcher.shutdown();
-    messageListenerDispatcher = null;
-
-    active = false;
+    finally {
+      contextLock.unlock();
+    }
   }
 
   @Override
-  public void destroyTemporaryDestination(String destination) {
+  public void destroyTemporaryDestination(String destination
+  ) {
     if (temporaryQueues.remove(destination)) {
       IQueue<Object> queue = resolveQueue(destination);
       if (queue != null) {
@@ -269,7 +341,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   @Override
   public String createTemporaryQueue() {
     IdGenerator idGenerator = config.getHazelcastInstance().getIdGenerator(
-        "hazelcastmqcontext-temporary-destination");
+        "hzmqcontext-temporary-destination");
 
     long tempDestId = idGenerator.newId();
     String destination = Headers.DESTINATION_TEMPORARY_QUEUE_PREFIX
@@ -283,7 +355,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   @Override
   public String createTemporaryTopic() {
     IdGenerator idGenerator = config.getHazelcastInstance().getIdGenerator(
-        "hazelcastmqcontext-temporary-destination");
+        "hzmqcontext-temporary-destination");
 
     long tempDestId = idGenerator.newId();
     String destination = Headers.DESTINATION_TEMPORARY_TOPIC_PREFIX
@@ -296,16 +368,16 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   /**
    * Returns the unique ID of this context.
-   * 
+   *
    * @return the ID of this context
    */
-  public String getId() {
+  String getId() {
     return id;
   }
 
   /**
    * Returns the parent HazelcastMQ instance that owns this context.
-   * 
+   *
    * @return the parent HazelcastMQ instance
    */
   public DefaultHazelcastMQInstance getHazelcastMQInstance() {
@@ -317,9 +389,9 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * the destination is not a queue, null is returned. This method takes into
    * account the transactional status of the context, returning a transactional
    * queue if necessary.
-   * 
-   * @param destination
-   *          the destination to be resolved
+   *
+   * @param destination the destination to be resolved
+   *
    * @return the resolved queue or null
    */
   public IQueue<Object> resolveQueue(String destination) {
@@ -354,9 +426,9 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * the destination is not a topic, null is returned. This method takes into
    * account the transactional status of the context, returning a transactional
    * topic if necessary.
-   * 
-   * @param destination
-   *          the destination to be resolved
+   *
+   * @param destination the destination to be resolved
+   *
    * @return the resolved topic or null
    */
   public ITopic<Object> resolveTopic(String destination) {
@@ -398,58 +470,43 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * thread for a context which services all consumers. This helps to keep the
    * threading model relatively simple for implementations of
    * {@link HazelcastMQMessageListener}.
-   * 
+   *
    * @author mpilone
-   * 
+   *
    */
-  private class MessageListenerDispatcher implements Runnable {
-    /**
-     * The latch which blocks until shutdown is complete.
-     */
-    private final CountDownLatch shutdownLatch;
+  private class MessageListenerDispatcher implements Runnable, AutoCloseable {
 
     /**
      * The flag which indicates if the dispatcher should shutdown.
      */
-    private volatile boolean shutdown;
-
-    /**
-     * A counting semaphore which adds permits when a consumer is ready for
-     * dispatch. All permits are drained when a dispatch loop is started.
-     */
-    private final Semaphore consumerReadySemaphore;
+    private volatile boolean closed;
 
     /**
      * Constructs the dispatcher.
      */
     public MessageListenerDispatcher() {
-      this.consumerReadySemaphore = new Semaphore(0);
-      shutdownLatch = new CountDownLatch(1);
-      shutdown = false;
+      closed = false;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.Runnable#run()
-     */
     @Override
     public void run() {
-      while (!shutdown) {
-        try {
-          consumerReadySemaphore.acquire();
-          consumerReadySemaphore.drainPermits();
+      while (!closed) {
 
-          if (!shutdown) {
-            doDispatch();
-          }
+        contextLock.lock();
+        try {
+          doDispatch();
+        }
+        finally {
+          contextLock.unlock();
+        }
+
+        try {
+          dispatchReadyCondition.await();
         }
         catch (InterruptedException ex) {
-          // Ignore for now
+          // ignore
         }
       }
-
-      shutdownLatch.countDown();
     }
 
     /**
@@ -458,54 +515,33 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
      * appropriate.
      */
     private void doDispatch() {
-      boolean dispatched = true;
+      boolean dispatched;
 
-      // Keep dispatching as long as one consumer had a successful dispatch.
-      while (dispatched && !shutdown) {
+      // Perform all push receives to message listeners. We'll keep
+      // dispatching as long as one consumer had a successful push in
+      // order to drain all queues and topics.
+      do {
         if (log.isFinestEnabled()) {
           log.finest(format("Initiating receive and dispatch on "
               + "[%d] consumers.", consumerMap.size()));
         }
 
         dispatched = false;
-
-        Set<String> consumerIds = new HashSet<>(consumerMap.keySet());
-        for (String id : consumerIds) {
-          DefaultHazelcastMQConsumer consumer = consumerMap.get(id);
-          if (consumer != null) {
-            dispatched = consumer.receiveAndDispatch() || dispatched;
-          }
+        for (DefaultHazelcastMQConsumer consumer : consumerMap.values()) {
+          dispatched = consumer.receiveAndDispatch() || dispatched;
         }
-      }
-    }
+      } while (dispatched);
 
-    /**
-     * Called when a consumer is ready for dispatch. The consumer will be queued
-     * and processed in the dispatch thread.
-     * 
-     * @param id
-     *          the ID of the consumer
-     */
-    public void onConsumerDispatchReady(String id) {
-      consumerReadySemaphore.release();
+      // Notify any thread doing a polling receive.
+      receiveReadyCondition.signalAll();
     }
 
     /**
      * Shuts the dispatcher down.
      */
-    public void shutdown() {
-      shutdown = true;
-
-      // Send a sentinel to the ready queue to wake it up if needed.
-      consumerReadySemaphore.release();
-
-      try {
-        shutdownLatch.await(1, TimeUnit.MINUTES);
-      }
-      catch (InterruptedException ex) {
-        log.warning("Interrupted while shutting down. Shutdown may "
-            + "not be complete.", ex);
-      }
+    @Override
+    public void close() {
+      closed = true;
     }
   }
 }

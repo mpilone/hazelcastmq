@@ -2,19 +2,19 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.*;
 
 import com.hazelcast.core.*;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
+import com.hazelcast.logging.*;
 
 /**
  * The default and primary implementation of a HazelcastMQ consumer. This
  * consumer uses the converter returned by
  * {@link HazelcastMQConfig#getMessageConverter()} to convert messages from the
- * raw Hazelcast object representation to a {@link HazelcastMQMessage}. 
-  *
+ * raw Hazelcast object representation to a {@link HazelcastMQMessage}.
+ *
  * @author mpilone
  */
 class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
@@ -42,12 +42,6 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   private final String id;
 
   /**
-   * The flag which indicates if the consumer is currently active, that is, the
-   * context has been started.
-   */
-  private boolean active;
-
-  /**
    * The listener that responses to topic events in Hazelcast when actively
    * consuming from a topic.
    */
@@ -72,13 +66,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * The lock used for thread safety around all receive and shutdown operations.
    */
-  private final ReentrantLock receiveLock;
-
-  /**
-   * The wait condition used when a receive call is made but the consumer isn't
-   * active. The condition will be notified when the consumer is started.
-   */
-  private final Condition receiveCondition;
+  private final ReentrantLock contextLock;
 
   /**
    * The flag which indicates if the consumer has been closed.
@@ -88,47 +76,62 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   /**
    * Constructs the consumer which will read from the given destination and is a
    * child of the given context.
-   * 
-   * @param destination
-   *          the destination that this consumer will read from
-   * @param hazelcastMQContext
-   *          the parent context of this consumer
+   *
+   * @param destination the destination that this consumer will read from
+   * @param hazelcastMQContext the parent context of this consumer
    */
   DefaultHazelcastMQConsumer(String destination,
       DefaultHazelcastMQContext hazelcastMQContext) {
     super();
 
     this.destination = destination;
-    this.receiveLock = new ReentrantLock();
-    this.receiveCondition = receiveLock.newCondition();
     this.closed = false;
-    this.active = false;
-
     this.hazelcastMQContext = hazelcastMQContext;
     this.config = hazelcastMQContext.getHazelcastMQInstance().getConfig();
+    this.contextLock = hazelcastMQContext.getContextLock();
+    this.id = "hzmqconsumer-" + UUID.randomUUID().toString();
 
-    HazelcastInstance hazelcast = this.hazelcastMQContext
-        .getHazelcastMQInstance().getConfig().getHazelcastInstance();
+    // Start listening for events. We currently always listen for events even
+    // if we don't have a message listener. If this has a performance impact
+    // on Hazelcast we may want to only listen if there is a registered
+    // message listener that we need to notify.
+    IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
+    if (queue != null) {
+      // Get the raw queue outside of any transactional context so we can add
+      // an item listener.
+      queue = config.getHazelcastInstance().getQueue(queue.getName());
+      queueListener = new HzQueueListener(queue);
+    }
 
-    IdGenerator idGenerator = hazelcast.getIdGenerator("hazelcastmqconsumer");
-    this.id = "hazelcastmqconsumer-" + String.valueOf(idGenerator.newId());
+    // If we are a consumer on a topic, immediately start listening for events
+    // so we can buffer them for (a)synchronous consumption.
+    ITopic<Object> topic = hazelcastMQContext.resolveTopic(destination);
+    if (topic != null) {
+      topicListener = new HzTopicListener(topic);
+    }
   }
 
- 
   @Override
   public void setMessageListener(HazelcastMQMessageListener messageListener) {
-    this.messageListener = messageListener;
 
-    if (messageListener != null && active) {
-      // Signal that we're dispatch ready so the context will drain the queue if
-      // there are pending messages.
-      hazelcastMQContext.onConsumerDispatchReady(id);
+    contextLock.lock();
+    try {
+      this.messageListener = messageListener;
+
+      if (messageListener != null) {
+        // Signal that we're dispatch ready so the context will drain the queue if
+        // there are pending messages.
+        hazelcastMQContext.getDispatchReadyCondition().signalAll();
+      }
+    }
+    finally {
+      contextLock.unlock();
     }
   }
 
   /**
    * Returns the unique ID of this consumer.
-   * 
+   *
    * @return the unique ID of this consumer
    */
   String getId() {
@@ -137,106 +140,25 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
   /**
    * Attempts to receive a message from the destination and dispatch (i.e. push)
-   * it to the current message listener.
-   * 
+   * it to the current message listener. This method must be called from within
+   * the context lock.
+   *
    * @return true if a message was dispatched, false otherwise
    */
   boolean receiveAndDispatch() {
     boolean dispatched = false;
 
     if (messageListener != null) {
-      receiveLock.lock();
-      try {
-        HazelcastMQMessage msg = receiveNoWait();
+      HazelcastMQMessage msg = doReceive(-1);
 
-        if (msg != null) {
-          messageListener.onMessage(msg);
-          dispatched = true;
-        }
-      }
-      finally {
-        receiveLock.unlock();
+      if (msg != null) {
+        // TODO: better error handling.
+        messageListener.onMessage(msg);
+        dispatched = true;
       }
     }
 
     return dispatched;
-  }
-
-  /**
-   * Starts the consumer which will register a queue or topic listener with
-   * Hazelcast and enable message consumption (push or pull). If the consumer is
-   * already active, this method does nothing.
-   */
-  void start() {
-    if (active) {
-      return;
-    }
-
-    receiveLock.lock();
-    try {
-      // Start listening for events. We currently always listen for events even
-      // if we don't have a message listener. If this has a performance impact
-      // on Hazelcast we may want to only listen if there is a registered
-      // message listener that we need to notify.
-      IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
-      if (queue != null) {
-        // Get the raw queue outside of any transactional context so we can add
-        // an item listener.
-        queue = config.getHazelcastInstance().getQueue(queue.getName());
-        queueListener = new HzQueueListener(queue);
-      }
-
-      // If we are a consumer on a topic, immediately start listening for events
-      // so we can buffer them for (a)synchronous consumption.
-      ITopic<Object> topic = hazelcastMQContext.resolveTopic(destination);
-      if (topic != null) {
-        topicListener = new HzTopicListener(topic);
-      }
-
-      active = true;
-
-      if (messageListener != null) {
-        // We have a message listener, so tell the context to drain the dispatch
-        // ready queues.
-        hazelcastMQContext.onConsumerDispatchReady(id);
-      }
-      else {
-        // Signal that any receive requests can continue.
-        receiveCondition.signalAll();
-      }
-    }
-    finally {
-      receiveLock.unlock();
-    }
-  }
-
-  /**
-   * Stops message consumption (push or pull), removes any listeners from
-   * Hazelcast, and returns once all consuming threads have returned.
-   */
-  void stop() {
-    if (!active) {
-      return;
-    }
-
-    receiveLock.lock();
-    try {
-      if (topicListener != null) {
-        topicListener.shutdown();
-        topicListener = null;
-      }
-
-      if (queueListener != null) {
-        queueListener.shutdown();
-        queueListener = null;
-      }
-
-      active = false;
-      receiveCondition.signalAll();
-    }
-    finally {
-      receiveLock.unlock();
-    }
   }
 
   @Override
@@ -246,36 +168,47 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
   @Override
   public void close() {
-
-    receiveLock.lock();
+    contextLock.lock();
     try {
-      hazelcastMQContext.onConsumerClose(id);
       closed = true;
-      receiveCondition.signalAll();
+
+      if (topicListener != null) {
+        topicListener.close();
+        topicListener = null;
+      }
+
+      if (queueListener != null) {
+        queueListener.close();
+        queueListener = null;
+      }
+
+      // Wake up any thread blocking on a receive call.
+      hazelcastMQContext.getDispatchReadyCondition().signalAll();
+      hazelcastMQContext.onConsumerClose(id);
     }
     finally {
-      receiveLock.unlock();
+      contextLock.unlock();
     }
   }
 
   /**
-   * Attempts to receive a message using the given strategy. The method will
-   * continue to attempt to receive until either
-   * {@link ReceiveStrategy#isRetryable()} returns false, a message is received,
-   * or the consumer is stopped.
-   * 
-   * @param strategy
-   *          the strategy to use for receiving the message and determining
-   *          retries
+   * Attempts to receive a message, potentially waiting up to the given timeout
+   * before returning. The method returns immediately if the consumer is closed.
+   *
+   * @param timeout the maximum amount of time to wait in milliseconds. A value
+   * less than 0 indicates no wait, 0 indicates indefinite wait, and greater
+   * than 0 is the time in milliseconds.
+   *
    * @return the message or null if no message was received
    */
-  private HazelcastMQMessage doReceive(ReceiveStrategy strategy) {
+  private HazelcastMQMessage doReceive(long timeout) {
 
     HazelcastMQMessage msg = null;
+    boolean expired = false;
 
-    do {
-      receiveLock.lock();
-      try {
+    contextLock.lock();
+    try {
+      while (msg == null && !expired && !closed) {
 
         IQueue<Object> queue = hazelcastMQContext.resolveQueue(destination);
 
@@ -287,66 +220,67 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
           queue = topicListener.getQueue();
         }
 
-        Object msgData = strategy.receive(queue);
-        if (msgData != null) {
-          msg = config.getMessageConverter().toMessage(msgData);
-        }
-
-        // Check for message expiration if we have a message with expiration
-        // time.
-        if (msg != null && msg.getHeaders().get(Headers.EXPIRATION) != null) {
-          long expirationTime = Long.parseLong(msg.getHeaders().get(
-              Headers.EXPIRATION));
-
-          if (expirationTime != 0
-              && expirationTime <= System.currentTimeMillis()) {
-            if (log.isFinestEnabled()) {
-              log.finest(format("Dropping message [%s] because it has expired.",
-                  msg.getId()));
-            }
-            msg = null;
+        if (hazelcastMQContext.isStarted()) {
+          Object msgData = queue.poll();
+          if (msgData != null) {
+            msg = config.getMessageConverter().toMessage(msgData);
           }
         }
 
-        if (log.isFinestEnabled() && msg != null) {
-          log.finest(format("Consumer received message %s", msg));
+        if (msg == null) {
+          if (timeout == 0) {
+            // Indefinite wait.
+            hazelcastMQContext.getReceiveReadyCondition().await();
+          }
+          else if (timeout < 0) {
+            // No wait.
+            expired = true;
+          }
+          else {
+            // Timed wait.
+            long waitStart = System.currentTimeMillis();
+            expired = !hazelcastMQContext.getReceiveReadyCondition().
+                await(timeout, TimeUnit.MILLISECONDS);
+
+            long waitEnd = System.currentTimeMillis();
+            timeout -= (waitEnd - waitStart);
+          }
         }
       }
-      finally {
-        receiveLock.unlock();
-      }
     }
-    while (msg == null && !closed && strategy.isRetryable());
+    catch (InterruptedException ex) {
+      log.warning("Interrupted while waiting on doReceive await.", ex);
+    }
+    finally {
+      contextLock.unlock();
+    }
 
     return msg;
   }
 
   @Override
   public HazelcastMQMessage receive() {
-    return receive(0, TimeUnit.MILLISECONDS);
+    assertMessageListenerNull();
+
+    return doReceive(0);
   }
 
   @Override
   public HazelcastMQMessage receive(long timeout, TimeUnit unit) {
+    assertMessageListenerNull();
 
     if (timeout < 0) {
       throw new IllegalArgumentException("Timeout must be >= 0.");
     }
 
-    if (timeout == 0) {
-      // Indefinite wait
-      return doReceive(new IndefiniteWaitReceive());
-    }
-    else {
-      // Timed wait
-      return doReceive(new TimedWaitReceive(TimeUnit.MILLISECONDS.convert(
-          timeout, unit)));
-    }
+    return doReceive(TimeUnit.MILLISECONDS.convert(timeout, unit));
   }
 
   @Override
   public HazelcastMQMessage receiveNoWait() {
-    return doReceive(new NoWaitReceive());
+    assertMessageListenerNull();
+
+    return doReceive(-1);
   }
 
   @Override
@@ -374,39 +308,47 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
   }
 
   /**
+   * Asserts that the message listener is null or raises an exception.
+   *
+   * @throws IllegalStateException if a message listener is set
+   */
+  private void assertMessageListenerNull() throws IllegalStateException {
+    if (messageListener != null) {
+      throw new IllegalStateException("Consumer cannot be used "
+          + "synchronously when an asynchronous message listener is set.");
+    }
+  }
+
+  /**
    * A Hazelcast {@link ItemListener} that notifies the parent context when a
    * new item arrives that could be pushed to a registered
    * {@link HazelcastMQMessageListener}.
-   * 
+   *
    * @author mpilone
    */
-  private class HzQueueListener implements ItemListener<Object> {
+  private class HzQueueListener implements ItemListener<Object>, AutoCloseable {
 
     private final String registrationId;
     private final IQueue<Object> queue;
 
     /**
      * Constructs the listener which will listen on the given queue.
-     * 
-     * @param queue
-     *          the queue to listen to
+     *
+     * @param queue the queue to listen to
      */
     public HzQueueListener(IQueue<Object> queue) {
       this.queue = queue;
       registrationId = this.queue.addItemListener(this, false);
     }
 
-    public void shutdown() {
+    @Override
+    public void close() {
       queue.removeItemListener(registrationId);
     }
 
     @Override
     public void itemAdded(ItemEvent<Object> arg0) {
-      if (messageListener != null) {
-        // Notify the context that this consumer is ready for asynchronous
-        // dispatch.
-        hazelcastMQContext.onConsumerDispatchReady(id);
-      }
+      hazelcastMQContext.getDispatchReadyCondition().signalAll();
     }
 
     @Override
@@ -421,10 +363,11 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
    * internal buffer queue for consumption. The number of topic messages queued
    * is controlled by the {@link HazelcastMQConfig#getTopicMaxMessageCount()}
    * value.
-   * 
+   *
    * @author mpilone
    */
-  private class HzTopicListener implements MessageListener<Object> {
+  private class HzTopicListener implements MessageListener<Object>,
+      AutoCloseable {
 
     private final IQueue<Object> queue;
     private final ITopic<Object> msgTopic;
@@ -432,9 +375,8 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
     /**
      * Constructs the topic listener which will listen on the given topic.
-     * 
-     * @param topic
-     *          the topic to listen to
+     *
+     * @param topic the topic to listen to
      */
     public HzTopicListener(ITopic<Object> topic) {
 
@@ -449,7 +391,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
     /**
      * Returns the internal buffer queue that all topic messages will be placed
      * into.
-     * 
+     *
      * @return the internal buffer queue
      */
     public IQueue<Object> getQueue() {
@@ -475,153 +417,13 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
         return;
       }
 
-      if (messageListener != null) {
-        hazelcastMQContext.onConsumerDispatchReady(id);
-      }
+      hazelcastMQContext.getDispatchReadyCondition().signalAll();
     }
 
-    public void shutdown() {
+    @Override
+    public void close() {
       msgTopic.removeMessageListener(registrationId);
       queue.clear();
-    }
-  }
-
-  /**
-   * A strategy used to receive a message from Hazelcast.
-   * 
-   * @author mpilone
-   */
-  private interface ReceiveStrategy {
-    /**
-     * Attempts to receive a raw message from the given queue and return it.
-     * Implementations may use different approaches for receiving such as
-     * blocking waits or immediate return. Short blocking waits should be
-     * combined with the {@link #isRetryable()} method to create longer waits to
-     * allow the receive to be cleanly interrupted.
-     * 
-     * @param queue
-     *          the queue to receive from
-     * @return the raw message received or null if no message was received
-     */
-    public Object receive(IQueue<Object> queue);
-
-    /**
-     * Returns true as long as the strategy is retryable, that is, as long as
-     * receive should be called.
-     * 
-     * @return true if {@link #receive(IQueue)} should be called again, false
-     *         otherwise
-     */
-    public boolean isRetryable();
-  }
-
-  /**
-   * A strategy that returns the first message available or null if no message
-   * is available without blocking.
-   * 
-   * @author mpilone
-   */
-  private class NoWaitReceive implements ReceiveStrategy {
-
-    @Override
-    public Object receive(IQueue<Object> queue) {
-      if (closed || !active) {
-        return null;
-      }
-
-      return queue.poll();
-    }
-
-    @Override
-    public boolean isRetryable() {
-      return false;
-    }
-
-  }
-
-  /**
-   * A strategy that waits for a given amount of time for a message to arrive if
-   * no message is immediately available.
-   * 
-   * @author mpilone
-   */
-  private class TimedWaitReceive implements ReceiveStrategy {
-
-    private long timeout;
-
-    public TimedWaitReceive(long timeout) {
-      this.timeout = timeout;
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see
-     * org.mpilone.hazelcastmq.core.DefaultHazelcastMQConsumer.ReceiveStrategy
-     * #receive(com.hazelcast.core.IQueue)
-     */
-    @Override
-    public Object receive(IQueue<Object> queue) {
-      if (closed) {
-        return null;
-      }
-
-      long t = Math.min(timeout, 500L);
-      timeout -= 500L;
-
-      try {
-        if (!active) {
-          receiveCondition.await(t, TimeUnit.MILLISECONDS);
-        }
-        else {
-          return queue.poll(t, TimeUnit.MILLISECONDS);
-        }
-      }
-      catch (InterruptedException ex) {
-        // Ignore for now
-      }
-
-      return null;
-    }
-
-    @Override
-    public boolean isRetryable() {
-      return !Thread.interrupted() && timeout > 0 && !closed;
-    }
-  }
-
-  /**
-   * A strategy that will wait indefinitely for a message, only stopping when a
-   * message arrives or the consumer is closed.
-   * 
-   * @author mpilone
-   */
-  private class IndefiniteWaitReceive implements ReceiveStrategy {
-
-    @Override
-    public Object receive(IQueue<Object> queue) {
-      if (closed) {
-        return null;
-      }
-
-      try {
-        if (!active) {
-          receiveCondition.await(500L, TimeUnit.MILLISECONDS);
-        }
-        else {
-          return queue.poll(500L, TimeUnit.MILLISECONDS);
-        }
-      }
-      catch (InterruptedException ex) {
-        // Ignore for now
-      }
-
-      return null;
-    }
-
-    @Override
-    public boolean isRetryable() {
-      return !Thread.interrupted() && !closed;
     }
   }
 }

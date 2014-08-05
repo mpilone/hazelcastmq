@@ -2,8 +2,6 @@ package org.mpilone.hazelcastmq.example.core;
 
 import static java.lang.String.format;
 
-import java.util.concurrent.TimeUnit;
-
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.ExampleApp;
 
@@ -20,9 +18,10 @@ public class ProducerConsumerLargeSend extends ExampleApp {
   /**
    * The number of messages to push through the queue.
    */
-  private static final int MESSAGE_COUNT = 2000;
+  private static final int MESSAGE_COUNT = 10000;
 
-  private final ILogger log = Logger.getLogger(getClass());
+  private final static ILogger log = Logger.getLogger(
+      ProducerConsumerLargeSend.class);
 
   public static void main(String[] args) throws Exception {
     ProducerConsumerLargeSend app = new ProducerConsumerLargeSend();
@@ -46,13 +45,10 @@ public class ProducerConsumerLargeSend extends ExampleApp {
 
       HazelcastMQInstance mqInstance = HazelcastMQ
           .newHazelcastMQInstance(mqConfig);
+
       HazelcastMQContext mqContext = mqInstance.createContext();
-
       HazelcastMQProducer mqProducer = mqContext.createProducer();
-
       HazelcastMQConsumer mqConsumer = mqContext.createConsumer(destination);
-
-     
 
       long startTime = System.currentTimeMillis();
 
@@ -67,15 +63,18 @@ public class ProducerConsumerLargeSend extends ExampleApp {
       int receivedCount = 0;
       HazelcastMQMessage msg;
       do {
-        msg = mqConsumer.receive(2, TimeUnit.SECONDS);
+        msg = mqConsumer.receiveNoWait();
         receivedCount += (msg == null ? 0 : 1);
       }
       while (msg != null);
 
       long endTime = System.currentTimeMillis();
+      long elapsed = endTime - startTime;
+      long msgsPerSec = (long) (receivedCount * (1000.0 / elapsed));
 
-      log.info(format("Sent %d and received %d messages in %d milliseconds "
-          + "(serially).", MESSAGE_COUNT, receivedCount, (endTime - startTime)));
+      log.info(format("Sent and received %d messages in %d milliseconds "
+          + "(in serial) for an average of %d messages per second.",
+          MESSAGE_COUNT, elapsed, msgsPerSec));
 
       mqConsumer.close();
       mqContext.stop();

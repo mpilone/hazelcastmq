@@ -6,14 +6,12 @@ import javax.jms.JMSException;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 
-import com.hazelcast.config.Config;
-import com.hazelcast.config.JoinConfig;
-import com.hazelcast.config.NetworkConfig;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.config.*;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * Example of producing to a queue and attempting to consume from a different
@@ -21,18 +19,20 @@ import com.hazelcast.core.HazelcastInstance;
  * 
  * @author mpilone
  */
-public class TransactionalReceive {
+public class TransactionalReceive extends ExampleApp {
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static ILogger log = Logger.
+      getLogger(TransactionalReceive.class);
 
-  private String destination = "/queue/transactional.send.example";
+  private final String destination = "/queue/transactional.send.example";
 
-  public static void main(String[] args) throws JMSException,
-      InterruptedException {
-    new TransactionalReceive();
+  public static void main(String[] args) {
+    TransactionalReceive app = new TransactionalReceive();
+    app.runExample();
   }
 
-  public TransactionalReceive() throws JMSException, InterruptedException {
+  @Override
+  public void start() throws Exception {
     // Create a two node cluster on localhost. We need to use two separate nodes
     // (or two separate threads) because transactional messages produced can be
     // consumed in the same thread before the transaction is committed. This is

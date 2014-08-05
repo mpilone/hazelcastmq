@@ -1,21 +1,27 @@
 package org.mpilone.hazelcastmq.example.core;
 
-import javax.jms.JMSException;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.mpilone.hazelcastmq.core.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * Example of subscribing to a queue and sending a message to the queue.
  */
-public class SimpleProducerAsyncConsumer implements HazelcastMQMessageListener {
+public class SimpleProducerConsumerAsync extends ExampleApp implements
+    HazelcastMQMessageListener {
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static ILogger log = Logger.getLogger(
+      SimpleProducerConsumerAsync.class);
+
+  private final CountDownLatch receiveLatch = new CountDownLatch(1);
 
   /*
    * (non-Javadoc)
@@ -27,23 +33,27 @@ public class SimpleProducerAsyncConsumer implements HazelcastMQMessageListener {
   @Override
   public void onMessage(HazelcastMQMessage msg) {
     log.info("Received message: " + msg.getBodyAsString());
+    receiveLatch.countDown();
   }
 
   public static void main(String[] args) throws Exception {
-    new SimpleProducerAsyncConsumer();
+    SimpleProducerConsumerAsync app = new SimpleProducerConsumerAsync();
+    app.runExample();
   }
 
   /**
    * Constructs the example.
    * 
-   * @throws JMSException
+   * @throws Exception if the example fails
    */
-  public SimpleProducerAsyncConsumer() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     String destination = "/queue/example.dest";
 
     // Create a Hazelcast instance.
     Config config = new Config();
+    config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
 
     try {
@@ -70,17 +80,15 @@ public class SimpleProducerAsyncConsumer implements HazelcastMQMessageListener {
       mqProducer.send(destination, msg);
 
       // Wait to receive the message.
-      Thread.sleep(1000);
+      receiveLatch.await(10, TimeUnit.SECONDS);
 
       mqConsumer.close();
-      mqProducerContext.stop();
       mqProducerContext.close();
-      mqConsumerContext.stop();
       mqConsumerContext.close();
       mqInstance.shutdown();
     }
     finally {
-      hz.getLifecycleService().shutdown();
+      hz.shutdown();
     }
   }
 }

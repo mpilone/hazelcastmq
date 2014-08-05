@@ -2,6 +2,9 @@
 
 ## SNAPSHOT, v1.3.0
 
+- [hazelcastmq-core] Reworked the threading/locking in the context and core
+to make it simpler and more consistent with the JMS 2 specification.
+
 ## 2014-07-30, v1.2.0
 
 - [hazelcastmq-examples] Upgraded to Spring 3.2.10
