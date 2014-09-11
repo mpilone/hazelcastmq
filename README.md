@@ -55,7 +55,7 @@ can configure Maven or Ivy to directly grab the dependencies by adding the repos
 And then adding the dependency:
 
     <dependency>
-        <groupId>org.mpilone</groupId>
+        <groupId>org.mpilone.hazelcastmq</groupId>
         <artifactId>hazelcastmq-core</artifactId>
         <version>X.X.X</version>
     </dependency>
