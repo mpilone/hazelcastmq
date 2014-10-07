@@ -43,4 +43,14 @@ public interface HazelcastMQInstance {
    */
   public HazelcastMQContext createContext(boolean transacted);
 
+  /**
+   * Returns a new, transactional messaging context that can participate in
+   * two-phase commit global transactions. The context can then be used to
+   * create producers and consumers. All contexts created should be closed to
+   * prevent resource leaks.
+   *
+   * @return the newly created context
+   */
+  public XAHazelcastMQContext createXAContext();
+
 }

@@ -4,6 +4,8 @@
 
 - [hazelcastmq-core] Reworked the threading/locking in the context and core
 to make it simpler and more consistent with the JMS 2 specification.
+- [hazelcastmq-core] Exposed a XAHazelcastMQContext to allow access to an
+XAResource for participation in global, two-phase commit transactions. (alpha)
 
 ## 2014-07-30, v1.2.0
 

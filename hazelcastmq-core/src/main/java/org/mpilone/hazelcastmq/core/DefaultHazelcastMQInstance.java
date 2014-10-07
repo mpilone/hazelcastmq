@@ -150,8 +150,16 @@ class DefaultHazelcastMQInstance implements HazelcastMQInstance {
 
   @Override
   public HazelcastMQContext createContext(boolean transacted) {
-    DefaultHazelcastMQContext context = new DefaultHazelcastMQContext(
+    DefaultHazelcastMQContext context = new DefaultLocalTxHazelcastMQContext(
         transacted, this);
+
+    contextMap.put(context.getId(), context);
+    return context;
+  }
+
+  @Override
+  public XAHazelcastMQContext createXAContext() {
+    DefaultXaHazelcastMQContext context = new DefaultXaHazelcastMQContext(this);
 
     contextMap.put(context.getId(), context);
     return context;

@@ -14,7 +14,7 @@ import com.hazelcast.transaction.TransactionContext;
  *
  * @author mpilone
  */
-class DefaultHazelcastMQContext implements HazelcastMQContext {
+abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   /**
    * The log for this class.
@@ -31,12 +31,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * The set of active temporary topics.
    */
   private final Set<String> temporaryTopics;
-
-  /**
-   * The Hazelcast transaction context if this context is transactional,
-   * otherwise null.
-   */
-  private TransactionContext txnContext;
 
   /**
    * The flag which indicates if the context is active, that is, if the context
@@ -58,7 +52,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   /**
    * The HazelcastMQ configuration for this context.
    */
-  private final HazelcastMQConfig config;
+  protected final HazelcastMQConfig config;
 
   /**
    * The unique ID of this context. The ID is generated using a Hazelcast
@@ -86,7 +80,7 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
    * The main lock in the context which is used to synchronize thread access to
    * the start, stop, and close operations during message dispatch.
    */
-  private final ReentrantLock contextLock;
+  protected final ReentrantLock contextLock;
 
   /**
    * The condition that signals that a message may be ready for synchronous
@@ -103,6 +97,17 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   private final Condition dispatchReadyCondition;
 
   /**
+   * The Hazelcast transaction context if this context is transactional,
+   * otherwise null.
+   */
+  protected TransactionContext txnContext;
+
+  @Override
+  public boolean isTransacted() {
+    return txnContext != null;
+  }
+
+  /**
    * Returns true if the context is started (i.e. running) and should therefore
    * be dispatching messages.
    *
@@ -113,14 +118,13 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
   }
 
   /**
-   * Constructs the context which may be transacted. The context is a child of
+   * Constructs the context. The context is a child of
    * the given HazelcastMQ instance.
    *
    * @param transacted true to create a transacted context, false otherwise
    * @param hazelcastMQInstance the parent MQ instance
    */
-  public DefaultHazelcastMQContext(boolean transacted,
-      DefaultHazelcastMQInstance hazelcastMQInstance) {
+  public DefaultHazelcastMQContext(DefaultHazelcastMQInstance hazelcastMQInstance) {
 
     this.hazelcastMQInstance = hazelcastMQInstance;
     this.config = this.hazelcastMQInstance.getConfig();
@@ -131,12 +135,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     this.contextLock = new ReentrantLock();
     this.receiveReadyCondition = this.contextLock.newCondition();
     this.dispatchReadyCondition = new StatefulCondition();
-
-    if (transacted) {
-      HazelcastInstance hazelcast = this.config.getHazelcastInstance();
-      txnContext = hazelcast.newTransactionContext();
-      txnContext.beginTransaction();
-    }
 
     messageListenerDispatcher = new MessageListenerDispatcher();
     config.getExecutor().execute(messageListenerDispatcher);
@@ -251,44 +249,6 @@ class DefaultHazelcastMQContext implements HazelcastMQContext {
     finally {
       contextLock.unlock();
     }
-  }
-
-  @Override
-  public void commit() {
-    if (isTransacted()) {
-      contextLock.lock();
-      try {
-        txnContext.commitTransaction();
-
-        txnContext = config.getHazelcastInstance().newTransactionContext();
-        txnContext.beginTransaction();
-      }
-      finally {
-        contextLock.unlock();
-      }
-    }
-  }
-
-  @Override
-  public void rollback() {
-    if (isTransacted()) {
-
-      contextLock.lock();
-      try {
-        txnContext.rollbackTransaction();
-
-        txnContext = config.getHazelcastInstance().newTransactionContext();
-        txnContext.beginTransaction();
-      }
-      finally {
-        contextLock.unlock();
-      }
-    }
-  }
-
-  @Override
-  public boolean isTransacted() {
-    return txnContext != null;
   }
 
   @Override
