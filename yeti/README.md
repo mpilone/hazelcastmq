@@ -33,7 +33,7 @@ The name Yeti came about because:
 
 1. All the cool variations of STOMP are already taken by other [implementations](http://stomp.github.io/implementations.html).
 2. It's fun to say "Netty Yeti STOMP".
-3. My daughter was watching Backyardigans and [this song](http://www.nickjr.com/kids-videos/backyardigans-the-yeti-stomp.html) gets stuck in your head (don't say I didn't warn you).
+3. My daughter was watching Backyardigans and [this song](https://www.youtube.com/watch?v=s_2L7O1UB5Q) gets stuck in your head (don't say I didn't warn you).
 
 ## Examples
 
@@ -74,4 +74,4 @@ and subscribe, send messages, and recieve messages. This example shows how to
 use the in-memory broker stomplet and the STOMP client to subscribe, send, 
 and receive messages.
 
-View the [example](../yeti/src/main/java/org/mpilone/yeti/example/ServerClientApp.java).
+View the [example](../yeti/src/test/java/org/mpilone/yeti/ServerClientApp.java).

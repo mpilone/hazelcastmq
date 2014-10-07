@@ -1,7 +1,6 @@
 
 package org.mpilone.yeti;
 
-import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +23,6 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
   private final static Logger log = LoggerFactory.getLogger(
       FrameDebugHandler.class);
 
-  private final String instanceId;
   private boolean debugInbound;
   private boolean debugOutbound;
 
@@ -43,21 +41,6 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
    * @param debugOutbound true to enable outbound debugging/logging
    */
   public FrameDebugHandler(boolean debugInbound, boolean debugOutbound) {
-    this(debugInbound, debugOutbound, null);
-  }
-
-  /**
-   * Constructs the handler with the specified instance ID.
-   *
-   * @param debugInbound true to enable inbound debugging/logging
-   * @param debugOutbound true to enable outbound debugging/logging
-   * @param instanceId an ID to be printed with all output
-   */
-  public FrameDebugHandler(boolean debugInbound, boolean debugOutbound,
-      String instanceId) {
-
-    this.instanceId = instanceId == null ? UUID.randomUUID().toString() :
-        instanceId;
     this.debugInbound = debugInbound;
     this.debugOutbound = debugOutbound;
   }
