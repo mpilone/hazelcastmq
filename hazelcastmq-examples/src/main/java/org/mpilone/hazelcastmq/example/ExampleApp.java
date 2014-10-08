@@ -17,6 +17,7 @@ public abstract class ExampleApp {
     System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "warn");
     System.setProperty("org.slf4j.simpleLogger.log.io.netty", "warn");
     System.setProperty("org.slf4j.simpleLogger.log.org.apache.camel", "warn");
+    System.setProperty("org.slf4j.simpleLogger.log.com.atomikos", "warn");
 
     try {
       start();
