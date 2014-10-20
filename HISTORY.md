@@ -1,11 +1,15 @@
 # HazelcastMQ History
 
-## SNAPSHOT, v1.3.0
+## SNAPSHOT, v1.4.0
+
+
+## 2014-10-20, v1.3.0
 
 - [hazelcastmq-core] Reworked the threading/locking in the context and core
 to make it simpler and more consistent with the JMS 2 specification.
 - [hazelcastmq-core] Exposed a XAHazelcastMQContext to allow access to an
 XAResource for participation in global, two-phase commit transactions. (alpha)
+- [hazelcastmq-core] Upgraded to Hazelcast 3.3.1.
 
 ## 2014-07-30, v1.2.0
 

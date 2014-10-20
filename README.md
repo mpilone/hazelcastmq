@@ -24,7 +24,9 @@ layers on top of HazelcastMQ Core.
 * [hazelcastmq-stomp](hazelcastmq-stomp/README.md): A [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
 producers and consumers.
-* [hazelcastmq-spring](hazelcastmq-spring/README.md): Provides integrations with the [Spring Framework](http://projects.spring.io/spring-framework/) such as transaction management and synchronization.
+* [hazelcastmq-spring](hazelcastmq-spring/README.md): Provides integrations with 
+the [Spring Framework](http://projects.spring.io/spring-framework/) such as 
+transaction management and synchronization.
 * [yeti](yeti/README.md): A [STOMP](http://stomp.github.com) server and client framework built 
 on [Netty](http://netty.io/) to make it simple to build STOMP implementations for 
 existing brokers.
