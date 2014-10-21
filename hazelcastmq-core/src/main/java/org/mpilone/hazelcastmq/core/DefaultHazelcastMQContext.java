@@ -156,8 +156,9 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
 
   /**
    * Returns the condition that signals that a message may be ready for
-   * synchronous (i.e. polling) receive calls. This condition is managed by the {@link #getContextLock()
-   * } therefore the lock must be obtained before using the condition.
+   * synchronous (i.e. polling) receive calls. This condition is managed by the
+   * {@link #getContextLock()} therefore the lock must be obtained before using
+   * the condition.
    *
    * @return the receive ready condition
    */
@@ -510,14 +511,15 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
 
     @Override
     public void run() {
-      if (!closed) {
-        contextLock.lock();
-        try {
+
+      contextLock.lock();
+      try {
+        if (!closed) {
           doDispatch();
         }
-        finally {
-          contextLock.unlock();
-        }
+      }
+      finally {
+        contextLock.unlock();
       }
     }
   }
@@ -555,19 +557,21 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
     public void run() {
       while (!closed) {
 
-        contextLock.lock();
-        try {
-          doDispatch();
-        }
-        finally {
-          contextLock.unlock();
-        }
-
         try {
           dispatchReadyCondition.await();
         }
         catch (InterruptedException ex) {
           // ignore
+        }
+
+        contextLock.lock();
+        try {
+          if (!closed) {
+            doDispatch();
+          }
+        }
+        finally {
+          contextLock.unlock();
         }
       }
     }

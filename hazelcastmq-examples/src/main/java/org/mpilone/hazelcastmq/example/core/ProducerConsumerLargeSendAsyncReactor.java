@@ -2,8 +2,7 @@ package org.mpilone.hazelcastmq.example.core;
 
 import static java.lang.String.format;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.ExampleApp;
@@ -15,14 +14,13 @@ import com.hazelcast.logging.Logger;
 
 /**
  * Example of subscribing to a queue and sending a large number of messages to
- * the queue. This example uses the dedicated thread dispatch strategy so each
- * of the 3 consumer contexts will get a thread.
+ * the queue. A single thread thread-pool will be used to force reactor style
+ * message dispatching so only one thread will be used for all contexts.
  */
-public class ProducerConsumerLargeSendAsync extends ExampleApp implements
+public class ProducerConsumerLargeSendAsyncReactor extends ExampleApp implements
     HazelcastMQMessageListener {
 
-  private final static ILogger log = Logger.getLogger(
-      ProducerConsumerLargeSendAsync.class);
+  private final static ILogger log = Logger.getLogger(ProducerConsumerLargeSendAsyncReactor.class);
 
   private final static int MESSAGE_COUNT = 10000;
 
@@ -34,7 +32,7 @@ public class ProducerConsumerLargeSendAsync extends ExampleApp implements
   }
 
   public static void main(String[] args) throws Exception {
-    ProducerConsumerLargeSendAsync app = new ProducerConsumerLargeSendAsync();
+    ProducerConsumerLargeSendAsyncReactor app = new ProducerConsumerLargeSendAsyncReactor();
     app.runExample();
   }
 
@@ -54,9 +52,14 @@ public class ProducerConsumerLargeSendAsync extends ExampleApp implements
     HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
 
     try {
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+
       // Setup the connection factory.
       HazelcastMQConfig mqConfig = new HazelcastMQConfig();
       mqConfig.setHazelcastInstance(hz);
+      mqConfig.setExecutor(executor);
+      mqConfig.setContextDispatchStrategy(
+          HazelcastMQConfig.ContextDispatchStrategy.REACTOR);
 
       HazelcastMQInstance mqInstance = HazelcastMQ
           .newHazelcastMQInstance(mqConfig);
@@ -72,11 +75,11 @@ public class ProducerConsumerLargeSendAsync extends ExampleApp implements
           .createConsumer(destination);
       mqConsumer1.setMessageListener(this);
 
-      HazelcastMQConsumer mqConsumer2 = mqConsumerContext2
+      HazelcastMQConsumer mqConsumer2 = mqConsumerContext1
           .createConsumer(destination);
       mqConsumer2.setMessageListener(this);
 
-      HazelcastMQConsumer mqConsumer3 = mqConsumerContext3
+      HazelcastMQConsumer mqConsumer3 = mqConsumerContext1
           .createConsumer(destination);
       mqConsumer3.setMessageListener(this);
 
@@ -98,8 +101,7 @@ public class ProducerConsumerLargeSendAsync extends ExampleApp implements
 
       log.info(format("Sent and received %d messages in %d milliseconds "
           + "(in parallel) for an average of %d messages per second.",
-          MESSAGE_COUNT, elapsed, msgsPerSec
-      ));
+          MESSAGE_COUNT, elapsed, msgsPerSec));
 
       mqConsumer1.close();
       mqConsumer2.close();
@@ -109,6 +111,8 @@ public class ProducerConsumerLargeSendAsync extends ExampleApp implements
       mqConsumerContext2.close();
       mqConsumerContext3.close();
       mqInstance.shutdown();
+
+      executor.shutdown();
     }
     finally {
       hz.shutdown();
