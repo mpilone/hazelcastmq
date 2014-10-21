@@ -2,6 +2,8 @@
 
 ## SNAPSHOT, v1.4.0
 
+- [hazelcastmq-core] Added a configuration property to support multiple
+context dispatch strategies to allow for low thread usage or low latency.
 
 ## 2014-10-20, v1.3.0
 

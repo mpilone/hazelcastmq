@@ -2,6 +2,7 @@ package org.mpilone.hazelcastmq.core;
 
 import static java.lang.String.format;
 
+import java.io.Closeable;
 import java.util.*;
 import java.util.concurrent.locks.*;
 
@@ -74,7 +75,7 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
    * The dispatcher which calls consumers that are ready to push a message to
    * message listeners. This is the primary "push" thread of this context.
    */
-  private final MessageListenerDispatcher messageListenerDispatcher;
+  private final MessageDispatcher messageDispatcher;
 
   /**
    * The main lock in the context which is used to synchronize thread access to
@@ -88,13 +89,6 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
    * }.
    */
   private final Condition receiveReadyCondition;
-
-  /**
-   * The condition that signals that a message may be ready for asynchronous
-   * (i.e. push) dispatch. This condition is not managed by any lock and can be
-   * used independently.
-   */
-  private final Condition dispatchReadyCondition;
 
   /**
    * The Hazelcast transaction context if this context is transactional,
@@ -118,13 +112,14 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
   }
 
   /**
-   * Constructs the context. The context is a child of
-   * the given HazelcastMQ instance.
+   * Constructs the context. The context is a child of the given HazelcastMQ
+   * instance.
    *
    * @param transacted true to create a transacted context, false otherwise
    * @param hazelcastMQInstance the parent MQ instance
    */
-  public DefaultHazelcastMQContext(DefaultHazelcastMQInstance hazelcastMQInstance) {
+  public DefaultHazelcastMQContext(
+      DefaultHazelcastMQInstance hazelcastMQInstance) {
 
     this.hazelcastMQInstance = hazelcastMQInstance;
     this.config = this.hazelcastMQInstance.getConfig();
@@ -134,10 +129,21 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
     this.id = "hzmqcontext-" + UUID.randomUUID().toString();
     this.contextLock = new ReentrantLock();
     this.receiveReadyCondition = this.contextLock.newCondition();
-    this.dispatchReadyCondition = new StatefulCondition();
 
-    messageListenerDispatcher = new MessageListenerDispatcher();
-    config.getExecutor().execute(messageListenerDispatcher);
+    switch (config.getContextDispatchStrategy()) {
+      case DEDICATED_THREAD:
+        messageDispatcher = new DedicatedThreadDispatcher();
+        break;
+
+      case REACTOR:
+        messageDispatcher = new ReactorThreadDispatcher();
+        break;
+
+      default:
+        throw new IllegalArgumentException(format(
+            "Unknown context dispatch strategy [%s]", config.
+            getContextDispatchStrategy()));
+    }
   }
 
   /**
@@ -160,14 +166,14 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
   }
 
   /**
-   * Returns the condition that signals that a message may be ready for
-   * asynchronous (i.e. push) dispatch. This condition is not managed by any
-   * lock and can be used outside of a lock by any number of threads.
-   *
-   * @return the dispatch ready condition
+   * Signals that a message may be ready for asynchronous (i.e. push) dispatch.
+   * This method can be used outside of a lock by any number of threads. Once
+   * called, depending on the dispatch strategy, the {@link DefaultHazelcastMQConsumer#receiveAndDispatch()
+   * } method will be called on all consumers in the context and the
+   * {@link #receiveReadyCondition} will be signaled in an appropriate thread.
    */
-  Condition getDispatchReadyCondition() {
-    return dispatchReadyCondition;
+  void signalDispatchReady() {
+    messageDispatcher.signalDispatchReady();
   }
 
   /**
@@ -227,7 +233,7 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
       stop();
 
       // Close the message dispatcher.
-      messageListenerDispatcher.close();
+      messageDispatcher.close();
 
       // Close all consumers
       List<DefaultHazelcastMQConsumer> consumers = new ArrayList<>(
@@ -434,47 +440,30 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
    * @author mpilone
    *
    */
-  private class MessageListenerDispatcher implements Runnable, AutoCloseable {
+  private interface MessageDispatcher extends Closeable {
+
+    public void signalDispatchReady();
+
+    @Override
+    public void close();
+  }
+
+  private abstract class AbstractMessageDispatcher implements
+      MessageDispatcher {
 
     /**
      * The flag which indicates if the dispatcher should shutdown.
      */
-    private volatile boolean closed;
-
-    /**
-     * Constructs the dispatcher.
-     */
-    public MessageListenerDispatcher() {
-      closed = false;
-    }
-
-    @Override
-    public void run() {
-      while (!closed) {
-
-        contextLock.lock();
-        try {
-          doDispatch();
-        }
-        finally {
-          contextLock.unlock();
-        }
-
-        try {
-          dispatchReadyCondition.await();
-        }
-        catch (InterruptedException ex) {
-          // ignore
-        }
-      }
-    }
+    protected volatile boolean closed;
 
     /**
      * Performs a dispatch operation on each child consumer. The consumer is
      * responsible for determining if dispatch, that is, message push is
-     * appropriate.
+     * appropriate. This method does not check if the dispatch has been closed
+     * so subclasses should perform appropriate checks before calling this
+     * method.
      */
-    private void doDispatch() {
+    protected void doDispatch() {
       boolean dispatched;
 
       // Perform all push receives to message listeners. We'll keep
@@ -502,6 +491,85 @@ abstract class DefaultHazelcastMQContext implements HazelcastMQContext {
     @Override
     public void close() {
       closed = true;
+    }
+  }
+
+  /**
+   * A single shot dispatcher that makes the trade-off of some latency for a
+   * lower overall thread count. Refer to
+   * {@link HazelcastMQConfig.ContextDispatchStrategy#REACTOR}.
+   */
+  private class ReactorThreadDispatcher extends AbstractMessageDispatcher
+      implements MessageDispatcher,
+      Runnable {
+
+    @Override
+    public void signalDispatchReady() {
+      config.getExecutor().execute(this);
+    }
+
+    @Override
+    public void run() {
+      if (!closed) {
+        contextLock.lock();
+        try {
+          doDispatch();
+        }
+        finally {
+          contextLock.unlock();
+        }
+      }
+    }
+  }
+
+  /**
+   * A dedicated thread dispatcher that uses a tight loop and a lock condition
+   * to sleep until signaled. Refer to
+   * {@link HazelcastMQConfig.ContextDispatchStrategy#DEDICATED_THREAD}.
+   */
+  private class DedicatedThreadDispatcher extends AbstractMessageDispatcher
+      implements MessageDispatcher,
+      Runnable {
+
+    /**
+     * The condition that signals that a message may be ready for asynchronous
+     * (i.e. push) dispatch. This condition is not managed by any lock and can
+     * be used independently.
+     */
+    private final Condition dispatchReadyCondition;
+
+    /**
+     * Constructs the dispatcher.
+     */
+    public DedicatedThreadDispatcher() {
+      this.dispatchReadyCondition = new StatefulCondition();
+      config.getExecutor().execute(this);
+    }
+
+    @Override
+    public void signalDispatchReady() {
+      dispatchReadyCondition.signalAll();
+    }
+
+    @Override
+    public void run() {
+      while (!closed) {
+
+        contextLock.lock();
+        try {
+          doDispatch();
+        }
+        finally {
+          contextLock.unlock();
+        }
+
+        try {
+          dispatchReadyCondition.await();
+        }
+        catch (InterruptedException ex) {
+          // ignore
+        }
+      }
     }
   }
 }

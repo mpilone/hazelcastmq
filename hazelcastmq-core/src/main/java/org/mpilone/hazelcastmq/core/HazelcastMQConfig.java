@@ -15,28 +15,12 @@ import com.hazelcast.core.HazelcastInstance;
  */
 public class HazelcastMQConfig {
 
-  /**
-   * The Hazelcast instance to use for all topic and queue management.
-   */
   private HazelcastInstance hazelcastInstance;
-
-  /**
-   * The message converter to use for converting HazelcastMQ messages into and
-   * out of Hazelcast.
-   */
   private MessageConverter messageConverter = new NoOpMessageConverter();
-
-  /**
-   * The maximum number of messages to buffer during topic reception before
-   * messages start getting dropped. Choose a value that is a balance between
-   * memory usage and consumer performance. This value is per topic consumer.
-   */
   private int topicMaxMessageCount = 1000;
-
-  /**
-   * The executor service to spin up message listener consumers.
-   */
   private ExecutorService executor;
+  private ContextDispatchStrategy contextDispatchStrategy =
+      ContextDispatchStrategy.DEDICATED_THREAD;
 
   /**
    * Constructs the configuration with the following defaults:
@@ -46,6 +30,8 @@ public class HazelcastMQConfig {
    * <li>executor: {@link Executors#newCachedThreadPool()} (lazy initialized)</li>
    * <li>hazelcastInstance: {@link Hazelcast#newHazelcastInstance()} (lazy
    * initialized)</li>
+   * <li>contextDispatchStrategy:
+   * {@link ContextDispatchStrategy#DEDICATED_THREAD}</li>
    * </ul>
    */
   public HazelcastMQConfig() {
@@ -58,6 +44,8 @@ public class HazelcastMQConfig {
    * <li>topicMaxMessageCount: 1000</li>
    * <li>executor: {@link Executors#newCachedThreadPool()} (lazy
    * initialized)</li>
+   * <li>contextDispatchStrategy:
+   * {@link ContextDispatchStrategy#DEDICATED_THREAD}</li>
    * </ul>
    *
    * @param hzInstance the Hazelcast instances to use for all queues and topic
@@ -65,6 +53,34 @@ public class HazelcastMQConfig {
    */
   public HazelcastMQConfig(HazelcastInstance hzInstance) {
     setHazelcastInstance(hzInstance);
+  }
+
+  /**
+   * Sets the context dispatch strategy used to dispatch messages to the
+   * consumers within a single {@link HazelcastMQContext}. Be sure to read the
+   * trade-offs of each strategy in the {@link ContextDispatchStrategy}
+   * documentation. The strategy selected may impact the desired configuration
+   * of the {@link #getExecutor() executor} to control dispatch concurrency and
+   * resource usage. The default is
+   * {@link ContextDispatchStrategy#DEDICATED_THREAD}.
+   *
+   * @param contextDispatchStrategy the dispatch strategy to use in contexts
+   */
+  public void setContextDispatchStrategy(
+      ContextDispatchStrategy contextDispatchStrategy) {
+    this.contextDispatchStrategy = contextDispatchStrategy;
+  }
+
+  /**
+   * Returns the context dispatch strategy used to dispatch messages to the
+   * consumers within a single {@link HazelcastMQContext}. Be sure to read the
+   * trade-offs of each strategy in the {@link ContextDispatchStrategy}
+   * documentation.
+   *
+   * @return the dispatch strategy to use in contexts
+   */
+  public ContextDispatchStrategy getContextDispatchStrategy() {
+    return contextDispatchStrategy;
   }
 
   /**
@@ -166,6 +182,36 @@ public class HazelcastMQConfig {
    */
   public void setHazelcastInstance(HazelcastInstance hazelcastInstance) {
     this.hazelcastInstance = hazelcastInstance;
+  }
+
+  /**
+   * The dispatch strategy to use within a single {@link HazelcastMQContext}.
+   */
+  public enum ContextDispatchStrategy {
+
+    /**
+     * A dedicated thread dispatcher that uses a tight loop and a lock condition
+     * to sleep until signaled. The thread, allocated from the thread pool in
+     * the constructor, is dedicated to this dispatcher until it is closed. This
+     * has the benefit of an almost zero latency between the signal and the
+     * dispatch; however with a large number of dedicated threads are required
+     * if a large number of contexts are created. It is important to use a
+     * proper thread pool configuration to be sure that every context can
+     * allocate a thread (i.e. an unbounded thread pool) or a context may never
+     * dispatch messages to consumers.
+     */
+    DEDICATED_THREAD,
+    /**
+     * A single shot dispatcher that makes the trade-off of some latency for a
+     * lower overall thread count. Each time the dispatcher is signalled it adds
+     * itself to the thread pool executor for eventual dispatch. This has the
+     * benefit of using few (potentially only 1) thread based on the thread poll
+     * configuration; however there is an extra cost in the thread pool to
+     * allocate a thread and run the dispatcher. The number of concurrent
+     * contexts (and therefore the number of concurrent consumers across
+     * contexts) will be limited by the thread pool configuration.
+     */
+    REACTOR
   }
 
 }

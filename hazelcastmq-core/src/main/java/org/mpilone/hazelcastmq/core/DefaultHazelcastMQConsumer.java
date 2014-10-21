@@ -121,7 +121,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       if (messageListener != null) {
         // Signal that we're dispatch ready so the context will drain the queue if
         // there are pending messages.
-        hazelcastMQContext.getDispatchReadyCondition().signalAll();
+        hazelcastMQContext.signalDispatchReady();
       }
     }
     finally {
@@ -183,7 +183,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
       }
 
       // Wake up any thread blocking on a receive call.
-      hazelcastMQContext.getDispatchReadyCondition().signalAll();
+      hazelcastMQContext.signalDispatchReady();
       hazelcastMQContext.onConsumerClose(id);
     }
     finally {
@@ -348,7 +348,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
 
     @Override
     public void itemAdded(ItemEvent<Object> arg0) {
-      hazelcastMQContext.getDispatchReadyCondition().signalAll();
+      hazelcastMQContext.signalDispatchReady();
     }
 
     @Override
@@ -417,7 +417,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
         return;
       }
 
-      hazelcastMQContext.getDispatchReadyCondition().signalAll();
+      hazelcastMQContext.signalDispatchReady();
     }
 
     @Override
