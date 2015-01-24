@@ -4,6 +4,9 @@
 
 - [hazelcastmq-core] Added a configuration property to support multiple
 context dispatch strategies to allow for low thread usage or low latency.
+- [hazelcastmq-camel] Marked the endpoint as multiple consumer capable so 
+multiple routes from a topic can be created on the same endpoint.
+- [hazelcastmq-core] Upgraded to Hazelcast 3.4.
 
 ## 2014-10-20, v1.3.0
 

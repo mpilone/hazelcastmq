@@ -13,20 +13,19 @@ import org.slf4j.*;
 
 /**
  * An example of using the {@link HazelcastMQCamelComponent} to consume a
- * message from one HzMq queue and produce it to another in a one way operation.
+ * message from a HzMq topic using two consumers on an endpoint.
  *
  * @author mpilone
  */
-public class CamelToCamelOneWay extends ExampleApp {
+public class CamelTopicConsumers extends ExampleApp {
 
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
-      CamelToCamelOneWay.class);
+  private final static Logger log = LoggerFactory.getLogger(CamelTopicConsumers.class);
 
   public static void main(String[] args) throws Exception {
-    CamelToCamelOneWay app = new CamelToCamelOneWay();
+    CamelTopicConsumers app = new CamelTopicConsumers();
     app.runExample();
   }
 
@@ -60,27 +59,41 @@ public class CamelToCamelOneWay extends ExampleApp {
       camelContext.addRoutes(new RouteBuilder() {
         @Override
         public void configure() {
-          from("hazelcastmq:queue:primo.test")
+          from("hazelcastmq:topic:event.test")
+              .to("hazelcastmq:queue:primo.test");
+          from("hazelcastmq:topic:event.test")
               .to("hazelcastmq:queue:secondo.test");
         }
       });
 
       camelContext.start();
 
-      // Send a message to the first queue and the Camel route should move it to the second.
+      // Send a message to the topic. The Camel route will result in two 
+      // instances of the message being consumed from the topic and placed
+      // into queues.
       try (HazelcastMQContext mqContext = mqInstance.createContext()) {
         HazelcastMQProducer mqProducer = mqContext.createProducer();
-        mqProducer.send("/queue/primo.test", "Hello World!");
+        mqProducer.send("/topic/event.test", "Hello World!");
 
-        try (HazelcastMQConsumer mqConsumer =
-            mqContext.createConsumer("/queue/secondo.test")) {
+        // Consume from both queues.
+        try (HazelcastMQConsumer mqConsumer = mqContext.createConsumer(
+            "/queue/primo.test")) {
           HazelcastMQMessage msg = mqConsumer.receive(12, TimeUnit.SECONDS);
 
           if (msg == null) {
             log.warn("Did not get expected message!");
+          } else {
+            log.info("Got expected message on primo queue.");
           }
-          else {
-            log.info("Got message on second queue: " + msg.getBodyAsString());
+        }
+
+        try (HazelcastMQConsumer mqConsumer = mqContext.createConsumer("/queue/secondo.test")) {
+          HazelcastMQMessage msg = mqConsumer.receive(12, TimeUnit.SECONDS);
+
+          if (msg == null) {
+            log.warn("Did not get expected message!");
+          } else {
+            log.info("Got expected message on secondo queue.");
           }
         }
       }

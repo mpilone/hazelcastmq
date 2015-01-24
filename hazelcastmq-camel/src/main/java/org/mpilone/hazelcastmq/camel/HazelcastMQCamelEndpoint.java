@@ -17,7 +17,8 @@ import org.mpilone.hazelcastmq.core.HazelcastMQ;
  *
  * @author mpilone
  */
-public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
+public class HazelcastMQCamelEndpoint extends DefaultEndpoint implements
+    MultipleConsumersSupport {
   private final String destination;
   private final HazelcastMQCamelConfig configuration;
 
@@ -56,6 +57,12 @@ public class HazelcastMQCamelEndpoint extends DefaultEndpoint {
   @Override
   public Producer createProducer() throws Exception {
     return new HazelcastMQCamelProducer(this);
+  }
+
+  @Override
+  public boolean isMultipleConsumersSupported() {
+    // Allow multiple consumers on both queues and topics
+    return true;
   }
 
   @Override
