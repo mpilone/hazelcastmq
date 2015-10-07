@@ -16,19 +16,20 @@ import com.hazelcast.core.*;
 /**
  * An example of using the {@link HazelcastMQCamelComponent} to consume a
  * message from one HzMq queue and produce it to another in a one way operation.
+ * This example uses the suspend/resume feature of Camel to demonstrate that a
+ * consumer can be stopped and restarted safely.
  *
  * @author mpilone
  */
-public class CamelToCamelOneWay extends ExampleApp {
+public class CamelToCamelOneWaySuspendResume extends ExampleApp {
 
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
-      CamelToCamelOneWay.class);
+  private final static Logger log = LoggerFactory.getLogger(CamelToCamelOneWaySuspendResume.class);
 
   public static void main(String[] args) throws Exception {
-    CamelToCamelOneWay app = new CamelToCamelOneWay();
+    CamelToCamelOneWaySuspendResume app = new CamelToCamelOneWaySuspendResume();
     app.runExample();
   }
 
@@ -68,6 +69,12 @@ public class CamelToCamelOneWay extends ExampleApp {
       });
 
       camelContext.start();
+
+      // Suspend the context.
+      camelContext.suspend();
+
+      // Resume the context.
+      camelContext.resume();
 
       // Send a message to the first queue and the Camel route should
       // move it to the second.

@@ -46,17 +46,24 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
     HazelcastMQCamelConfig config = endpoint.getConfiguration();
     this.messageConverter = config.getMessageConverter();
     this.consumers = new ArrayList<>();
+  }
 
-    // Create the number of consumers requested.
-    int concurrentConsumers = config.getConcurrentConsumers();
-    for (int i = 0; i < concurrentConsumers; ++i) {
-      this.consumers.add(new SingleThreadedConsumer(config, endpoint));
-    }
+  @Override
+  public HazelcastMQCamelEndpoint getEndpoint() {
+    return (HazelcastMQCamelEndpoint) super.getEndpoint();
   }
 
   @Override
   protected void doStart() throws Exception {
     super.doStart();
+
+    HazelcastMQCamelConfig config = getEndpoint().getConfiguration();
+
+    // Create the number of consumers requested.
+    int concurrentConsumers = config.getConcurrentConsumers();
+    for (int i = 0; i < concurrentConsumers; ++i) {
+      this.consumers.add(new SingleThreadedConsumer(config, getEndpoint()));
+    }
 
     for (SingleThreadedConsumer consumer : consumers) {
       consumer.start();
@@ -66,8 +73,13 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
   @Override
   protected void doStop() throws Exception {
     for (SingleThreadedConsumer consumer : consumers) {
-      consumer.stop();
+      // Shutdown the consumer because we are going to release all resources.
+      consumer.shutdown();
     }
+
+    // Clear the existing consumers. They will be recreated if this component
+    // is re-started.
+    consumers.clear();
 
     super.doStop();
   }
@@ -78,7 +90,26 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
       consumer.shutdown();
     }
 
+    consumers.clear();
     super.doShutdown();
+  }
+
+  @Override
+  protected void doSuspend() throws Exception {
+    for (SingleThreadedConsumer consumer : consumers) {
+      consumer.stop();
+    }
+
+    super.doSuspend();
+  }
+
+  @Override
+  protected void doResume() throws Exception {
+    for (SingleThreadedConsumer consumer : consumers) {
+      consumer.start();
+    }
+
+    super.doResume();
   }
 
   /**
