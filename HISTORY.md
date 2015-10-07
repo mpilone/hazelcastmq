@@ -2,6 +2,13 @@
 
 ## SNAPSHOT, v1.5.0
 
+- [hazelcastmq-camel] Added support for suspend/resume in the Camel consumer 
+component (Issue #11).
+- [hazelcastmq-camel] Upgraded to Camel 2.15.3.
+- [hazelcastmq-core] Updated to Hazelcast 3.5.2.
+- [hazelcastmq-spring] Updated to Spring 4.2.1.
+- [yeti] Upgraded to Netty 4.0.32.
+
 ## 2015-02-04, v1.4.0
 
 - [hazelcastmq-core] Added a configuration property to support multiple
