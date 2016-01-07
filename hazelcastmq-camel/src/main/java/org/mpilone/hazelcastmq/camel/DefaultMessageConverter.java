@@ -1,14 +1,22 @@
 
 package org.mpilone.hazelcastmq.camel;
 
-import static java.lang.String.format;
-
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.Map;
 
 import org.apache.camel.Message;
 import org.apache.camel.RuntimeCamelException;
 import org.apache.camel.impl.DefaultMessage;
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
+
+import static java.lang.String.format;
 
 /**
  * The default implementation of a message converter.
@@ -17,14 +25,20 @@ import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
  */
 public class DefaultMessageConverter implements MessageConverter {
 
+  private static final String PLAIN = "text/plain";
+  private static final String BINARY = "application/octet-stream";
+  private static final String SERIAL = "application/x-java-serialized-object";
+
   /**
    * Converts from a Camel message to a HzMq message. The headers are simply
    * copied unmodified. The body is mapped by type:
    * <ul>
    * <li>String: set on the HzMq message and the content type set to
-   * text/plain</li>
+   * {@value #PLAIN}</li>
    * <li>byte[]: set on the HzMq message and the content type set to
-   * application/octet-stream</li>
+   * {@value #BINARY}</li>
+   * <li>Serializable: serialized to a byte[] and set on the HzMq
+   * message and the content type set to {@value #SERIAL}</li>
    * <li>null: set on the HzMq message with no content type</li>
    * <li>all others: exception raised</li>
    * </ul>
@@ -51,11 +65,15 @@ public class DefaultMessageConverter implements MessageConverter {
     Object camelBody = camelMsg.getBody();
     if (camelBody instanceof String) {
       mqMsg.setBody((String) camelBody);
-      mqMsg.setContentType("text/plain");
+      mqMsg.setContentType(PLAIN);
     }
     else if (camelBody instanceof byte[]) {
       mqMsg.setBody((byte[]) camelBody);
-      mqMsg.setContentType("application/octet-stream");
+      mqMsg.setContentType(BINARY);
+    }
+    else if (camelBody instanceof Serializable) {
+      mqMsg.setBody(serialize(camelBody));
+      mqMsg.setContentType(SERIAL);
     }
     else if (camelBody == null) {
       mqMsg.setBody((byte[]) null);
@@ -72,7 +90,9 @@ public class DefaultMessageConverter implements MessageConverter {
    * Converts from a Camel message to a HzMq message. The headers are simply
    * copied unmodified. The body is mapped by type:
    * <ul>
-   * <li>If the content type is text/plain, the body is set as a String</li>
+   * <li>If the content type is {@value #PLAIN}, the body is set as a String</li>
+   * <li>If the content type is {@value #SERIAL}, the body is deserialized and
+   * set as an Object</li>
    * <li>all others: the body is set as a byte[] (or null)</li>
    * </ul>
    *
@@ -86,14 +106,37 @@ public class DefaultMessageConverter implements MessageConverter {
 
     camelMsg.setHeaders((Map) mqMsg.getHeaders().getHeaderMap());
 
-    if (mqMsg.getContentType() != null && mqMsg.getContentType().equals(
-        "text/plain")) {
+    String contentType = mqMsg.getContentType();
+    if (PLAIN.equals(contentType)) {
       camelMsg.setBody(mqMsg.getBodyAsString());
+    }
+    else if (SERIAL.equals(contentType)) {
+      camelMsg.setBody(deserialize(mqMsg.getBody()));
     }
     else {
       camelMsg.setBody(mqMsg.getBody());
     }
 
     return camelMsg;
+  }
+
+  private static byte[] serialize(Object object) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    try (ObjectOutput oo = new ObjectOutputStream(out)) {
+      oo.writeObject(object);
+    } catch (IOException e) {
+      throw new RuntimeCamelException(format(
+          "Could not serialize message body type: %s",
+          object.getClass().getName()), e);
+    }
+    return out.toByteArray();
+  }
+
+  private static Object deserialize(byte[] b) {
+    try (ObjectInput in = new ObjectInputStream(new ByteArrayInputStream(b))) {
+      return in.readObject();
+    } catch (IOException | ClassNotFoundException e) {
+      throw new RuntimeCamelException(e);
+    }
   }
 }
