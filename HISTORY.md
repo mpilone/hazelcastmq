@@ -5,6 +5,7 @@
 - [hazelcastmq-camel] Added support for suspend/resume in the Camel consumer 
 component (Issue #11).
 - [hazelcastmq-camel] Upgraded to Camel 2.15.3.
+- [hazelcastmq-camel] Added support for Serializable objects in the DefaultMessageConverter. [Matt Sicker <matthew.sicker@ahold.com>]
 - [hazelcastmq-core] Updated to Hazelcast 3.5.2.
 - [hazelcastmq-spring] Updated to Spring 4.2.1.
 - [yeti] Upgraded to Netty 4.0.32.

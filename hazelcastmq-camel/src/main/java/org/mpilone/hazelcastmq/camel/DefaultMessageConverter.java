@@ -1,22 +1,15 @@
 
 package org.mpilone.hazelcastmq.camel;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
+import static java.lang.String.format;
+
+import java.io.*;
 import java.util.Map;
 
 import org.apache.camel.Message;
 import org.apache.camel.RuntimeCamelException;
 import org.apache.camel.impl.DefaultMessage;
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
-
-import static java.lang.String.format;
 
 /**
  * The default implementation of a message converter.
@@ -25,9 +18,20 @@ import static java.lang.String.format;
  */
 public class DefaultMessageConverter implements MessageConverter {
 
-  private static final String PLAIN = "text/plain";
-  private static final String BINARY = "application/octet-stream";
-  private static final String SERIAL = "application/x-java-serialized-object";
+  /**
+   * The content type used for plain text messages.
+   */
+  public static final String PLAIN = "text/plain";
+
+  /**
+   * The content type used for binary (byte[]) messages.
+   */
+  public static final String BINARY = "application/octet-stream";
+
+  /**
+   * The content type used for serialized Java object messages.
+   */
+  public static final String SERIAL = "application/x-java-serialized-object";
 
   /**
    * Converts from a Camel message to a HzMq message. The headers are simply
@@ -120,7 +124,15 @@ public class DefaultMessageConverter implements MessageConverter {
     return camelMsg;
   }
 
-  private static byte[] serialize(Object object) {
+  /**
+   * Serializes the given object into a byte array using an
+   * {@link ObjectOutputStream}.
+   *
+   * @param object the object to serialize
+   *
+   * @return the byte array
+   */
+  protected byte[] serialize(Object object) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try (ObjectOutput oo = new ObjectOutputStream(out)) {
       oo.writeObject(object);
@@ -132,11 +144,19 @@ public class DefaultMessageConverter implements MessageConverter {
     return out.toByteArray();
   }
 
-  private static Object deserialize(byte[] b) {
+  /**
+   * Deserializes the given byte array into an object using an
+   * {@link ObjectInputStream}.
+   *
+   * @param b the byte array to deserialize
+   *
+   * @return the new object
+   */
+  protected Object deserialize(byte[] b) {
     try (ObjectInput in = new ObjectInputStream(new ByteArrayInputStream(b))) {
       return in.readObject();
     } catch (IOException | ClassNotFoundException e) {
-      throw new RuntimeCamelException(e);
+      throw new RuntimeCamelException("Could not deserialize message body.", e);
     }
   }
 }
