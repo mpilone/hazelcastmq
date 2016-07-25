@@ -1,8 +1,8 @@
 package org.mpilone.hazelcastmq.core;
 
 /**
- * Entry point into HazelcastMQ. This factory creates new HazelcastMQ instances
- * based on a given configuration or a default configuration will be
+ * Entry point into HazelcastMQ. This factory creates new HazelcastMQ broker
+ * instances * based on a given configuration or a default configuration will be
  * constructed.
  * 
  * @author mpilone
@@ -10,30 +10,28 @@ package org.mpilone.hazelcastmq.core;
 public class HazelcastMQ {
 
   /**
-   * Returns a new {@link HazelcastMQInstance} that will use a default
-   * configuration.
+   * Returns a new broker that will use a default   * configuration.
    * 
-   * @return a new HazelcastMQ instance
+   * @return a new broker instance
    */
-  public static HazelcastMQInstance newHazelcastMQInstance() {
-    return newHazelcastMQInstance(null);
+  public static Broker newBroker() {
+    return newBroker(null);
   }
 
   /**
-   * Returns a new {@link HazelcastMQInstance} using the given configuration. If
-   * the configuration is null, a default configuration will be used.
+   * Returns a new broker using the given configuration. If   * the configuration is null, a default configuration will be used.
    * 
    * @param config
    *          the configuration for the instance
-   * @return the new HazelcastMQ instance
+   * @return the new broker instance
    */
-  public static HazelcastMQInstance newHazelcastMQInstance(
-      HazelcastMQConfig config) {
+  public static Broker newBroker(
+      BrokerConfig config) {
 
     if (config == null) {
-      config = new HazelcastMQConfig();
+      config = new BrokerConfig();
     }
 
-    return new DefaultHazelcastMQInstance(config);
+    return new DefaultBroker(config);
   }
 }
