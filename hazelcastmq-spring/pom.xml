@@ -29,6 +29,11 @@
       <artifactId>hazelcastmq-core</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.hazelcast</groupId>
+      <artifactId>hazelcast-spring</artifactId>
+      <version>${hazelcast.version}</version>
+    </dependency>
 
     <!-- Test -->
     <dependency>

@@ -1,12 +1,10 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.io.Closeable;
-
 /**
  *
  * @author mpilone
  */
-public interface ChannelContext extends Closeable {
+public interface ChannelContext extends AutoCloseable {
 
   Channel createChannel(DataStructureKey key);
 
@@ -17,5 +15,8 @@ public interface ChannelContext extends Closeable {
   void commit();
 
   void rollback();
+
+  @Override
+  void close();
 
 }
