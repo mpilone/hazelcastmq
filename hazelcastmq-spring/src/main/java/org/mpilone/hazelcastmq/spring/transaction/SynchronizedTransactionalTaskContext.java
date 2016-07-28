@@ -121,6 +121,7 @@ public class SynchronizedTransactionalTaskContext implements
     else {
       // Start a Hazelcast transaction and add a synchronization to the transaction manager.
       context = hazelcastInstance.newTransactionContext();
+      context.beginTransaction();
 
       TransactionSynchronizationManager.bindResource(this, context);
       TransactionSynchronizationManager.registerSynchronization(

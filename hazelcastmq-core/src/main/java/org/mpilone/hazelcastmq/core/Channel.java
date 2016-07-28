@@ -25,13 +25,21 @@ public interface Channel extends Closeable {
 
   boolean send(Message<?> msg, long timeout, TimeUnit unit);
 
-  SelectionKey registerSelector(Selector selector);
+  void addReadReadyListener(ReadReadyListener listener);
 
-  void setTemporary(boolean temporary);
+  void removeReadReadyListener(ReadReadyListener listener);
+
+  boolean isClosed();
+
+  void markTemporary();
 
   boolean isTemporary();
 
   void setAckMode(AckMode ackMode);
 
   AckMode getAckMode();
+
+  @Override
+  public void close();
+
 }

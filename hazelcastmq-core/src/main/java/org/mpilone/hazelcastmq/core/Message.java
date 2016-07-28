@@ -10,5 +10,5 @@ public interface Message<B> {
 
   MessageHeaders getHeaders();
 
-  B getBody();
+  B getPayload();
 }

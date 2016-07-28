@@ -50,7 +50,7 @@
       <artifactId>spring-jms</artifactId>
       <version>${spring.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
       <groupId>org.apache.geronimo.specs</groupId>
       <artifactId>geronimo-jms_1.1_spec</artifactId>
       <version>${geronimo-jms_1.1.version}</version>
@@ -64,7 +64,7 @@
       <groupId>javax.transaction</groupId>
       <artifactId>jta</artifactId>
       <version>1.1</version>
-  </dependency>
+    </dependency>
 
     <!-- Runtime -->
     <dependency>
@@ -75,4 +75,21 @@
     </dependency>
 
   </dependencies>
+  
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <includes>
+            <include>org/mpilone/hazelcastmq/example/core/QueueChannelSendReceive.java</include>
+            <include>org/mpilone/hazelcastmq/example/core/QueueChannelSendReceiveAsync.java</include>
+            <include>org/mpilone/hazelcastmq/example/core/TransactionalReceive.java</include>
+            <include>org/mpilone/hazelcastmq/example/core/TransactionalSend.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

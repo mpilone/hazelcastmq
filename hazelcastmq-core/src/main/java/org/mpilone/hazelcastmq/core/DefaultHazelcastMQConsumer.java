@@ -405,7 +405,7 @@ class DefaultHazelcastMQConsumer implements HazelcastMQConsumer {
      * com.hazelcast.core.MessageListener#onMessage(com.hazelcast.core.Message)
      */
     @Override
-    public void onMessage(Message<Object> hzMsg) {
+    public void onMessage(com.hazelcast.core.Message<Object> hzMsg) {
       // We always queue the message even if we have a message listener. We'll
       // immediately pull it out of the queue and dispatch in a separate thread.
       // This is important to prevent slow message handlers from blocking topic

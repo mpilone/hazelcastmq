@@ -1,12 +1,14 @@
 package org.mpilone.hazelcastmq.core;
 
+import static java.lang.String.format;
+
+import java.util.*;
+
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.core.BaseQueue;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionalTaskContext;
-
-import static java.lang.String.format;
 
 /**
  * Default implementation of the channel context. The context can participate in
@@ -20,15 +22,21 @@ public class DefaultChannelContext implements ChannelContext {
 
   private final DefaultBroker broker;
   private final HazelcastInstance hazelcastInstance;
+  private final Set<DataStructureKey> temporaryDataStructures;
+  private final List<Channel> channels;
+  private final Object channelMutex;
 
   private TransactionContext transactionContext;
   private TransactionalTaskContext managedTransactionalTaskContext;
   private boolean autoCommit = true;
-  private boolean closed = false;
+  private volatile boolean closed = false;
 
   public DefaultChannelContext(DefaultBroker broker) {
     this.broker = broker;
     this.hazelcastInstance = broker.getConfig().getHazelcastInstance();
+    this.temporaryDataStructures = new HashSet<>();
+    this.channels = new LinkedList<>();
+    this.channelMutex = new Object();
   }
 
   @Override
@@ -47,6 +55,7 @@ public class DefaultChannelContext implements ChannelContext {
 
       // Start a transaction to manage.
       transactionContext = hazelcastInstance.newTransactionContext();
+      transactionContext.beginTransaction();
     }
     else if (transactionContext != null) {
 
@@ -79,6 +88,7 @@ public class DefaultChannelContext implements ChannelContext {
 
     transactionContext.commitTransaction();
     transactionContext = hazelcastInstance.newTransactionContext();
+    transactionContext.beginTransaction();
   }
 
   @Override
@@ -94,8 +104,9 @@ public class DefaultChannelContext implements ChannelContext {
           + "auto-commit mode.");
     }
 
-    transactionContext.commitTransaction();
+    transactionContext.rollbackTransaction();
     transactionContext = hazelcastInstance.newTransactionContext();
+    transactionContext.beginTransaction();
   }
 
   /**
@@ -146,18 +157,43 @@ public class DefaultChannelContext implements ChannelContext {
    */
   private void requireNotClosed() throws HazelcastMQException {
     if (closed) {
-      throw new HazelcastMQException("Connection is closed.");
+      throw new HazelcastMQException("Context is closed.");
     }
   }
 
   @Override
   public void close() {
+    if (closed) {
+      return;
+    }
+
+    closed = true;
+
+    // Close any open channels.
+    synchronized (channelMutex) {
+      new ArrayList<>(channels).stream().forEach(Channel::close);
+      channels.clear();
+    }
+
     if (transactionContext != null) {
       transactionContext.rollbackTransaction();
       transactionContext = null;
     }
 
-    closed = true;
+    // Destroy any temporary data structures.
+    temporaryDataStructures.stream().forEach(key -> {
+      hazelcastInstance.
+          getDistributedObject(key.getServiceName(), key.getName()).destroy();
+    });
+    temporaryDataStructures.clear();
+
+    getBroker().remove(this);
+  }
+
+  void remove(Channel channel) {
+    synchronized (channelMutex) {
+      channels.remove(channel);
+    }
   }
 
   /**
@@ -204,6 +240,8 @@ public class DefaultChannelContext implements ChannelContext {
 
   @Override
   public Channel createChannel(DataStructureKey key) {
+    requireNotClosed();
+
     switch (key.getServiceName()) {
       case QueueService.SERVICE_NAME:
         return new QueueChannel(this, key);
@@ -215,7 +253,16 @@ public class DefaultChannelContext implements ChannelContext {
     }
   }
 
+  /**
+   * Returns the broker that created this context.
+   *
+   * @return the parent broker
+   */
   DefaultBroker getBroker() {
     return broker;
+  }
+
+  void addTemporaryDataStructure(DataStructureKey key) {
+    temporaryDataStructures.add(key);
   }
 }
