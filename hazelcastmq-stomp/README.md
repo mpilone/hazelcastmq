@@ -2,10 +2,10 @@
 
 A [STOMP](http://stomp.github.com) 
 server which maps all SEND and SUBSCRIBE commands to HazelcastMQ Core
-producers and consumers. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
+channels. This allows non-Java components (such as C, C++, Python, Ruby, etc.)
 to interact with the MQ capabilities of HazelcastMQ. HazelcastMQ STOMP may be 
 used to integrate into existing frameworks such as [Apache Camel's](http://camel.apache.org/)
-while not requiring any of the JMS complexity.
+while not requiring any of the JMS complexity associated with existing brokers and STOMP endpoints.
 
 ## Features
 * STOMP 1.1 and 1.2 protocols
@@ -17,8 +17,6 @@ while not requiring any of the JMS complexity.
 
 ## Not Implemented Yet
 * Acks (ACK, NACK)
-
-## Not Going to Work Any Time Soon
 * Transaction message reception or ACK/NACK (i.e. always auto ACK)
 
 ## Examples
@@ -39,7 +37,7 @@ while not requiring any of the JMS complexity.
 
 Using HazelcastMQ STOMP requires configuring a simple layer on the Core functionality:
 
-1. Create a HazelcastMQ instance
+1. Create a HazelcastMQ broker
 2. Create a stomp configuration
 3. Create a stomp server
 4. Connect with STOMP clients

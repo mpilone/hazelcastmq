@@ -1,4 +1,4 @@
-package org.mpilone.hazelcastmq.stomp.server;
+package org.mpilone.hazelcastmq.stomp;
 
 
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
@@ -10,23 +10,26 @@ import com.hazelcast.logging.Logger;
 
 /**
  * A STOMP server backed by {@link HazelcastMQ}. The server is started
- * automatically at construction and will terminate when the {@link #shutdown()}
- * method is called.
+ * automatically at construction and will terminate when the {@link #close()}
+ * method is called. This implementation is a thin wrapper on
+ * {@link StompServer} that simply configures the server to use the
+ * {@link StompAdapterStomplet}. It is possible (and even recommended) that the
+ * stomplet be used directly to allow for more specific Yeti/Netty server
+ * configuration.
   * 
  * @author mpilone
  */
-public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance {
+public class StompServerStompAdapter implements StompAdapter {
 
   /**
    * The log for this class.
    */
-  private final ILogger log = Logger.getLogger(
-      DefaultHazelcastMQStompInstance.class);
+  private final ILogger log = Logger.getLogger(StompServerStompAdapter.class);
 
   /**
    * The configuration of the STOMP server.
    */
-  private final HazelcastMQStompConfig config;
+  private final StompAdapterConfig config;
 
   /**
    * The STOMP server that will relay messages into HazelcastMQ.
@@ -34,13 +37,13 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
   private final StompServer stompServer;
 
   /**
-   * Constructs the stomper STOMP server which will immediately begin listening
+   * Constructs the STOMP server which will immediately begin listening
    * for connections on the configured port.
    * 
    * @param config
    *          the stomper configuration
    */
-  DefaultHazelcastMQStompInstance(final HazelcastMQStompConfig config) {
+  StompServerStompAdapter(final StompAdapterConfig config) {
     this.config = config;
     this.stompServer = new StompServer(
         this.config.getMaxFrameSize(),
@@ -58,7 +61,7 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
   }
 
   @Override
-  public void shutdown() {
+  public void close() {
     try {
       // Wait until the server socket is closed.
      stompServer.stop();
@@ -70,25 +73,25 @@ public class DefaultHazelcastMQStompInstance implements HazelcastMQStompInstance
   }
 
   /**
-   * Returns the stomper configuration. Alterations to the configuration after
-   * the server has started may not have an affect.
-   * 
+   * Returns the STOMP configuration. Alterations to the configuration after the
+   * server has started may not have an affect.
+    * 
    * @return the configuration given during construction
    */
-  public HazelcastMQStompConfig getConfig() {
+  public StompAdapterConfig getConfig() {
     return config;
   }
 
   /**
    * A {@link StompServer.StompletFactory} that returns new instances of
-   * {@link HazelcastMQStomplet}s.
+   * {@link StompAdapterStomplet}s.
    */
   private class HazelcastMQStompletFactory implements
       StompServer.StompletFactory {
 
     @Override
     public Stomplet createStomplet() throws Exception {
-      return new HazelcastMQStomplet(config);
+      return new StompAdapterStomplet(config);
     }
 
   }

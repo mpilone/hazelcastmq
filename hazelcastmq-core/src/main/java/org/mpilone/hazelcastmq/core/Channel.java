@@ -39,7 +39,9 @@ public interface Channel extends Closeable {
 
   AckMode getAckMode();
 
+  DataStructureKey getChannelKey();
+
   @Override
-  public void close();
+   void close();
 
 }

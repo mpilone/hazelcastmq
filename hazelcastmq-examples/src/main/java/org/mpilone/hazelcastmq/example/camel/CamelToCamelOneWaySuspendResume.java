@@ -10,11 +10,12 @@ import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.slf4j.*;
 
+import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * An example of using the {@link HazelcastMQCamelComponent} to consume a
+ * An example of using the {@link CamelComponent} to consume a
  * message from one HzMq queue and produce it to another in a one way operation.
  * This example uses the suspend/resume feature of Camel to demonstrate that a
  * consumer can be stopped and restarted safely.
@@ -41,19 +42,15 @@ public class CamelToCamelOneWaySuspendResume extends ExampleApp {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    BrokerConfig brokerConfig = new BrokerConfig(hazelcast);
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create the camel component.
-      HazelcastMQCamelConfig mqCamelConfig = new HazelcastMQCamelConfig();
-      mqCamelConfig.setHazelcastMQInstance(mqInstance);
+      CamelConfig mqCamelConfig = new CamelConfig();
+      mqCamelConfig.setBroker(broker);
 
-      HazelcastMQCamelComponent mqCamelComponent =
-          new HazelcastMQCamelComponent();
+      CamelComponent mqCamelComponent =
+          new CamelComponent();
       mqCamelComponent.setConfiguration(mqCamelConfig);
 
       // Create the Camel context. This could be done via a Spring XML file.
@@ -78,25 +75,28 @@ public class CamelToCamelOneWaySuspendResume extends ExampleApp {
 
       // Send a message to the first queue and the Camel route should
       // move it to the second.
-      try (HazelcastMQContext mqContext = mqInstance.createContext()) {
-        HazelcastMQProducer mqProducer = mqContext.createProducer();
-        mqProducer.send("/queue/primo.test", "Hello World!");
+      try (ChannelContext mqContext = broker.createChannelContext()) {
 
-        try (HazelcastMQConsumer mqConsumer =
-            mqContext.createConsumer("/queue/secondo.test")) {
-          HazelcastMQMessage msg = mqConsumer.receive(12, TimeUnit.SECONDS);
+        try (Channel channel = mqContext.createChannel(new DataStructureKey(
+            "primo.test", QueueService.SERVICE_NAME))) {
+          channel.send(MessageBuilder.withPayload("Hello World!").build());
+        }
+
+        try (Channel channel = mqContext.createChannel(new DataStructureKey(
+            "secondo.test", QueueService.SERVICE_NAME))) {
+          org.mpilone.hazelcastmq.core.Message<?> msg = channel.receive(10,
+              TimeUnit.SECONDS);
 
           if (msg == null) {
             log.warn("Did not get expected message!");
           }
           else {
-            log.info("Got message on second queue: " + msg.getBodyAsString());
+            log.info("Got message on second queue: " + msg.getPayload());
           }
         }
       }
-      camelContext.stop();
 
-      mqInstance.shutdown();
+      camelContext.stop();
     }
     finally {
       // Shutdown Hazelcast.

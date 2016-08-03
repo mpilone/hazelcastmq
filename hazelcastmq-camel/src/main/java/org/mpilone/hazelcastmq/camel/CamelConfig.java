@@ -2,7 +2,7 @@ package org.mpilone.hazelcastmq.camel;
 
 import org.apache.camel.Message;
 import org.apache.camel.RuntimeCamelException;
-import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
+import org.mpilone.hazelcastmq.core.Broker;
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
 
 /**
@@ -14,23 +14,24 @@ import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
  *
  * @author mpilone
  */
-public class HazelcastMQCamelConfig implements Cloneable {
+public class CamelConfig implements Cloneable {
 
-  private HazelcastMQInstance hazelcastMQInstance;
+  private Broker broker;
   private MessageConverter messageConverter;
   private int concurrentConsumers;
   private int requestTimeout;
   private int timeToLive;
   private String replyTo;
+  private String executorServiceRef;
 
   /**
    * <p>
    * Constructs the configuration with reasonable defaults. This is a
    * convenience method for
-   * {@link #HazelcastMQCamelConfig(org.mpilone.hazelcastmq.core.HazelcastMQInstance) HazelcastMQCamelConfig(null)}.
+   * {@link #CamelConfig(org.mpilone.hazelcastmq.core.Broker) CamelConfig(null)}.
    * </p>
    */
-  public HazelcastMQCamelConfig() {
+  public CamelConfig() {
     this(null);
   }
 
@@ -39,43 +40,48 @@ public class HazelcastMQCamelConfig implements Cloneable {
    * Constructs the configuration with the following defaults.
    * </p>
    * <ul>
-   * <li>messageConverter: {@link DefaultMessageConverter}</li>
+   * <li>messageConverter: {@link BasicMessageConverter}</li>
    * <li>concurrentConsumers: 1</li>
    * <li>requestTimeout: 20000</li>
    * <li>timeToLive: 0</li>
    * <li>replyTo: null</li>
    * </ul>
    *
-   * @param hazelcastMQInstance the HazelcastMQ instance to use for all
-   * messaging operations
+   * @param broker the HazelcastMQ broker to use for all messaging operations
    */
-  public HazelcastMQCamelConfig(HazelcastMQInstance hazelcastMQInstance) {
-    this.hazelcastMQInstance = hazelcastMQInstance;
-    messageConverter = new DefaultMessageConverter();
+  public CamelConfig(Broker broker) {
+    this.broker = broker;
+    messageConverter = new BasicMessageConverter();
     concurrentConsumers = 1;
     requestTimeout = 20000;
     timeToLive = 0;
   }
 
-  /**
-   * Sets the {@link HazelcastMQInstance} that will be used to access all
-   * destinations. A HzMq instance must be set on the configuration before any
-   * endpoints are created by the component.
-   *
-   * @param hazelcastMQInstance the HzMq instance
-   */
-  public void setHazelcastMQInstance(HazelcastMQInstance hazelcastMQInstance) {
-    this.hazelcastMQInstance = hazelcastMQInstance;
+  public void setExecutorServiceRef(String executorServiceRef) {
+    this.executorServiceRef = executorServiceRef;
+  }
+
+  public String getExecutorServiceRef() {
+    return executorServiceRef;
   }
 
   /**
-   * Returns the {@link HazelcastMQInstance} that will be used to access all
-   * destinations.
+   * Sets the {@link Broker} that will be used to access all channels. A HzMq
+   * broker must be set on the configuration before any   * endpoints are created by the component.
    *
-   * @return the HzMq instance
+   * @param broker the HzMq Broker
    */
-  public HazelcastMQInstance getHazelcastMQInstance() {
-    return hazelcastMQInstance;
+  public void setBroker(Broker broker) {
+    this.broker = broker;
+  }
+
+  /**
+   * Returns the {@link Broker} that will be used to access all channels.
+   *
+   * @return the HzMq broker
+   */
+  public Broker getBroker() {
+    return broker;
   }
 
   /**
@@ -103,9 +109,9 @@ public class HazelcastMQCamelConfig implements Cloneable {
    *
    * @return the new copy of the configuration
    */
-  public HazelcastMQCamelConfig copy() {
+  public CamelConfig copy() {
     try {
-      HazelcastMQCamelConfig copy = (HazelcastMQCamelConfig) clone();
+      CamelConfig copy = (CamelConfig) clone();
       return copy;
     }
     catch (CloneNotSupportedException e) {

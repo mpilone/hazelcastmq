@@ -14,7 +14,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * An example of using the {@link HazelcastMQCamelComponent} to produce a
+ * An example of using the {@link CamelComponent} to produce a
  * request and wait for a reply from the other end.
  *
  * @author mpilone
@@ -40,19 +40,16 @@ public class CamelToCamelRequestReply extends ExampleApp {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    // Create the HazelcaseMQ broker.
+    BrokerConfig brokerConfig = new BrokerConfig();
+    brokerConfig.setHazelcastInstance(hazelcast);
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create the camel component.
-      HazelcastMQCamelConfig mqCamelConfig = new HazelcastMQCamelConfig();
-      mqCamelConfig.setHazelcastMQInstance(mqInstance);
+      CamelConfig mqCamelConfig = new CamelConfig();
+      mqCamelConfig.setBroker(broker);
 
-      HazelcastMQCamelComponent mqCamelComponent =
-          new HazelcastMQCamelComponent();
+      CamelComponent mqCamelComponent =          new CamelComponent();
       mqCamelComponent.setConfiguration(mqCamelConfig);
 
       // Create the Camel context. This could be done via a Spring XML file.
@@ -86,11 +83,12 @@ public class CamelToCamelRequestReply extends ExampleApp {
       else {
         log.info("Got reply message: " + reply);
       }
+
       camelContext.stop();
     }
     finally {
       // Shutdown Hazelcast.
-      hazelcast.getLifecycleService().shutdown();
+      hazelcast.shutdown();
     }
   }
 }

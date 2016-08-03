@@ -5,9 +5,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.impl.PollingConsumerSupport;
-import org.mpilone.hazelcastmq.core.HazelcastMQConsumer;
-import org.mpilone.hazelcastmq.core.HazelcastMQContext;
-import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
+import org.mpilone.hazelcastmq.camel.MessageConverter;
+import org.mpilone.hazelcastmq.core.*;
 
 /**
  * <p>
@@ -18,10 +17,10 @@ import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
  *
  * @author mpilone
  */
-public class HazelcastMQCamelPollingConsumer extends PollingConsumerSupport {
+public class CamelPollingConsumer extends PollingConsumerSupport {
 
-  private HazelcastMQContext mqContext;
-  private HazelcastMQConsumer mqConsumer;
+  private ChannelContext mqContext;
+  private Channel mqChannel;
   private final MessageConverter messageConverter;
 
   /**
@@ -29,44 +28,43 @@ public class HazelcastMQCamelPollingConsumer extends PollingConsumerSupport {
    *
    * @param endpoint the parent endpoint
    */
-  public HazelcastMQCamelPollingConsumer(HazelcastMQCamelEndpoint endpoint) {
+  public CamelPollingConsumer(CamelEndpoint endpoint) {
     super(endpoint);
 
     messageConverter = endpoint.getConfiguration().getMessageConverter();
   }
 
   @Override
-  public HazelcastMQCamelEndpoint getEndpoint() {
-    return (HazelcastMQCamelEndpoint) super.getEndpoint();
+  public CamelEndpoint getEndpoint() {
+    return (CamelEndpoint) super.getEndpoint();
   }
 
   @Override
   protected void doStart() throws Exception {
     if (mqContext == null) {
-      mqContext = getEndpoint().getConfiguration().getHazelcastMQInstance().
-          createContext();
-      mqContext.setAutoStart(true);
-      mqConsumer = mqContext.createConsumer(getEndpoint().getDestination());
+      mqContext = getEndpoint().getConfiguration().getBroker().
+          createChannelContext();
+      mqChannel = mqContext.createChannel(getEndpoint().getChannelKey());
     }
   }
 
   @Override
   protected void doStop() throws Exception {
     if (mqContext != null) {
-      mqConsumer.close();
+      mqChannel.close();
       mqContext.close();
 
-      mqConsumer = null;
+      mqChannel = null;
       mqContext = null;
     }
   }
 
   @Override
   public Exchange receive() {
-    HazelcastMQMessage msg = null;
+    org.mpilone.hazelcastmq.core.Message<?> msg = null;
 
-    if (mqConsumer != null) {
-      msg = mqConsumer.receive();
+    if (mqChannel != null && !mqChannel.isClosed()) {
+      msg = mqChannel.receive();
     }
 
     return msg == null ? null : createExchange(msg);
@@ -74,21 +72,15 @@ public class HazelcastMQCamelPollingConsumer extends PollingConsumerSupport {
 
   @Override
   public Exchange receiveNoWait() {
-    HazelcastMQMessage msg = null;
-
-    if (mqConsumer != null) {
-      msg = mqConsumer.receiveNoWait();
-    }
-
-    return msg == null ? null : createExchange(msg);
+    return receive(0);
   }
 
   @Override
   public Exchange receive(long timeout) {
-    HazelcastMQMessage msg = null;
+    org.mpilone.hazelcastmq.core.Message<?> msg = null;
 
-    if (mqConsumer != null) {
-      msg = mqConsumer.receive(timeout, TimeUnit.MILLISECONDS);
+    if (mqChannel != null) {
+      msg = mqChannel.receive(timeout, TimeUnit.MILLISECONDS);
     }
 
     return msg == null ? null : createExchange(msg);
@@ -101,7 +93,7 @@ public class HazelcastMQCamelPollingConsumer extends PollingConsumerSupport {
    *
    * @return the new exchange
    */
-  private Exchange createExchange(HazelcastMQMessage msg) {
+  private Exchange createExchange(org.mpilone.hazelcastmq.core.Message<?> msg) {
     // Build an exchange.
     Message camelMsg = messageConverter.toCamelMessage(msg);
 

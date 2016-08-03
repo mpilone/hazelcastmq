@@ -1,5 +1,9 @@
 package org.mpilone.hazelcastmq.example.stomp;
 
+import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
+import org.mpilone.hazelcastmq.stomp.StompAdapter;
+import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
+
 import javax.jms.*;
 import javax.jms.Message;
 
@@ -58,10 +62,9 @@ public class StompToJmsOneWay {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
+      StompAdapterConfig stompConfig = new StompAdapterConfig(
           mqInstance);
-      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
-          newHazelcastMQStompInstance(stompConfig);
+      StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());

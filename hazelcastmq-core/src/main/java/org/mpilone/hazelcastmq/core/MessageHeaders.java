@@ -11,7 +11,7 @@ public class MessageHeaders implements Map<String, Object>, Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  public static final UUID ID_VALUE_NONE = new UUID(0, 0);
+  public static final String ID_VALUE_NONE = new UUID(0, 0).toString();
 
   public static final String ID = "id";
 
@@ -30,14 +30,15 @@ public class MessageHeaders implements Map<String, Object>, Serializable {
     this(headers, null, null);
   }
 
-  protected MessageHeaders(Map<String, Object> headers, UUID id, Long timestamp) {
+  protected MessageHeaders(Map<String, Object> headers, String id,
+      Long timestamp) {
     this.headers = (headers != null ? new HashMap<>(headers) :
         new HashMap<>());
 
     if (id == null) {
-      this.headers.put(ID, UUID.randomUUID());
+      this.headers.put(ID, UUID.randomUUID().toString());
     }
-    else if (id == ID_VALUE_NONE) {
+    else if (id.equals(ID_VALUE_NONE)) {
       this.headers.remove(ID);
     }
     else {
@@ -55,8 +56,8 @@ public class MessageHeaders implements Map<String, Object>, Serializable {
     }
   }
 
-  public UUID getId() {
-    return get(ID, UUID.class);
+  public String getId() {
+    return get(ID, String.class);
   }
 
   public Long getTimestamp() {
@@ -67,8 +68,8 @@ public class MessageHeaders implements Map<String, Object>, Serializable {
     return get(REPLY_TO, DataStructureKey.class);
   }
 
-  public UUID getCorrelationId() {
-    return get(CORRELATION_ID, UUID.class);
+  public String getCorrelationId() {
+    return get(CORRELATION_ID, String.class);
   }
 
   protected Map<String, Object> getRawHeaders() {

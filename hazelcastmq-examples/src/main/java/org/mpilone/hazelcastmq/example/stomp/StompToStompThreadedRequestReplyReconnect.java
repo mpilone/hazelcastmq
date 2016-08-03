@@ -1,5 +1,9 @@
 package org.mpilone.hazelcastmq.example.stomp;
 
+import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
+import org.mpilone.hazelcastmq.stomp.StompAdapter;
+import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
+
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -94,11 +98,10 @@ public class StompToStompThreadedRequestReplyReconnect {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
+      StompAdapterConfig stompConfig = new StompAdapterConfig(
           mqInstance);
       stompConfig.setPort(STOMP_PORT);
-      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
-          newHazelcastMQStompInstance(stompConfig);
+      StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());

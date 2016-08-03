@@ -1,8 +1,5 @@
 package org.mpilone.hazelcastmq.camel;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.camel.*;
 import org.apache.camel.impl.*;
 import org.mpilone.hazelcastmq.camel.MessageConverter;
@@ -27,10 +24,10 @@ import org.mpilone.hazelcastmq.core.*;
  *
  * @author mpilone
  */
-public class HazelcastMQCamelConsumer extends DefaultConsumer {
+public class CamelConsumer extends DefaultConsumer {
 
   private final MessageConverter messageConverter;
-  private final List<SingleThreadedConsumer> consumers;
+  private final MultipleThreadPollingMessageDispatcher dispatcher;
 
   /**
    * Constructs the consumer which will consume messages from the given endpoint
@@ -39,75 +36,56 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
    * @param endpoint the endpoint to consume from
    * @param processor the processor to send incoming messages to
    */
-  public HazelcastMQCamelConsumer(HazelcastMQCamelEndpoint endpoint,
-      Processor processor) {
+  public CamelConsumer(CamelEndpoint endpoint, Processor processor) {
     super(endpoint, processor);
 
-    HazelcastMQCamelConfig config = endpoint.getConfiguration();
+    CamelConfig config = endpoint.getConfiguration();
     this.messageConverter = config.getMessageConverter();
-    this.consumers = new ArrayList<>();
+
+    dispatcher = new MultipleThreadPollingMessageDispatcher();
+    dispatcher.setExecutor(endpoint.getExecutorService());
+    dispatcher.setMaxConcurrentPerformers(config.getConcurrentConsumers());
+    dispatcher.setPerformer(new ConsumerPerformer(config.getBroker()));
+    dispatcher.setBroker(config.getBroker());
+    dispatcher.setChannelKey(endpoint.getChannelKey());
   }
 
   @Override
-  public HazelcastMQCamelEndpoint getEndpoint() {
-    return (HazelcastMQCamelEndpoint) super.getEndpoint();
+  public CamelEndpoint getEndpoint() {
+    return (CamelEndpoint) super.getEndpoint();
   }
 
   @Override
   protected void doStart() throws Exception {
     super.doStart();
 
-    HazelcastMQCamelConfig config = getEndpoint().getConfiguration();
-
-    // Create the number of consumers requested.
-    int concurrentConsumers = config.getConcurrentConsumers();
-    for (int i = 0; i < concurrentConsumers; ++i) {
-      this.consumers.add(new SingleThreadedConsumer(config, getEndpoint()));
-    }
-
-    for (SingleThreadedConsumer consumer : consumers) {
-      consumer.start();
-    }
+    dispatcher.start();
   }
 
   @Override
   protected void doStop() throws Exception {
-    for (SingleThreadedConsumer consumer : consumers) {
-      // Shutdown the consumer because we are going to release all resources.
-      consumer.shutdown();
-    }
-
-    // Clear the existing consumers. They will be recreated if this component
-    // is re-started.
-    consumers.clear();
+    dispatcher.stop();
 
     super.doStop();
   }
 
   @Override
   protected void doShutdown() throws Exception {
-    for (SingleThreadedConsumer consumer : consumers) {
-      consumer.shutdown();
-    }
+    dispatcher.stop();
 
-    consumers.clear();
     super.doShutdown();
   }
 
   @Override
   protected void doSuspend() throws Exception {
-    for (SingleThreadedConsumer consumer : consumers) {
-      consumer.stop();
-    }
+    dispatcher.stop();
 
     super.doSuspend();
   }
 
   @Override
   protected void doResume() throws Exception {
-    for (SingleThreadedConsumer consumer : consumers) {
-      consumer.start();
-    }
+    dispatcher.start();
 
     super.doResume();
   }
@@ -117,57 +95,27 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
    * dispatches them to a processor. Each consumer manages its own
    * context and consumer instance.
    */
-  private class SingleThreadedConsumer implements HazelcastMQMessageListener,
-      ShutdownableService {
+  private class ConsumerPerformer implements MessageDispatcher.Performer {
 
-    private final HazelcastMQContext mqContext;
-    private final HazelcastMQConsumer mqConsumer;
+    private final Broker broker;
 
-    /**
-     * Constructs the consumer. The consumer will not start listening for
-     * messages until it is started.
-     *
-     * @param config the component configuration
-     * @param endpoint the endpoint that the consumer belongs to
-     */
-    public SingleThreadedConsumer(HazelcastMQCamelConfig config,
-        HazelcastMQCamelEndpoint endpoint) {
-      this.mqContext = config.getHazelcastMQInstance().createContext();
-      this.mqContext.setAutoStart(false);
-
-      this.mqConsumer = mqContext.createConsumer(endpoint.getDestination());
-      this.mqConsumer.setMessageListener(this);
+    public ConsumerPerformer(Broker broker) {
+      this.broker = broker;
     }
 
     @Override
-    public void start() {
-      mqContext.start();
-    }
+    public void perform(org.mpilone.hazelcastmq.core.Message<?> msg) {
 
-    @Override
-    public void stop() {
-      mqContext.stop();
-    }
-
-    @Override
-    public void shutdown() {
-      mqConsumer.close();
-      mqContext.close();
-    }
-
-    @Override
-    public void onMessage(HazelcastMQMessage msg) {
-
-      String replyToDestination = msg.getReplyTo();
-      String correlationId = msg.getCorrelationId();
+      DataStructureKey replyToKey = msg.getHeaders().getReplyTo();
+      String correlationId = msg.getHeaders().getCorrelationId();
 
       // Build an exchange.
-      Message camelMsg = messageConverter.toCamelMessage(msg);
+      org.apache.camel.Message camelMsg = messageConverter.toCamelMessage(msg);
       Exchange camelExchange = getEndpoint().createExchange();
 
       // Change the pattern to out/in if we have a reply destination
       // and the exchange isn't already out capable.
-      if (replyToDestination != null && !camelExchange.getPattern().
+      if (replyToKey != null && !camelExchange.getPattern().
           isOutCapable()) {
         camelExchange.setPattern(ExchangePattern.OutIn);
       }
@@ -181,9 +129,9 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
         camelExchange.setException(e);
       }
 
-      if (!camelExchange.isFailed() && replyToDestination != null
+      if (!camelExchange.isFailed() && replyToKey != null
           && camelExchange.getPattern().isOutCapable()) {
-        sendReply(correlationId, replyToDestination, camelExchange);
+        sendReply(correlationId, replyToKey, camelExchange);
       }
 
       if (camelExchange.isFailed()) {
@@ -202,20 +150,31 @@ public class HazelcastMQCamelConsumer extends DefaultConsumer {
      * @param camelExchange the exchange containing the message to send as the
      * reply
      */
-    private void sendReply(String correlationId, String replyToDestination,
+    private void sendReply(String correlationId, DataStructureKey replyToKey,
         Exchange camelExchange) {
 
-      Message camelMsg = camelExchange.hasOut() ? camelExchange.getOut() :
+      org.apache.camel.Message camelMsg = camelExchange.hasOut() ?
+          camelExchange.getOut() :
           camelExchange.getIn();
 
       if (camelMsg != null) {
         try {
-          HazelcastMQMessage msg = messageConverter.fromCamelMessage(camelMsg);
-          msg.getHeaders().remove(org.mpilone.hazelcastmq.core.Headers.REPLY_TO);
-          msg.setDestination(replyToDestination);
-          msg.setCorrelationId(correlationId);
+          org.mpilone.hazelcastmq.core.Message msg = messageConverter.
+              fromCamelMessage(camelMsg);
 
-          mqContext.createProducer(replyToDestination).send(msg);
+          // Remove the reply-to header because this is the reply.
+          // Add the correlation ID so the sender can correlate the reply.
+          msg = MessageBuilder.fromMessage(msg).removeHeader(
+              MessageHeaders.REPLY_TO).setHeader(MessageHeaders.CORRELATION_ID,
+                  correlationId).build();
+
+          // We don't know what the threading model of the dispatcher looks
+          // like so we create a new context just for this reply and send it.
+          try (ChannelContext context = broker.createChannelContext();
+              org.mpilone.hazelcastmq.core.Channel channel = context.
+              createChannel(replyToKey)) {
+            channel.send(msg);
+          }
         }
         catch (Throwable ex) {
           camelExchange.setException(ex);

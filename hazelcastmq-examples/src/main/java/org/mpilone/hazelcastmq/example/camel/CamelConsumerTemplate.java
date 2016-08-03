@@ -8,11 +8,12 @@ import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.slf4j.*;
 
+import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * An example of using the {@link HazelcastMQCamelComponent} to create a Camel
+ * An example of using the {@link CamelComponent} to create a Camel
  * {@link ConsumerTemplate} to poll for messages rather than having them pushed
  * to an endpoint.
  *
@@ -40,19 +41,18 @@ public class CamelConsumerTemplate extends ExampleApp {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    // Create the HazelcaseMQ broker.
+    BrokerConfig brokerConfig = new BrokerConfig();
+    brokerConfig.setHazelcastInstance(hazelcast);
+
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create the camel component.
-      HazelcastMQCamelConfig mqCamelConfig = new HazelcastMQCamelConfig();
-      mqCamelConfig.setHazelcastMQInstance(mqInstance);
+      CamelConfig mqCamelConfig = new CamelConfig();
+      mqCamelConfig.setBroker(broker);
 
-      HazelcastMQCamelComponent mqCamelComponent =
-          new HazelcastMQCamelComponent();
+      CamelComponent mqCamelComponent =
+          new CamelComponent();
       mqCamelComponent.setConfiguration(mqCamelConfig);
 
       // Create the Camel context. This could be done via a Spring XML file.
@@ -62,9 +62,10 @@ public class CamelConsumerTemplate extends ExampleApp {
       camelContext.start();
 
       // Send a message to a queue.
-      try (HazelcastMQContext mqContext = mqInstance.createContext()) {
-        HazelcastMQProducer mqProducer = mqContext.createProducer();
-        mqProducer.send("/queue/primo.test", "Hello World!");
+      try (ChannelContext mqContext = broker.createChannelContext();
+          Channel channel = mqContext.createChannel(new DataStructureKey(
+                  "primo.test", QueueService.SERVICE_NAME))) {
+        channel.send(MessageBuilder.withPayload("Hello World!").build());
       }
 
       // Create a Camel polling consumer.

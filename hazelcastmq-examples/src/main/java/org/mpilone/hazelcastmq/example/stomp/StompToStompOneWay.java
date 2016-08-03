@@ -4,7 +4,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.stomp.server.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
+import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
+import org.mpilone.hazelcastmq.stomp.StompAdapter;
+import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.client.StompClient;
@@ -17,26 +20,23 @@ import com.hazelcast.core.*;
  * This example uses a HazelcastMQ STOMP server to accept a Yeti STOMP client
  * connection. The client then sends and receives a STOMP frame. The server is
  * backed by HazelcastMQ which is backed by a local Hazelcast instance.
-  * 
+ *
  * @author mpilone
  */
-public class StompToStompOneWay {
+public class StompToStompOneWay extends ExampleApp {
 
   /**
    * The log for this class.
    */
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final static Logger log = LoggerFactory.getLogger(
+      StompToStompOneWay.class);
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
-    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
-
-    new StompToStompOneWay();
+    new StompToStompOneWay().runExample();
   }
 
-  public StompToStompOneWay() throws Exception {
+  @Override
+  protected void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -44,53 +44,51 @@ public class StompToStompOneWay {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    // Create the HazelcaseMQ broker.
+    BrokerConfig mqConfig = new BrokerConfig();
+    mqConfig.setHazelcastInstance(hazelcast);
+
+    try (Broker broker = HazelcastMQ.newBroker(mqConfig)) {
 
       // Create a Stomp server.
-      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
-          mqInstance);
-      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
-          newHazelcastMQStompInstance(stompConfig);
+      StompAdapterConfig stompConfig = new StompAdapterConfig(broker);
+      try (StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(
+          stompConfig)) {
 
-      log.info("Stomp server is now listening on port: "
-          + stompConfig.getPort());
+        log.info("Stomp server is now listening on port: "
+            + stompConfig.getPort());
 
-      // Create a Stomp client.
-      StompClient stompClient = new StompClient("localhost", stompConfig.
-          getPort());
-      stompClient.connect();
+        // Create a Stomp client.
+        StompClient stompClient = new StompClient("localhost", stompConfig.
+            getPort());
+        stompClient.connect();
 
-      // Subscribe to a queue.
-      StompClient.QueuingFrameListener msgListener =
-          new StompClient.QueuingFrameListener();
-      Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
-      stompClient.subscribe(frame, msgListener);
+        // Subscribe to a queue.
+        StompClient.QueuingFrameListener msgListener =
+            new StompClient.QueuingFrameListener();
+        Frame frame = FrameBuilder.subscribe("/queue/demo.test", "1").build();
+        stompClient.subscribe(frame, msgListener);
 
-      // Send a message on that queue.
-      frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
-      stompClient.send(frame);
+        // Send a message on that queue.
+        frame = FrameBuilder.send("/queue/demo.test", "Hello World!").build();
+        stompClient.send(frame);
 
-      // Now consume that message.
-      frame = msgListener.poll(3, TimeUnit.SECONDS);
-      Assert.notNull(frame, "Did not receive expected frame!");
+        // Now consume that message.
+        frame = msgListener.poll(3, TimeUnit.SECONDS);
+        Assert.notNull(frame, "Did not receive expected frame!");
 
-      log.info("Got frame: " + frame.getBodyAsString());
+        log.info("Got frame: " + frame.getBodyAsString());
 
-      // Shutdown the client.
-      stompClient.disconnect();
+        // Shutdown the client.
+        stompClient.disconnect();
 
-      // Shutdown the server.
-      log.info("Shutting down STOMP server.");
-      stompServer.shutdown();
+        // Shutdown the server.
+        log.info("Shutting down STOMP server.");
+      }
     }
     finally {
       // Shutdown Hazelcast.
-      hazelcast.getLifecycleService().shutdown();
+      hazelcast.shutdown();
     }
 
   }

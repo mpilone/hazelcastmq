@@ -1,6 +1,7 @@
-package org.mpilone.hazelcastmq.stomp.server;
+package org.mpilone.hazelcastmq.stomp;
 
 import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
+import org.mpilone.hazelcastmq.core.Message;
 import org.mpilone.yeti.Command;
 import org.mpilone.yeti.Frame;
 
@@ -19,7 +20,7 @@ public interface FrameConverter {
    *          the frame to convert
    * @return the new HazelcastMQ message
    */
-  public HazelcastMQMessage fromFrame(Frame frame);
+  public Message<?> fromFrame(Frame frame);
 
   /**
    * Converts the given {@link HazelcastMQMessage} to a STOMP frame. The frame
@@ -30,5 +31,5 @@ public interface FrameConverter {
    *          the HazelcastMQ message to convert
    * @return the new STOMP frame
    */
-  public Frame toFrame(HazelcastMQMessage msg);
+  public Frame toFrame(Message<?> msg);
 }

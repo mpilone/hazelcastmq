@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import com.hazelcast.core.*;
 import com.hazelcast.spring.transaction.HazelcastTransactionManager;
+import com.hazelcast.spring.transaction.ManagedTransactionalTaskContext;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionalObject;
 import com.hazelcast.transaction.TransactionalTaskContext;

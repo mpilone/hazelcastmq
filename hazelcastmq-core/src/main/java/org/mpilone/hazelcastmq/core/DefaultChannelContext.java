@@ -7,6 +7,8 @@ import java.util.*;
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.core.BaseQueue;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionalTaskContext;
 
@@ -19,6 +21,9 @@ import com.hazelcast.transaction.TransactionalTaskContext;
  * @author mpilone
  */
 public class DefaultChannelContext implements ChannelContext {
+
+  private final static ILogger log = Logger.getLogger(
+      DefaultChannelContext.class);
 
   private final DefaultBroker broker;
   private final HazelcastInstance hazelcastInstance;

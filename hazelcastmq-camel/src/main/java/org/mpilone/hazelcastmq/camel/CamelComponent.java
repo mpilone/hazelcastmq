@@ -1,38 +1,37 @@
-
 package org.mpilone.hazelcastmq.camel;
 
 import java.util.Map;
 
 import org.apache.camel.Endpoint;
 import org.apache.camel.impl.DefaultComponent;
+import org.mpilone.hazelcastmq.core.DataStructureKey;
 import org.mpilone.hazelcastmq.core.HazelcastMQ;
 
 /**
  * <p>
  * An Apache Camel component for creating endpoints to {@link HazelcastMQ}
- * queues and topics. The endpoint URI can specify if the destination is a queue
- * or a topic such as {@code hazelcastmq:queue:my.outgoing.orders} or
- * {@code hazelcastmq:topic:order.processed.event}. The destination will be
- * transformed into a standard HzMq destination such as
- * {@code /queue/my.outgoing.orders} or {@code /topic/order.processed.event}. If
- * queue or topic is not specified, a queue will be assumed.
+ * channels. The endpoint URI can specify the destination service name such as
+ * {@code hazelcastmq:queue:my.outgoing.orders} or
+ * {@code hazelcastmq:ringbuffer:order.processed.event}. The destination will be
+ * transformed into a standard HzMq channel. If a service name is not specified,
+ * a queue channel will be assumed.
  * </p>
  * <p>
- * Refer to the {@link HazelcastMQCamelConfig} class for details on
- * configuration and supported URL parameters.
+ * Refer to the {@link CamelConfig} class for details on configuration and
+ * supported URL parameters.
  * </p>
  *
  * @author mpilone
  */
-public class HazelcastMQCamelComponent extends DefaultComponent {
+public class CamelComponent extends DefaultComponent {
 
-  private HazelcastMQCamelConfig configuration;
+  private CamelConfig configuration;
 
   /**
    * Constructs the component with no configuration. A default configuration
    * will be used if one is not set before adding the component to the context.
    */
-  public HazelcastMQCamelComponent() {
+  public CamelComponent() {
   }
 
   /**
@@ -40,25 +39,22 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
    *
    * @param configuration the component configuration
    */
-  public HazelcastMQCamelComponent(HazelcastMQCamelConfig configuration) {
+  public CamelComponent(CamelConfig configuration) {
     this.configuration = configuration;
   }
 
   @Override
   protected Endpoint createEndpoint(String uri, String remaining,
       Map<String, Object> parameters) throws Exception {
-    String destination = HazelcastMQCamelEndpoint.toHazelcastMQDestination(
-        remaining);
 
     // Must copy config so we do not have side effects.
-    HazelcastMQCamelConfig config = getConfiguration().copy();
+    CamelConfig config = getConfiguration().copy();
 
     // Allow to configure configuration from uri parameters.
     setProperties(config, parameters);
 
     // Create and return the endpoint.
-    HazelcastMQCamelEndpoint endpoint = new HazelcastMQCamelEndpoint(uri, this,
-        config, destination);
+    CamelEndpoint endpoint = new CamelEndpoint(uri, this, config, remaining);
     setProperties(endpoint, parameters);
     return endpoint;
   }
@@ -70,7 +66,7 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
    *
    * @return the component configuration
    */
-  public HazelcastMQCamelConfig getConfiguration() {
+  public CamelConfig getConfiguration() {
     return configuration;
   }
 
@@ -81,16 +77,21 @@ public class HazelcastMQCamelComponent extends DefaultComponent {
    *
    * @param configuration the component configuration
    */
-  public void setConfiguration(HazelcastMQCamelConfig configuration) {
+  public void setConfiguration(CamelConfig configuration) {
     this.configuration = configuration;
   }
 
   @Override
   public void start() throws Exception {
     if (configuration == null) {
-      this.configuration = new HazelcastMQCamelConfig();
+      this.configuration = new CamelConfig();
     }
 
     super.start();
+  }
+
+  private DataStructureKey toDataStructureKey(String remaining) {
+    // TODO: Implement method
+    throw new UnsupportedOperationException("Not supported yet.");
   }
 }

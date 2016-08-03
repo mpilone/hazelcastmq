@@ -16,7 +16,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * An example of using the {@link HazelcastMQCamelComponent} to produce a
+ * An example of using the {@link CamelComponent} to produce a
  * request asynchronously and do some other work while waiting for a reply.
  *
  * @author mpilone
@@ -42,19 +42,15 @@ public class CamelToCamelRequestReplyAsync extends ExampleApp {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    BrokerConfig brokerConfig = new BrokerConfig(hazelcast);
+
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create the camel component.
-      HazelcastMQCamelConfig mqCamelConfig = new HazelcastMQCamelConfig();
-      mqCamelConfig.setHazelcastMQInstance(mqInstance);
+      CamelConfig mqCamelConfig = new CamelConfig();
+      mqCamelConfig.setBroker(broker);
 
-      HazelcastMQCamelComponent mqCamelComponent =
-          new HazelcastMQCamelComponent();
+      CamelComponent mqCamelComponent =          new CamelComponent();
       mqCamelComponent.setConfiguration(mqCamelConfig);
 
       // Create the Camel context. This could be done via a Spring XML file.
@@ -108,7 +104,7 @@ public class CamelToCamelRequestReplyAsync extends ExampleApp {
     }
     finally {
       // Shutdown Hazelcast.
-      hazelcast.getLifecycleService().shutdown();
+      hazelcast.shutdown();
     }
   }
 

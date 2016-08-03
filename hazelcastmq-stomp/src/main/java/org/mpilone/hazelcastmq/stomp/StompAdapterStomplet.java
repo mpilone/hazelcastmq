@@ -1,11 +1,10 @@
-package org.mpilone.hazelcastmq.stomp.server;
+package org.mpilone.hazelcastmq.stomp;
 
 import static java.lang.String.format;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import org.mpilone.hazelcastmq.core.*;
 import org.mpilone.yeti.*;
@@ -17,15 +16,15 @@ import org.mpilone.yeti.server.ConnectDisconnectStomplet;
  *
  * @author mpilone
  */
-class HazelcastMQStomplet extends ConnectDisconnectStomplet {
+class StompAdapterStomplet extends ConnectDisconnectStomplet {
 
-  private final String DEFAULT_CONTEXT_TXN_ID =
+  private final static String DEFAULT_CONTEXT_TXN_ID =
       "hazelcastmq-stomp-server-default";
 
   /**
    * The configuration cached from the {@link #stomper} instance.
    */
-  private final HazelcastMQStompConfig config;
+  private final StompAdapterConfig config;
 
   /**
    * The map of transaction ID to the transaction instance for all active client
@@ -44,7 +43,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
    *
    * @param config the stomplet configuration
    */
-  public HazelcastMQStomplet(HazelcastMQStompConfig config) {
+  public StompAdapterStomplet(StompAdapterConfig config) {
 
     super(new StompVersion[]{StompVersion.VERSION_1_1, StompVersion.VERSION_1_2});
 
@@ -52,13 +51,10 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     this.transactions = new HashMap<>();
     this.subscriptions = new HashMap<>();
 
-    // Create the default context. This context will be used for all operations
-    // outside of a named transaction.
-    HazelcastMQContext mqContext = config.getHazelcastMQInstance()
-        .createContext();
-    mqContext.start();
+    // Create the default transaction. This context will be used for all
+    // operations outside of a named transaction.
     transactions.put(DEFAULT_CONTEXT_TXN_ID,
-        new ClientTransaction(DEFAULT_CONTEXT_TXN_ID, mqContext));
+        new ClientTransaction(DEFAULT_CONTEXT_TXN_ID, config.getBroker()));
   }
 
   @Override
@@ -73,16 +69,11 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
   @Override
   public void destroy() {
     // Close any open MQ contexts.
-    for (ClientTransaction tx : transactions.values()) {
-      safeClose(tx.getContext());
-    }
+    transactions.values().forEach(ClientTransaction::close);
     transactions.clear();
 
     // Close any open MQ subscriptions.
-    for (ClientSubscription subscription : subscriptions.values()) {
-      safeClose(subscription.getConsumer());
-      safeClose(subscription.getContext());
-    }
+    subscriptions.values().forEach(ClientSubscription::close);
     subscriptions.clear();
 
     super.destroy();
@@ -102,17 +93,13 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Check that this isn't an existing subscription ID.
     if (subscriptions.containsKey(id)) {
       throw new StompClientException(format(
-          "Subscription with id [%s] already exists.", id), null, frame);
+          "Subscription with id %s already exists.", id), null, frame);
     }
-
-    // Create the HazelcastMQ components.
-    HazelcastMQContext session = config.getHazelcastMQInstance().createContext(
-        false);
-    HazelcastMQConsumer consumer = session.createConsumer(destination);
 
     // Create the subscription.
     ClientSubscription subscription = new ClientSubscription(id,
-        res.getFrameChannel(), consumer, session);
+        res.getFrameChannel(), config.getBroker(), DataStructureKey.fromString(
+            destination), config.getExecutor());
     subscriptions.put(id, subscription);
 
     writeOptionalReceipt(frame, res.getFrameChannel());
@@ -133,12 +120,11 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Check that it exists.
     if (subscription == null) {
       throw new StompClientException(format(
-          "Subscription with id [%s] not found.", id), null, frame);
+          "Subscription with id %s not found.", id), null, frame);
     }
 
     // Close the MQ components.
-    safeClose(subscription.getConsumer());
-    safeClose(subscription.getContext());
+    subscription.close();
 
     writeOptionalReceipt(frame, res.getFrameChannel());
   }
@@ -156,12 +142,12 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Make sure it exists.
     ClientTransaction tx = transactions.remove(transactionId);
     if (tx == null) {
-      throw new StompClientException(format("Transaction [%s] is not active.",
+      throw new StompClientException(format("Transaction %s is not active.",
           transactionId), null, frame);
     }
 
     tx.getContext().rollback();
-    safeClose(tx.getContext());
+    tx.close();
 
     writeOptionalReceipt(frame, res.getFrameChannel());
   }
@@ -179,12 +165,12 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Make sure it exists.
     ClientTransaction tx = transactions.remove(transactionId);
     if (tx == null) {
-      throw new StompClientException(format("Transaction [%s] is not active.",
+      throw new StompClientException(format("Transaction %s is not active.",
           transactionId), null, frame);
     }
 
     tx.getContext().commit();
-    safeClose(tx.getContext());
+    tx.close();
 
     writeOptionalReceipt(frame, res.getFrameChannel());
   }
@@ -202,16 +188,15 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     // Make sure it isn't already in use.
     if (transactions.containsKey(transactionId)) {
       throw new StompClientException(format(
-          "Transaction [%s] is already active.",
+          "Transaction %s is already active.",
           transactionId), null, frame);
     }
 
     // Create a transacted session and store it away for future commands.
-    HazelcastMQContext mqContext = config.getHazelcastMQInstance().
-        createContext(
-            true);
+    ChannelContext mqContext = config.getBroker().createChannelContext();
+    mqContext.setAutoCommit(false);
     transactions.put(transactionId, new ClientTransaction(transactionId,
-        mqContext));
+        config.getBroker()));
 
     writeOptionalReceipt(frame, res.getFrameChannel());
   }
@@ -238,16 +223,17 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
 
     ClientTransaction tx = transactions.get(transactionId);
     if (tx == null) {
-      throw new StompClientException(format("Transaction [%s] is not active.",
+      throw new StompClientException(format("Transaction %s is not active.",
           transactionId), null, frame);
     }
-    HazelcastMQContext context = tx.getContext();
+    ChannelContext mqContext = tx.getContext();
 
     // Create the producer.
-    HazelcastMQProducer producer = context.createProducer();
+    Channel mqChannel = mqContext.createChannel(DataStructureKey.
+        fromString(destName));
 
     // Convert and send the message.
-    producer.send(destName, config.getFrameConverter().fromFrame(frame));
+    mqChannel.send(config.getFrameConverter().fromFrame(frame));
 
     writeOptionalReceipt(frame, res.getFrameChannel());
   }
@@ -274,25 +260,11 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
   }
 
   /**
-   * Closes the given instance, ignoring any exceptions.
-   *
-   * @param closeable the closeable to close
-   */
-  private static void safeClose(Closeable closeable) {
-    try {
-      closeable.close();
-    }
-    catch (IOException ex) {
-      // Ignore
-    }
-  }
-
-  /**
    * An active transaction for a client.
    *
    * @author mpilone
    */
-  static class ClientTransaction {
+  static class ClientTransaction implements AutoCloseable {
 
     /**
      * The unique ID of the transaction.
@@ -300,36 +272,45 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
     private final String transactionId;
 
     /**
-     * The {@link HazelcastMQContext} used for all message production within the
+     * The {@link ChannelContext} used for all message production within the
      * transaction.
      */
-    private final HazelcastMQContext context;
+    private final ChannelContext mqContext;
 
     /**
      * Constructs the transaction.
      *
      * @param transactionId the unique ID of the transaction
-     * @param context the HazelcastMQContext used for all message production
-     * within the transaction
+     * @param context the context used for all message production within the transaction
      */
-    public ClientTransaction(String transactionId, HazelcastMQContext context) {
+    public ClientTransaction(String transactionId, Broker broker) {
       super();
       this.transactionId = transactionId;
-      this.context = context;
+      this.mqContext = broker.createChannelContext();
+      mqContext.setAutoCommit(transactionId.equals(DEFAULT_CONTEXT_TXN_ID));
     }
 
     /**
-     * @return the id
+     * Returns the unique ID of the transaction.
+     *
+     * @return the ID of the transaction
      */
     public String getTransactionId() {
       return transactionId;
     }
 
     /**
-     * @return the session
+     * Returns the channel context for this transaction.
+     *
+     * @return the channel context
      */
-    public HazelcastMQContext getContext() {
-      return context;
+    public ChannelContext getContext() {
+      return mqContext;
+    }
+
+    @Override
+    public void close() {
+      mqContext.close();
     }
 
   }
@@ -340,17 +321,7 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
    *
    * @author mpilone
    */
-  class ClientSubscription implements HazelcastMQMessageListener {
-
-    /**
-     * The session used to create the consumer.
-     */
-    private final HazelcastMQContext context;
-
-    /**
-     * The consumer to receive messages for the subscription.
-     */
-    private final HazelcastMQConsumer consumer;
+  class ClientSubscription implements MessageDispatcher.Performer, AutoCloseable {
 
     /**
      * The ID of the subscription.
@@ -361,6 +332,8 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
      * The frame channel to write all messages for the subscription.
      */
     private final WritableFrameChannel frameChannel;
+
+    private final SingleThreadPollingMessageDispatcher dispatcher;
 
     /**
      * Constructs a subscription which will execute the given callback every
@@ -374,39 +347,36 @@ class HazelcastMQStomplet extends ConnectDisconnectStomplet {
      */
     public ClientSubscription(String subscriptionId,
         WritableFrameChannel frameChannel,
-        HazelcastMQConsumer consumer, HazelcastMQContext session) {
+        Broker broker, DataStructureKey channelKey, ExecutorService executor) {
       super();
       this.subscriptionId = subscriptionId;
-      this.consumer = consumer;
-      this.context = session;
       this.frameChannel = frameChannel;
 
-      consumer.setMessageListener(this);
+      this.dispatcher = new SingleThreadPollingMessageDispatcher();
+      dispatcher.setChannelKey(channelKey);
+      dispatcher.setBroker(broker);
+      dispatcher.setExecutor(executor);
+      dispatcher.setPerformer(this);
+      dispatcher.start();
+    }
+
+    @Override
+    public void close() {
+      dispatcher.stop();
     }
 
     /**
-     * @return the session
-     */
-    public HazelcastMQContext getContext() {
-      return context;
-    }
-
-    /**
-     * @return the consumer
-     */
-    public HazelcastMQConsumer getConsumer() {
-      return consumer;
-    }
-
-    /**
-     * @return the subscriptionId
+     * Returns the unique subscription ID.
+     *
+     * @return the subscription ID
      */
     public String getSubscriptionId() {
       return subscriptionId;
     }
 
     @Override
-    public void onMessage(HazelcastMQMessage msg) {
+    public void perform(
+        Message<?> msg) {
       FrameBuilder fb = FrameBuilder.copy(config.getFrameConverter().
           toFrame(msg));
       fb.header(org.mpilone.yeti.Headers.SUBSCRIPTION, getSubscriptionId());

@@ -6,9 +6,9 @@ import org.mpilone.hazelcastmq.core.HazelcastMQ;
 import org.mpilone.hazelcastmq.core.HazelcastMQConfig;
 import org.mpilone.hazelcastmq.core.HazelcastMQInstance;
 import org.mpilone.hazelcastmq.example.Assert;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStomp;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompConfig;
-import org.mpilone.hazelcastmq.stomp.server.HazelcastMQStompInstance;
+import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
+import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
+import org.mpilone.hazelcastmq.stomp.StompAdapter;
 import org.mpilone.yeti.Frame;
 import org.mpilone.yeti.FrameBuilder;
 import org.mpilone.yeti.client.StompClient;
@@ -59,10 +59,9 @@ public class StompToStompOneWayTransaction {
           .newHazelcastMQInstance(mqConfig);
 
       // Create a Stomp server.
-      HazelcastMQStompConfig stompConfig = new HazelcastMQStompConfig(
+      StompAdapterConfig stompConfig = new StompAdapterConfig(
           mqInstance);
-      HazelcastMQStompInstance stompServer = HazelcastMQStomp.
-          newHazelcastMQStompInstance(stompConfig);
+      StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(stompConfig);
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
