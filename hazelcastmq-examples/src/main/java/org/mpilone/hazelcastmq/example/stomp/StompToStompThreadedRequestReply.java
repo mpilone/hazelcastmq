@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.mpilone.hazelcastmq.core.*;
-import org.mpilone.hazelcastmq.stomp.server.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.mpilone.yeti.*;
 import org.mpilone.yeti.client.StompClient;
 import org.slf4j.*;
@@ -17,7 +17,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * This example uses a HazelcastMQ STOMP server to accept a Yeti STOMP client
+ * This example uses a HazelcastMQ STOMP adapter to accept a Yeti STOMP client
  * connection simulating a frontend and a STOMP client connection from another
  * thread simulating a backend. The client then sends a bunch of request frames
  * and waits for replies. The server is backed by HazelcastMQ which is backed by
@@ -25,7 +25,7 @@ import com.hazelcast.core.*;
   * 
  * @author mpilone
  */
-public class StompToStompThreadedRequestReply {
+public class StompToStompThreadedRequestReply extends ExampleApp {
 
   /**
    * The log for this class.
@@ -38,15 +38,11 @@ public class StompToStompThreadedRequestReply {
   private static final String REPLY_QUEUE = "/queue/do.some.work.replies";
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
-    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
-
-    new StompToStompThreadedRequestReply();
+    new StompToStompThreadedRequestReply().runExample();
   }
 
-  public StompToStompThreadedRequestReply() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
@@ -54,18 +50,17 @@ public class StompToStompThreadedRequestReply {
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    // Create the HazelcaseMQ instance.
+    BrokerConfig brokerConfig = new BrokerConfig(hazelcast);
+
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create a Stomp server.
-      StompAdapterConfig stompConfig = new StompAdapterConfig(
-          mqInstance);
+      StompAdapterConfig stompConfig = new StompAdapterConfig(broker);
       stompConfig.setPort(STOMP_PORT);
-      StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(stompConfig);
+
+      try (StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(
+          stompConfig)) {
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
@@ -114,11 +109,11 @@ public class StompToStompThreadedRequestReply {
 
       // Shutdown the server.
       log.info("Shutting down STOMP server.");
-      stompServer.shutdown();
+      }
     }
     finally {
       // Shutdown Hazelcast.
-      hazelcast.getLifecycleService().shutdown();
+      hazelcast.shutdown();
     }
 
   }

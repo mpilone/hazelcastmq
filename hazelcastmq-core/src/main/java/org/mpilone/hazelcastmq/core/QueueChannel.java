@@ -1,5 +1,9 @@
 package org.mpilone.hazelcastmq.core;
 
+import static java.lang.String.format;
+
+import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -23,12 +27,14 @@ class QueueChannel implements Channel {
   private final Object taskMutex;
   private final Object readReadyMutex;
   private final Collection<ReadReadyListener> readReadyListeners;
+  private final MessageConverter messageConverter;
 
   private String readReadyNotifierRegistrationId;
   private StoppableTask<Boolean> sendTask;
   private StoppableTask<Message<?>> receiveTask;
   private volatile boolean closed;
   private boolean temporary;
+  private Clock clock = Clock.systemUTC();
 
   public QueueChannel(DefaultChannelContext context, DataStructureKey channelKey) {
 
@@ -36,6 +42,8 @@ class QueueChannel implements Channel {
     this.channelKey = channelKey;
     this.hazelcastInstance = context.getBroker().getConfig()
         .getHazelcastInstance();
+    this.messageConverter = context.getBroker().getConfig().
+        getMessageConverter();
     this.taskMutex = new Object();
     this.readReadyMutex = new Object();
     this.readReadyListeners = new HashSet<>(2);
@@ -130,7 +138,8 @@ class QueueChannel implements Channel {
         throw new HazelcastMQException("Send is already in progress.");
       }
 
-      sendTask = new StoppableTask<>(new SendLogic(msg, timeout, unit), false);
+      sendTask = new StoppableTask<>(new SendLogicBusyLoop(msg, timeout, unit),
+          false);
     }
 
     boolean result;
@@ -265,51 +274,120 @@ class QueueChannel implements Channel {
 
   }
 
-  private class SendLogic implements Callable<Boolean> {
+
+  /**
+   * The logic to send a message to the backing queue. Ideally this logic would
+   * simply call {@link BaseQueue#offer(java.lang.Object) } and block until the
+   * message could be sent or until interrupted but Hazelcast's blocking
+   * operations do not return when interrupted because they must wait until the
+   * distributed operation is complete. Until this behavior changes a busy loop
+   * is used to offer in short intervals and the thread interrupt status is
+   * checked on each iteration of the loop.
+   */
+  private class SendLogicBusyLoop implements Callable<Boolean> {
 
     private final Message<?> msg;
-    private final long timeout;
-    private final TimeUnit unit;
+    private final CountdownTimer timer;
 
-    public SendLogic(Message<?> msg, long timeout, TimeUnit unit) {
+    public SendLogicBusyLoop(Message<?> msg, long timeout, TimeUnit unit) {
       this.msg = msg;
-      this.timeout = timeout;
-      this.unit = unit;
+      this.timer = new CountdownTimer(timeout, unit);
     }
 
     @Override
     public Boolean call() throws Exception {
-      BaseQueue<Message<?>> queue = context.getQueue(channelKey.getName(), true);
-      return queue.offer(msg, timeout, unit);
+      final BaseQueue<Object> queue = context.getQueue(channelKey.getName(),
+          true);
+
+      // Convert to a raw message object.
+      final Object rawMsg = messageConverter.fromMessage(msg);
+
+      boolean success = false;
+      boolean interrupted;
+
+      timer.reset();
+      timer.start();
+
+      do {
+
+        // Offer to the queue.
+        success = queue.offer(rawMsg, timer.getRemainingOrInterval(1,
+            TimeUnit.SECONDS), TimeUnit.MILLISECONDS);
+
+        interrupted = Thread.interrupted();
+
+      } while (!interrupted && !success && !timer.isExpired());
+
+      timer.stop();
+
+      if (!success && interrupted) {
+        throw new InterruptedException();
+      }
+
+      return success;
     }
 
   }
 
+  /**
+   * The logic to receive a message from the backing queue. Ideally this logic
+   * would simply call {@link BaseQueue#poll() } and block until a message was
+   * available or until interrupted but Hazelcast's blocking operations do not
+   * return when interrupted because they must wait until the distributed
+   * operation is complete. Until this behavior changes a busy loop is used to
+   * poll in short intervals and the thread interrupt status is checked on each
+   * iteration of the loop.
+   */
   private class ReceiveLogicBusyLoop implements Callable<Message<?>> {
 
-    private final long timeout;
-    private final TimeUnit unit;
+    private final CountdownTimer timer;
 
     public ReceiveLogicBusyLoop(long timeout, TimeUnit unit) {
-      this.timeout = timeout;
-      this.unit = unit;
+      this.timer = new CountdownTimer(timeout, unit);
     }
 
     @Override
     public Message<?> call() throws Exception {
 
-      long remainingTime = unit.toMillis(timeout);
-      BaseQueue<Message<?>> queue = context.getQueue(channelKey.getName(), true);
-      Message<?> msg;
+      final BaseQueue<Message<?>> queue = context.getQueue(channelKey.getName(),
+          true);
+
+      Message<?> msg = null;
       boolean interrupted;
+
+      timer.reset();
+      timer.start();
+
       do {
-        msg = queue.poll(Math.min(1000, remainingTime), TimeUnit.MILLISECONDS);
-        remainingTime = remainingTime - 1000;
+
+        final Object rawMsg = queue.poll(timer.getRemainingOrInterval(1,
+            TimeUnit.SECONDS), TimeUnit.MILLISECONDS);
+
+        if (rawMsg != null) {
+          // Convert to a message.
+          msg = messageConverter.toMessage(rawMsg);
+
+          // Check for message expiration.
+          Long expiration = (Long) msg.getHeaders().get(
+              MessageHeaders.EXPIRATION);
+          if (expiration != null && Instant.now(clock).toEpochMilli()
+              > expiration) {
+
+            // TODO: it would be nice to move the message to a DLQ.
+            log.fine(format("Dropping expired message %s.", msg.getHeaders().
+                getId()));
+
+            msg = null;
+          }
+        }
+
         interrupted = Thread.interrupted();
 
-      } while (msg == null && remainingTime > 0 && !interrupted);
+      } while (msg == null && !timer.isExpired() && !interrupted);
 
-      if (interrupted) {
+      timer.stop();
+
+      if (msg == null && interrupted) {
         throw new InterruptedException();
       }
 

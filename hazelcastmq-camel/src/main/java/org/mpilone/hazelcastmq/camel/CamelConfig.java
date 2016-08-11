@@ -3,7 +3,6 @@ package org.mpilone.hazelcastmq.camel;
 import org.apache.camel.Message;
 import org.apache.camel.RuntimeCamelException;
 import org.mpilone.hazelcastmq.core.Broker;
-import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
 
 /**
  * The configuration for the HazelcastMQ component and endpoint. The
@@ -86,7 +85,8 @@ public class CamelConfig implements Cloneable {
 
   /**
    * Returns the message converter that will be to convert all Camel
-   * {@link Message}s to and from {@link HazelcastMQMessage}s.
+   * {@link Message}s to and from HazelcastMQ
+   * {@link org.mpilone.hazelcastmq.core.Message}s.
    *
    * @return the message converter
    */
@@ -96,7 +96,8 @@ public class CamelConfig implements Cloneable {
 
   /**
    * Sets the message converter that will be to convert all Camel
-   * {@link Message}s to and from {@link HazelcastMQMessage}s.
+   * {@link Message}s to and from HazelcastMQ
+   * {@link org.mpilone.hazelcastmq.core.Message}s.
    *
    * @param messageConverter the message converter
    */

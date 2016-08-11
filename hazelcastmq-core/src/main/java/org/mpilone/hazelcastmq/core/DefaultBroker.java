@@ -5,6 +5,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
+ * The default and primary implementation of the broker.
  *
  * @author mpilone
  */
@@ -16,6 +17,11 @@ public class DefaultBroker implements Broker {
   private final List<RouterContext> routerContexts;
   private volatile boolean closed;
 
+  /**
+   * Constructs the broker with the given configuration.
+   *
+   * @param config the broker configuration
+   */
   public DefaultBroker(BrokerConfig config) {
     this.config = config;
 

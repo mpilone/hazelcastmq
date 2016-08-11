@@ -76,22 +76,4 @@
 
   </dependencies>
   
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <includes>
-            <include>org/mpilone/hazelcastmq/example/core/QueueChannelSendReceive.java</include>
-            <include>org/mpilone/hazelcastmq/example/core/QueueChannelSendReceiveAsync.java</include>
-            <include>org/mpilone/hazelcastmq/example/core/TransactionalReceive.java</include>
-            <include>org/mpilone/hazelcastmq/example/core/TransactionalSend.java</include>
-            <include>org/mpilone/hazelcastmq/example/camel/*.java</include>
-            <include>org/mpilone/hazelcastmq/example/stomp/StompToStompOneWay.java</include>
-          </includes>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
 </project>

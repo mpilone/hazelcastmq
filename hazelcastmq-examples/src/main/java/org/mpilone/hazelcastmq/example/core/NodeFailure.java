@@ -23,7 +23,8 @@ public class NodeFailure extends ExampleApp {
   private final ILogger log = Logger.getLogger(getClass());
 
   private int msgCounter = 0;
-  private final String destination = "/queue/node.failure.test";
+  private final DataStructureKey destination = DataStructureKey.fromString(
+      "/queue/node.failure.test");
 
   public static void main(String[] args) throws JMSException,
       InterruptedException {
@@ -44,7 +45,7 @@ public class NodeFailure extends ExampleApp {
     joinConfig.getTcpIpConfig().setEnabled(true);
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10572");
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10573");
-    config.getMapConfig("*").setBackupCount(2);
+    config.getQueueConfig("default").setBackupCount(2);
     ClusterNode node1 = new ClusterNode(config);
 
     config = new Config();
@@ -56,7 +57,7 @@ public class NodeFailure extends ExampleApp {
     joinConfig.getTcpIpConfig().setEnabled(true);
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10571");
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10573");
-    config.getMapConfig("*").setBackupCount(2);
+    config.getQueueConfig("default").setBackupCount(2);
     ClusterNode node2 = new ClusterNode(config);
 
     config = new Config();
@@ -68,7 +69,7 @@ public class NodeFailure extends ExampleApp {
     joinConfig.getTcpIpConfig().setEnabled(true);
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10571");
     joinConfig.getTcpIpConfig().addMember("127.0.0.1:10572");
-    config.getMapConfig("*").setBackupCount(2);
+    config.getQueueConfig("default").setBackupCount(2);
     ClusterNode node3 = new ClusterNode(config);
 
     try {
@@ -115,9 +116,11 @@ public class NodeFailure extends ExampleApp {
   private void sendKillTwoRestartOneKillOneAndReceive(ClusterNode node1,
       ClusterNode node2, ClusterNode node3) throws InterruptedException {
 
-    HazelcastMQProducer mqProducer = node1.getMqContext().createProducer();
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
+    try (Channel mqProducer = node1.getMqContext().createChannel(destination)) {
+    mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+    }
 
     // Kill the first two nodes. Again, this may not prove too much because we
     // don't know where the original data landed in the cluster. There's a
@@ -125,11 +128,11 @@ public class NodeFailure extends ExampleApp {
     node1.kill();
     node2.kill();
 
-    HazelcastMQConsumer mqConsumer = node3.getMqContext().createConsumer(
-        destination);
-    String msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+    org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+        TimeUnit.SECONDS);
+    log.info("Got message on node 3: " + msg.getPayload());
+    }
 
     // Now restart node 2 and give it some time to join the cluster and migrate
     // data.
@@ -140,19 +143,23 @@ public class NodeFailure extends ExampleApp {
     // migrated to node 2.
     node3.kill();
 
-    mqConsumer = node2.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 2: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node2.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+    log.info("Got message on node 2: " + msg.getPayload());
+    }
   }
 
   private void sendKillTwoAndReceive(ClusterNode node1, ClusterNode node2,
       ClusterNode node3) {
 
     log.info("Sending messages on node 1");
-    HazelcastMQProducer mqProducer = node1.getMqContext().createProducer();
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
+    try (Channel mqProducer = node1.getMqContext().createChannel(destination)) {
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+    }
 
     // Kill the first two nodes. Again, this may not prove too much because we
     // don't know where the original data landed in the cluster. There's a
@@ -164,84 +171,100 @@ public class NodeFailure extends ExampleApp {
     node2.kill();
 
     log.info("Attempting receive from node 3");
-    HazelcastMQConsumer mqConsumer = node3.getMqContext().createConsumer(
-        destination);
-    String msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 3: " + msg.getPayload());
+    }
 
-    mqConsumer = node3.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 3: " + msg.getPayload());
+    }
   }
 
   private void sendAndReceiveOnMultipleNodes(ClusterNode node1,
       ClusterNode node2, ClusterNode node3) {
 
-    HazelcastMQProducer mqProducer = node1.getMqContext().createProducer();
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
+    try (Channel mqProducer = node1.getMqContext().createChannel(destination)) {
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+    }
 
-    HazelcastMQConsumer mqConsumer = node2.getMqContext().createConsumer(
-        destination);
-    String msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 2: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node2.getMqContext().createChannel(
+        destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 2: " + msg.getPayload());
+    }
 
-    mqConsumer = node1.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 1: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node1.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 1: " + msg.getPayload());
+    }
 
-    mqConsumer = node3.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 3: " + msg.getPayload());
+    }
 
-    mqConsumer = node2.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 2: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node2.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 2: " + msg.getPayload());
+    }
   }
 
   private void sendAndReceiveOnSingleOtherNode(ClusterNode node1,
       ClusterNode node3) {
 
-    HazelcastMQProducer mqProducer = node1.getMqContext().createProducer();
-    mqProducer.send(destination, "Hello " + msgCounter++);
+    try (Channel mqProducer = node1.getMqContext().createChannel(destination)) {
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+    }
 
-    HazelcastMQConsumer mqConsumer = node3.getMqContext().createConsumer(
-        destination);
-    String msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
     log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    }
   }
 
   private void sendKillAndReceiveOnMultipleNodes(ClusterNode node1,
       ClusterNode node2, ClusterNode node3) {
 
-    HazelcastMQProducer mqProducer = node1.getMqContext().createProducer();
-    mqProducer.send(destination, "Hello " + msgCounter++);
-    mqProducer.send(destination, "Hello " + msgCounter++);
+    try (Channel mqProducer = node1.getMqContext().createChannel(destination)) {
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+      mqProducer.send(MessageBuilder.withPayload("Hello " + msgCounter++).
+          build());
+    }
 
     // Kill the node. This doesn't prove too much because we don't know where
     // the original data landed in the cluster. There's a good chance the
     // "master" data isn't sitting on node1 anyway.
     node1.kill();
 
-    HazelcastMQConsumer mqConsumer = node2.getMqContext().createConsumer(
-        destination);
-    String msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 2: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node2.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 2: " + msg.getPayload());
+    }
 
-    mqConsumer = node3.getMqContext().createConsumer(destination);
-    msg = new String(mqConsumer.receiveBody(1, TimeUnit.SECONDS));
-    log.info("Got message on node 3: " + msg);
-    mqConsumer.close();
+    try (Channel mqConsumer = node3.getMqContext().createChannel(destination)) {
+      org.mpilone.hazelcastmq.core.Message<?> msg = mqConsumer.receive(1,
+          TimeUnit.SECONDS);
+      log.info("Got message on node 3: " + msg.getPayload());
+    }
   }
 
   /**
@@ -253,8 +276,8 @@ public class NodeFailure extends ExampleApp {
   private static class ClusterNode {
 
     private HazelcastInstance hazelcast;
-    private HazelcastMQInstance connectionFactory;
-    private HazelcastMQContext mqContext;
+    private Broker broker;
+    private ChannelContext mqContext;
     private Config config;
 
     /**
@@ -278,21 +301,26 @@ public class NodeFailure extends ExampleApp {
 
       hazelcast = Hazelcast.newHazelcastInstance(config);
 
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
+      BrokerConfig mqConfig = new BrokerConfig();
       mqConfig.setHazelcastInstance(hazelcast);
 
-      connectionFactory = HazelcastMQ.newHazelcastMQInstance(mqConfig);
-      mqContext = connectionFactory.createContext();
+      broker = HazelcastMQ.newBroker(mqConfig);
+      mqContext = broker.createChannelContext();
     }
 
-    public HazelcastMQContext getMqContext() {
+    public ChannelContext getMqContext() {
       return mqContext;
     }
 
     public void kill() {
-      if (connectionFactory != null) {
-        connectionFactory.shutdown();
-        connectionFactory = null;
+      if (mqContext != null) {
+        mqContext.close();
+        mqContext = null;
+      }
+
+      if (broker != null) {
+        broker.close();
+        broker = null;
       }
 
       if (hazelcast != null) {
@@ -302,9 +330,14 @@ public class NodeFailure extends ExampleApp {
     }
 
     public void shutdown() {
-      if (connectionFactory != null) {
-        connectionFactory.shutdown();
-        connectionFactory = null;
+      if (mqContext != null) {
+        mqContext.close();
+        mqContext = null;
+      }
+
+      if (broker != null) {
+        broker.close();
+        broker = null;
       }
 
       if (hazelcast != null) {

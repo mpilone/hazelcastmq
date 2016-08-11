@@ -37,6 +37,9 @@ import com.hazelcast.transaction.TransactionalTaskContext;
  * the {@link Transactional} annotation was not in used or a transaction was not
  * started manually in the platform transaction manager.
  * </p>
+ * <p>
+ * Note that the term "synchronized" in this context refers to transaction
+ * synchronization and not thread synchronization.
  *
  * @author mpilone
  * @see HazelcastTransactionManager

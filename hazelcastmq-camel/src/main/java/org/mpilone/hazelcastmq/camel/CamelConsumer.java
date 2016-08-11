@@ -14,12 +14,11 @@ import org.mpilone.hazelcastmq.core.*;
  * configured.
  * </p>
  * <p>
- * The consumer supports a configurable number of concurrent consumers. Each
- * concurrent consumer will be managed in a separate {@link HazelcastMQContext}
- * and therefore a separate thread. If consuming from a topic, it is important
- * to only have one concurrent consumer or duplicate messages will be received.
- * Unlike the Camel JMS component, this consumer does not scale up or down with
- * load but simply has a fixed number of consumers.
+ * The consumer supports a configurable number of concurrent consumers. The
+ * consumers will be managed by a {@link MultipleThreadPollingMessageDispatcher}
+ * and therefore use separate threads. * Unlike the Camel JMS component, this
+ * consumer does not scale up or down with load but simply has a fixed number of
+ * consumers.
  * </p>
  *
  * @author mpilone
@@ -91,9 +90,9 @@ public class CamelConsumer extends DefaultConsumer {
   }
 
   /**
-   * A consumer that listens for messages on a destination and
-   * dispatches them to a processor. Each consumer manages its own
-   * context and consumer instance.
+   * A consumer that listens for messages on a destination and dispatches them
+   * to a processor. Each consumer manages its own context and consumer
+   * instance.
    */
   private class ConsumerPerformer implements MessageDispatcher.Performer {
 

@@ -2,12 +2,11 @@ package org.mpilone.hazelcastmq.camel;
 
 
 import org.apache.camel.Message;
-import org.mpilone.hazelcastmq.core.HazelcastMQMessage;
 
 /**
  * A converter responsible for converting a Camel message into a
- * {@link HazelcastMQMessage}.
- * 
+ * {@link org.mpilone.hazelcastmq.core.Message}.
+  * 
  * @author mpilone
  */
 public interface MessageConverter {

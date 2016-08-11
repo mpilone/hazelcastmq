@@ -26,6 +26,18 @@ public class SingleThreadPollingMessageDispatcher implements MessageDispatcher {
   private Performer performer;
   private volatile boolean stopped = true;
 
+  public SingleThreadPollingMessageDispatcher() {
+  }
+
+  public SingleThreadPollingMessageDispatcher(Broker broker,
+      DataStructureKey channelKey, Performer performer,
+      ExecutorService executor) {
+    this.channelKey = channelKey;
+    this.executor = executor;
+    this.broker = broker;
+    this.performer = performer;
+  }
+
   @Override
   public void start() {
     if (!stopped) {
@@ -88,6 +100,22 @@ public class SingleThreadPollingMessageDispatcher implements MessageDispatcher {
     requireStopped();
 
     this.executor = executor;
+  }
+
+  public ExecutorService getExecutor() {
+    return executor;
+  }
+
+  public Performer getPerformer() {
+    return performer;
+  }
+
+  public DataStructureKey getChannelKey() {
+    return channelKey;
+  }
+
+  public Broker getBroker() {
+    return broker;
   }
 
   private void requireStopped() {

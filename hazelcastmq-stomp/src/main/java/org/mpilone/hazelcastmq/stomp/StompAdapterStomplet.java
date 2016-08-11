@@ -193,8 +193,6 @@ class StompAdapterStomplet extends ConnectDisconnectStomplet {
     }
 
     // Create a transacted session and store it away for future commands.
-    ChannelContext mqContext = config.getBroker().createChannelContext();
-    mqContext.setAutoCommit(false);
     transactions.put(transactionId, new ClientTransaction(transactionId,
         config.getBroker()));
 

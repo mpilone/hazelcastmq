@@ -30,6 +30,6 @@ public class HazelcastMQStomp {
       config = new StompAdapterConfig();
     }
 
-    return new StompServerStompAdapter(config);
+    return new DefaultStompAdapter(config);
   }
 }

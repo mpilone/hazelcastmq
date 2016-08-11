@@ -9,6 +9,9 @@ import java.util.regex.Pattern;
 import com.hazelcast.collection.impl.queue.QueueService;
 
 /**
+ * A key to lookup a Hazelcast data structure. The service name is normally
+ * defined as a constant in the service implementation such as
+ * {@link QueueService#SERVICE_NAME}.
  *
  * @author mpilone
  */
@@ -26,15 +29,32 @@ public class DataStructureKey implements Serializable {
   private final String name;
   private final String serviceName;
 
+  /**
+   * Constructs the key with the given data structure name and service name.
+   *
+   * @param name the name of the data structure
+   * @param serviceName the service name/data structure type
+   */
   public DataStructureKey(String name, String serviceName) {
     this.name = name;
     this.serviceName = serviceName;
   }
 
+  /**
+   * Returns the name of the data structure such as "foo.bar".
+   *
+   * @return the name of the data structure
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * Returns the name of the data structure service (i.e. type) such as
+   * {@link QueueService#SERVICE_NAME}.
+   *
+   * @return the name of the service
+   */
   public String getServiceName() {
     return serviceName;
   }

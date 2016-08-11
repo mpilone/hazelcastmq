@@ -1,14 +1,13 @@
 package org.mpilone.hazelcastmq.example.stomp;
 
-import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
-import org.mpilone.hazelcastmq.stomp.StompAdapter;
-import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
-
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.mpilone.hazelcastmq.core.*;
-import org.mpilone.hazelcastmq.stomp.server.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
+import org.mpilone.hazelcastmq.stomp.HazelcastMQStomp;
+import org.mpilone.hazelcastmq.stomp.StompAdapter;
+import org.mpilone.hazelcastmq.stomp.StompAdapterConfig;
 import org.mpilone.yeti.*;
 import org.mpilone.yeti.client.StompClient;
 import org.slf4j.*;
@@ -17,7 +16,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 
 /**
- * This example uses a HazelcastMQ STOMP server to accept a Yeti STOMP client
+ * This example uses a HazelcastMQ STOMP adapter to accept a Yeti STOMP client
  * connection simulating a frontend and a STOMP client connection from another
  * thread simulating a backend. The client then sends a bunch of request frames
  * and waits for replies. For each request/reply frame, the frontend client will
@@ -26,7 +25,7 @@ import com.hazelcast.core.*;
  *
  * @author mpilone
  */
-public class StompToStompThreadedRequestReplyReconnect {
+public class StompToStompThreadedRequestReplyReconnect extends ExampleApp {
 
   /**
    * The log for this class.
@@ -69,39 +68,27 @@ public class StompToStompThreadedRequestReplyReconnect {
       + "blaster at your side, kid. As you wish.</p> ";
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
-    System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-    System.setProperty("org.slf4j.simpleLogger.log.com.hazelcast", "info");
-    System.setProperty("org.slf4j.simpleLogger.log.io.netty", "info");
-
-    new StompToStompThreadedRequestReplyReconnect();
+    new StompToStompThreadedRequestReplyReconnect().runExample();
   }
 
-  /**
-   * Constructs and executes the example.
-   *
-   * @throws Exception if there is an unexpected error
-   */
-  public StompToStompThreadedRequestReplyReconnect() throws Exception {
+  @Override
+  public void start() throws Exception {
 
     // Create a Hazelcast instance.
     Config config = new Config();
-    config.setProperty("hazelcast.logging.type", "slf4j");
     config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
     HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(config);
 
-    try {
-      // Create the HazelcaseMQ instance.
-      HazelcastMQConfig mqConfig = new HazelcastMQConfig();
-      mqConfig.setHazelcastInstance(hazelcast);
-      HazelcastMQInstance mqInstance = HazelcastMQ
-          .newHazelcastMQInstance(mqConfig);
+    // Create the HazelcaseMQ instance.
+    BrokerConfig brokerConfig = new BrokerConfig(hazelcast);
+
+    try (Broker broker = HazelcastMQ.newBroker(brokerConfig)) {
 
       // Create a Stomp server.
-      StompAdapterConfig stompConfig = new StompAdapterConfig(
-          mqInstance);
+      StompAdapterConfig stompConfig = new StompAdapterConfig(broker);
       stompConfig.setPort(STOMP_PORT);
-      StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(stompConfig);
+      try (StompAdapter stompServer = HazelcastMQStomp.newStompAdapter(
+          stompConfig)) {
 
       log.info("Stomp server is now listening on port: "
           + stompConfig.getPort());
@@ -112,7 +99,7 @@ public class StompToStompThreadedRequestReplyReconnect {
       t.start();
 
       // Send a bunch of messages that need replies.
-      for (int i = 0; i < 50; ++i) {
+      for (int i = 0; i < 20; ++i) {
 
         // Create a Stomp client.
         StompClient stompClient = new StompClient("localhost",
@@ -152,7 +139,7 @@ public class StompToStompThreadedRequestReplyReconnect {
 
       // Shutdown the server.
       log.info("Shutting down STOMP server.");
-      stompServer.shutdown();
+      }
     }
     finally {
       // Shutdown Hazelcast.
