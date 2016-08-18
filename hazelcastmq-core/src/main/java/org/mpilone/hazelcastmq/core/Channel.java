@@ -48,7 +48,7 @@ public interface Channel extends Closeable {
   /**
    * Receives a message from this channel, blocking for the given timeout until
    * a message is available, the thread is interrupted, or the channel is
-   * closed.
+   * closed. A timeout of 0 indicates no wait.
    *
    * @param timeout the amount of time to wait for a message
    * @param unit the unit of the timeout value
@@ -72,7 +72,8 @@ public interface Channel extends Closeable {
 
   /**
    * Sends the given message, blocking up to the given timeout value if the
-   * underlying data structure is full and cannot handle more items.
+   * underlying data structure is full and cannot handle more items. A timeout
+   * of 0 indicates no wait.
    *
    * @param msg the message to send
    * @param timeout the amount of time to wait for the data structure to accept
@@ -180,10 +181,23 @@ public interface Channel extends Closeable {
   DataStructureKey getChannelKey();
 
   /**
+   * <p>
    * Closes the channel. This method blocks until all the resources used by the
    * channel are closed and released. Any blocking send or receive call will be
    * interrupted and allowed to return before this method returns. This is the
    * only method on a channel that can be safely called by multiple threads.
+   * </p>
+   * <p>
+   * Closing a channel does not destroy the backing distributed object nor any
+   * of the data in the data structure but simply closes this reference to the
+   * data structure. Multiple channel instances can exist concurrently for the
+   * same channel key and continue to work with the data in the channel as
+   * instances are created and closed. To completely destroy a channel and the
+   * backing data, use the {@link ChannelContext#destroyChannel(org.mpilone.hazelcastmq.core.DataStructureKey)
+   * } method or mark the channel as temporary using {@link #markTemporary() }
+   * and it will be automatically destroyed when the owning channel context is
+   * closed.
+   * </p>
    */
   @Override
    void close();

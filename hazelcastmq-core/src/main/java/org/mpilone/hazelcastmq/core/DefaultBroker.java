@@ -43,7 +43,12 @@ public class DefaultBroker implements Broker {
 
   @Override
   public RouterContext createRouterContext() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+
+    synchronized (contextMutex) {
+      RouterContext context = new DefaultRouterContext(this);
+      routerContexts.add(context);
+      return context;
+    }
   }
 
   @Override
@@ -63,6 +68,9 @@ public class DefaultBroker implements Broker {
       // Clone the list so there is no concurrent modification exception.
       new ArrayList<>(channelContexts).stream().forEach(ChannelContext::close);
       channelContexts.clear();
+
+      new ArrayList<>(routerContexts).stream().forEach(RouterContext::close);
+      routerContexts.clear();
     }
   }
 
@@ -77,6 +85,12 @@ public class DefaultBroker implements Broker {
     }
   }
 
+  void remove(RouterContext context) {
+    synchronized (contextMutex) {
+      routerContexts.remove(context);
+    }
+  }
+
   /**
    * Checks if the context is closed and throws an exception if it is.
    *
@@ -87,4 +101,5 @@ public class DefaultBroker implements Broker {
       throw new HazelcastMQException("Broker is closed.");
     }
   }
+
 }

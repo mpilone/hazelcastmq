@@ -1,12 +1,15 @@
 package org.mpilone.hazelcastmq.core;
 
+import java.io.Serializable;
 import java.util.Collection;
 
 /**
  *
  * @author mpilone
  */
-public interface RoutingStrategy {
-  Collection<DataStructureKey> apply(Message<?> msg,
-      Collection<DataStructureKey> targetKeys);
+public interface RoutingStrategy extends Serializable {
+
+  Collection<DataStructureKey> routeMessage(Message<?> msg,
+      Collection<Route> routes);
+
 }

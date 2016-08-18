@@ -75,7 +75,7 @@ class QueueChannel implements Channel {
   }
 
   /**
-   * Checks if the context is closed and throws an exception if it is.
+   * Checks if the channel is closed and throws an exception if it is.
    *
    * @throws HazelcastMQException if the context is closed
    */
@@ -237,7 +237,7 @@ class QueueChannel implements Channel {
   @Override
   public void markTemporary() {
     temporary = true;
-    context.addTemporaryDataStructure(channelKey);
+    context.addTemporaryChannel(channelKey);
   }
 
   @Override

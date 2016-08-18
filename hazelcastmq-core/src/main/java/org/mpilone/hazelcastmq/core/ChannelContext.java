@@ -31,6 +31,21 @@ public interface ChannelContext extends AutoCloseable {
   Channel createChannel(DataStructureKey channelKey);
 
   /**
+   * Destroys the given channel by destroying the backing distributed object and
+   * all associated data in the data structure. If a channel with the given key
+   * is used or created again, the data structure will be recreated
+   * automatically. There is no difference between this method and simply
+   * getting the distributed object directly out of Hazelcast and destroying it.
+   * This method exists primarily to provide symmetry with the routing context.
+   *
+   * @param channelKey the channel key used to identify the data structure to
+   * destroy
+   *
+   * @return true if the data structure existed and was destroyed
+   */
+  boolean destroyChannel(DataStructureKey channelKey);
+
+  /**
    * Enables or disables auto-commit for this channel context. If there are
    * pending transactional operations, the result of those operations are
    * undefined (they may be committed or rolled back). Therefore it is

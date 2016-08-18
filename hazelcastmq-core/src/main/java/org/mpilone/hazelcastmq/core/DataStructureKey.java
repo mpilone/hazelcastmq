@@ -3,6 +3,7 @@ package org.mpilone.hazelcastmq.core;
 import static java.lang.String.format;
 
 import java.io.Serializable;
+import java.util.Comparator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,7 +16,8 @@ import com.hazelcast.collection.impl.queue.QueueService;
  *
  * @author mpilone
  */
-public class DataStructureKey implements Serializable {
+public class DataStructureKey implements Serializable,
+    Comparable<DataStructureKey> {
 
   private static final long serialVersionUID = 1L;
 
@@ -94,6 +96,12 @@ public class DataStructureKey implements Serializable {
       return new DataStructureKey(channelAddress,
           QueueService.SERVICE_NAME);
     }
+  }
+
+  @Override
+  public int compareTo(DataStructureKey o) {
+    return Comparator.comparing(DataStructureKey::getServiceName).thenComparing(
+        DataStructureKey::getName).compare(this, o);
   }
 
 }

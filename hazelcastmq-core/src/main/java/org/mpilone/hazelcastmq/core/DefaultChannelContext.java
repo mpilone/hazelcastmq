@@ -5,8 +5,7 @@ import static java.lang.String.format;
 import java.util.*;
 
 import com.hazelcast.collection.impl.queue.QueueService;
-import com.hazelcast.core.BaseQueue;
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.*;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.transaction.TransactionContext;
@@ -20,7 +19,8 @@ import com.hazelcast.transaction.TransactionalTaskContext;
  *
  * @author mpilone
  */
-public class DefaultChannelContext implements ChannelContext {
+public class DefaultChannelContext implements ChannelContext,
+    TrackingParent<Channel>, DataStructureResolver {
 
   /**
    * The log for this class.
@@ -30,7 +30,7 @@ public class DefaultChannelContext implements ChannelContext {
 
   private final DefaultBroker broker;
   private final HazelcastInstance hazelcastInstance;
-  private final Set<DataStructureKey> temporaryDataStructures;
+  private final Set<DataStructureKey> temporaryChannels;
   private final List<Channel> channels;
   private final Object channelMutex;
 
@@ -42,7 +42,7 @@ public class DefaultChannelContext implements ChannelContext {
   public DefaultChannelContext(DefaultBroker broker) {
     this.broker = broker;
     this.hazelcastInstance = broker.getConfig().getHazelcastInstance();
-    this.temporaryDataStructures = new HashSet<>();
+    this.temporaryChannels = new HashSet<>();
     this.channels = new LinkedList<>();
     this.channelMutex = new Object();
   }
@@ -201,16 +201,17 @@ public class DefaultChannelContext implements ChannelContext {
     }
 
     // Destroy any temporary data structures.
-    temporaryDataStructures.stream().forEach(key -> {
-      hazelcastInstance.
-          getDistributedObject(key.getServiceName(), key.getName()).destroy();
+    temporaryChannels.stream().forEach(key -> {
+      destroyChannel(key);
     });
-    temporaryDataStructures.clear();
+    temporaryChannels.clear();
 
+    // Remove ourself from the broker.
     getBroker().remove(this);
   }
 
-  void remove(Channel channel) {
+  @Override
+  public void remove(Channel channel) {
     synchronized (channelMutex) {
       channels.remove(channel);
     }
@@ -226,23 +227,11 @@ public class DefaultChannelContext implements ChannelContext {
     return managedTransactionalTaskContext != null;
   }
 
-  /**
-   * Returns the queue with the given name. If <code>transactional</code> is
-   * true and there is an active transaction in the context (either local or
-   * managed), the queue will be transactional. If false or if there is no
-   * transaction, the queue will be non-transactional.
-   *
-   * @param <E> the type of the elements in the queue
-   * @param name the name of the distributed queue
-   * @param transactional true to get a transactional queue if possible, false
-   * to always get a non-transactional queue
-   *
-   * @return the queue instance
-   */
-  <E> BaseQueue<E> getQueue(String name, boolean transactional) {
+  @Override
+  public <E> BaseQueue<E> getQueue(String name, boolean joinTransaction) {
     BaseQueue<E> queue = null;
 
-    if (transactional) {
+    if (joinTransaction) {
       if (managedTransactionalTaskContext != null) {
         queue = managedTransactionalTaskContext.getQueue(name);
       }
@@ -259,17 +248,39 @@ public class DefaultChannelContext implements ChannelContext {
   }
 
   @Override
+  public <K, V> BaseMap<K, V> getMap(String name, boolean joinTransaction) {
+    BaseMap<K, V> map = null;
+
+    if (joinTransaction) {
+      if (managedTransactionalTaskContext != null) {
+        map = managedTransactionalTaskContext.getMap(name);
+      }
+      else if (transactionContext != null) {
+        map = transactionContext.getMap(name);
+      }
+    }
+
+    if (map == null) {
+      map = hazelcastInstance.getMap(name);
+    }
+
+    return map;
+  }
+
+  @Override
   public Channel createChannel(DataStructureKey key) {
-    requireNotClosed();
+    synchronized (channelMutex) {
+      requireNotClosed();
 
-    switch (key.getServiceName()) {
-      case QueueService.SERVICE_NAME:
-        return new QueueChannel(this, key);
+      switch (key.getServiceName()) {
+        case QueueService.SERVICE_NAME:
+          return new QueueChannel(this, key);
 
-      default:
-        throw new UnsupportedOperationException(format(
-            "Service type [%s] is not currently supported.", key
-            .getServiceName()));
+        default:
+          throw new UnsupportedOperationException(format(
+              "Service type [%s] is not currently supported.", key
+              .getServiceName()));
+      }
     }
   }
 
@@ -282,7 +293,34 @@ public class DefaultChannelContext implements ChannelContext {
     return broker;
   }
 
-  void addTemporaryDataStructure(DataStructureKey key) {
-    temporaryDataStructures.add(key);
+  /**
+   * Adds a channel to the list of temporary channels to be destroyed when this
+   * context is closed.
+   *
+   * @param channelKey the key of the channel to be destroyed
+   */
+  void addTemporaryChannel(DataStructureKey channelKey) {
+    temporaryChannels.add(channelKey);
   }
+
+  @Override
+  public boolean destroyChannel(DataStructureKey channelKey) {
+
+    // Find the first matching object.
+    Optional<DistributedObject> opDistObj = hazelcastInstance.
+        getDistributedObjects().stream().filter(obj -> {
+          return obj.getServiceName().equals(channelKey.getServiceName())
+          && obj.getName().equals(channelKey.getName());
+        }).findFirst();
+
+    // If present, destroy it.
+    if (opDistObj.isPresent()) {
+      opDistObj.get().destroy();
+    }
+
+    // Return if it was destroyed.
+    return opDistObj.isPresent();
+  }
+
+
 }

@@ -1,18 +1,28 @@
 package org.mpilone.hazelcastmq.core;
 
+import java.io.Serializable;
 import java.util.Collection;
 
 /**
  *
  * @author mpilone
  */
-public interface Router {
+public interface Router extends Serializable, AutoCloseable {
 
-  void addRoute(DataStructureKey targetKey);
+  static final String DEFAULT_ROUTING_KEY = "";
 
-  void removeRoute(DataStructureKey targetKey);
+  @Override
+  public void close();
 
-  Collection<DataStructureKey> getRoutes();
+  boolean isClosed();
+
+  void addRoute(DataStructureKey targetKey, String... routingKeys);
+
+  void removeRoute(DataStructureKey targetKey, String... routingKeys);
+
+  DataStructureKey getChannelKey();
+
+  Collection<Route> getRoutes();
 
   RoutingStrategy getRoutingStrategy();
 
