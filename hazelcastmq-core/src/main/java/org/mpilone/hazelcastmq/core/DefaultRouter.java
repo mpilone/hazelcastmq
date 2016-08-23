@@ -1,37 +1,44 @@
 package org.mpilone.hazelcastmq.core;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 import com.hazelcast.map.AbstractEntryProcessor;
 
 /**
  *
  * @author mpilone
  */
-public class DefaultRouter implements Router {
+class DefaultRouter implements Router {
 
-  private final DefaultRouterContext context;
+  private final BrokerConfig config;
+  private final HazelcastInstance hazelcastInstance;
+  private final TrackingParent<Router> parent;
   private final DataStructureKey channelKey;
 
   private volatile boolean closed;
 
-  DefaultRouter(DefaultRouterContext context, DataStructureKey channelKey) {
-    this.context = context;
+  DefaultRouter(DataStructureKey channelKey, TrackingParent<Router> parent,
+      BrokerConfig config) {
+    this.config = config;
     this.channelKey = channelKey;
+    this.hazelcastInstance = config.getHazelcastInstance();
+    this.parent = parent;
 
     // Make sure the router data exists for this router in the data map.
-    context.getRouterDataMap().putIfAbsent(channelKey,
-        new RouterData(channelKey));
+    getRouterDataMap().putIfAbsent(channelKey,    new RouterData(channelKey));
   }
 
   @Override
   public void close() {
     closed = true;
 
-    context.remove(this);
+    parent.remove(this);
   }
 
   @Override
@@ -39,11 +46,15 @@ public class DefaultRouter implements Router {
     return closed;
   }
 
+  private IMap<DataStructureKey, RouterData> getRouterDataMap() {
+    return hazelcastInstance.getMap(DefaultRouterContext.ROUTER_DATA_MAP_NAME);
+  }
+
   @Override
   public void addRoute(DataStructureKey targetKey, String... routingKeys) {
     requireNotClosed();
 
-    context.getRouterDataMap().executeOnKey(channelKey, new AddRouteProcessor(
+    getRouterDataMap().executeOnKey(channelKey, new AddRouteProcessor(
         targetKey, routingKeys));
   }
 
@@ -51,7 +62,7 @@ public class DefaultRouter implements Router {
   public void removeRoute(DataStructureKey targetKey, String... routingKeys) {
     requireNotClosed();
 
-    context.getRouterDataMap().executeOnKey(channelKey,
+    getRouterDataMap().executeOnKey(channelKey,
         new RemoveRouteProcessor(targetKey, routingKeys));
   }
 
@@ -65,21 +76,21 @@ public class DefaultRouter implements Router {
     requireNotClosed();
 
     // The route list in RouterData is already unmodifiable.
-    return context.getRouterDataMap().get(channelKey).getRoutes();
+    return getRouterDataMap().get(channelKey).getRoutes();
   }
 
   @Override
   public RoutingStrategy getRoutingStrategy() {
     requireNotClosed();
 
-    return context.getRouterDataMap().get(channelKey).getRoutingStrategy();
+    return getRouterDataMap().get(channelKey).getRoutingStrategy();
   }
 
   @Override
   public void setRoutingStrategy(RoutingStrategy strategy) {
     requireNotClosed();
 
-    context.getRouterDataMap().executeOnKey(channelKey,
+    getRouterDataMap().executeOnKey(channelKey,
         new SetRoutingStrategyProcessor(strategy));
   }
 
@@ -91,6 +102,39 @@ public class DefaultRouter implements Router {
   private void requireNotClosed() throws HazelcastMQException {
     if (closed) {
       throw new HazelcastMQException("Router is closed.");
+    }
+  }
+
+  public void routeMessages() {
+
+    // Get the strategy and possible output routes.
+    final RouterData routerData = getRouterDataMap().get(channelKey);
+    final RoutingStrategy strategy = routerData.getRoutingStrategy();
+    final Collection<Route> routes = routerData.getRoutes();
+
+    // Create a channel context to access input and output channels.
+    try (DefaultChannelContext channelContext = new DefaultChannelContext(
+        child -> {
+        }, config)) {
+
+      // Create the input channel to read from.
+      try (Channel sourceChannel = channelContext.createChannel(routerData.
+          getChannelKey())) {
+
+        // As long as we have messages, keep routing.
+        Message<?> msg;
+        while ((msg = sourceChannel.receive(0, TimeUnit.SECONDS)) != null) {
+
+          // Use the strategy to route the message and send it to each target channel.
+          final Message<?> _msg = msg;
+          strategy.routeMessage(_msg, routes).stream().forEach(targetKey -> {
+
+            try (Channel targetChannel = channelContext.createChannel(targetKey)) {
+              targetChannel.send(_msg, 0, TimeUnit.SECONDS);
+            }
+          });
+        }
+      }
     }
   }
 

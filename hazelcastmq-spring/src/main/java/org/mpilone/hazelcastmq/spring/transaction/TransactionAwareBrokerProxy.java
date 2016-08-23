@@ -1,16 +1,18 @@
 package org.mpilone.hazelcastmq.spring.transaction;
 
-import com.hazelcast.spring.transaction.ManagedTransactionalTaskContext;
-import com.hazelcast.transaction.TransactionalTaskContext;
+import static java.lang.String.format;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+
 import org.mpilone.hazelcastmq.core.*;
 import org.springframework.transaction.NoTransactionException;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import static java.lang.String.format;
+import com.hazelcast.spring.transaction.ManagedTransactionalTaskContext;
+import com.hazelcast.transaction.TransactionalTaskContext;
 
 /**
  * A {@link Broker} proxy that is aware of a distributed/managed transaction via
@@ -77,9 +79,9 @@ public class TransactionAwareBrokerProxy implements Broker {
 
         // Let the context know about the tx synchronized transactional
         // task context?
-        if (channelContext instanceof DefaultChannelContext) {
-          ((DefaultChannelContext) channelContext).setManagedTransactionContext(
-              transactionalTaskContext);
+        if (channelContext instanceof ManagedTransactionContextAware) {
+          ((ManagedTransactionContextAware) channelContext).
+              setManagedTransactionContext(transactionalTaskContext);
         }
         else {
           throw new UnsupportedOperationException(format("Joining a "

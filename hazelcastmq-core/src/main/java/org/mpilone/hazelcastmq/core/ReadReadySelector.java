@@ -106,10 +106,10 @@ public class ReadReadySelector implements ReadReadyListener {
   }
 
   @Override
-  public void readReady(Channel channel) {
+  public void readReady(ReadReadyEvent event) {
     channelLock.lock();
     try {
-      channels.add(channel);
+      channels.add(event.getChannel());
       readReadyCondition.signal();
     }
     finally {

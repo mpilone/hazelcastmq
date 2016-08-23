@@ -11,20 +11,23 @@ import com.hazelcast.core.IMap;
  *
  * @author mpilone
  */
-public class DefaultRouterContext implements RouterContext {
+class DefaultRouterContext implements RouterContext, TrackingParent<Router> {
 
-  private final static String ROUTER_DATA_MAP_NAME = "hzmq.routerdata";
+  final static String ROUTER_DATA_MAP_NAME = "hzmq.routerdata";
 
-  private final DefaultBroker broker;
+  private final TrackingParent<RouterContext> parent;
   private final HazelcastInstance hazelcastInstance;
   private final List<Router> routers;
   private final Object routerMutex;
+  private final BrokerConfig config;
 
   private volatile boolean closed;
 
-  public DefaultRouterContext(DefaultBroker broker) {
-    this.broker = broker;
-    this.hazelcastInstance = broker.getConfig().getHazelcastInstance();
+  public DefaultRouterContext(TrackingParent<RouterContext> parent,
+      BrokerConfig config) {
+    this.parent = parent;
+    this.config = config;
+    this.hazelcastInstance = config.getHazelcastInstance();
     this.routers = new LinkedList<>();
     this.routerMutex = new Object();
   }
@@ -44,7 +47,7 @@ public class DefaultRouterContext implements RouterContext {
     }
 
     // Remove ourself from the broker.
-    broker.remove(this);
+    parent.remove(this);
   }
 
   @Override
@@ -52,7 +55,8 @@ public class DefaultRouterContext implements RouterContext {
     return closed;
   }
 
-  void remove(Router router) {
+  @Override
+  public void remove(Router router) {
     synchronized (routerMutex) {
       routers.remove(router);
     }
@@ -65,7 +69,7 @@ public class DefaultRouterContext implements RouterContext {
       requireNotClosed();
 
       
-      DefaultRouter router = new DefaultRouter(this, channelKey);
+      DefaultRouter router = new DefaultRouter(channelKey, this, config);
       routers.add(router);
 
       return router;
@@ -74,10 +78,6 @@ public class DefaultRouterContext implements RouterContext {
 
   IMap<DataStructureKey, RouterData> getRouterDataMap() {
     return hazelcastInstance.getMap(ROUTER_DATA_MAP_NAME);
-  }
-
-  DefaultBroker getBroker() {
-    return broker;
   }
 
   @Override

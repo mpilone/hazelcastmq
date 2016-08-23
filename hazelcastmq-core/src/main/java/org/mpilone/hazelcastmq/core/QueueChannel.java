@@ -21,32 +21,33 @@ class QueueChannel implements Channel {
 
   private final static ILogger log = Logger.getLogger(QueueChannel.class);
 
-  private final DefaultChannelContext context;
+  private final TrackingParent<Channel> parent;
+  private final DataStructureContext dataStructureContext;
   private final DataStructureKey channelKey;
-  private final HazelcastInstance hazelcastInstance;
   private final Object taskMutex;
   private final Object readReadyMutex;
   private final Collection<ReadReadyListener> readReadyListeners;
   private final MessageConverter messageConverter;
 
-  private String readReadyNotifierRegistrationId;
+  private String messageSentMapRegistrationId;
   private StoppableTask<Boolean> sendTask;
   private StoppableTask<Message<?>> receiveTask;
   private volatile boolean closed;
   private boolean temporary;
   private Clock clock = Clock.systemUTC();
 
-  public QueueChannel(DefaultChannelContext context, DataStructureKey channelKey) {
+  public QueueChannel(DataStructureKey channelKey,
+      TrackingParent<Channel> parent,
+      DataStructureContext dataStructureContext,
+      BrokerConfig config) {
 
-    this.context = context;
+    this.parent = parent;
     this.channelKey = channelKey;
-    this.hazelcastInstance = context.getBroker().getConfig()
-        .getHazelcastInstance();
-    this.messageConverter = context.getBroker().getConfig().
-        getMessageConverter();
+    this.messageConverter = config.getMessageConverter();
     this.taskMutex = new Object();
     this.readReadyMutex = new Object();
     this.readReadyListeners = new HashSet<>(2);
+    this.dataStructureContext = dataStructureContext;
   }
 
   @Override
@@ -167,10 +168,10 @@ class QueueChannel implements Channel {
     // Delay adding the item listener until we get our first read-ready
     // listener. This allows for light weight channels that just use
     // polling and therefore may never need to use an item listener at all.
-    if (readReadyNotifierRegistrationId == null) {
-      readReadyNotifierRegistrationId = hazelcastInstance.getQueue(
-          channelKey.getName()).
-          addItemListener(new ReadReadyNotifier(), false);
+    if (messageSentMapRegistrationId == null) {
+      messageSentMapRegistrationId = MessageSentMapAdapter.getMapToListen(
+          dataStructureContext).addEntryListener(
+              new ReadReadyNotifier(), channelKey, false);
     }
 
     // Synchronize because the listeners will be notified from a HZ
@@ -184,6 +185,15 @@ class QueueChannel implements Channel {
   public void removeReadReadyListener(ReadReadyListener listener) {
     synchronized (readReadyListeners) {
       readReadyListeners.remove(listener);
+    }
+
+    if (readReadyListeners.isEmpty() && messageSentMapRegistrationId
+        != null) {
+      // Stop listening for events. This is a slight optimization to
+      // avoid getting events that we'll never notify listeners of.
+      MessageSentMapAdapter.getMapToListen(dataStructureContext).
+          removeEntryListener(messageSentMapRegistrationId);
+      messageSentMapRegistrationId = null;
     }
   }
 
@@ -204,11 +214,12 @@ class QueueChannel implements Channel {
       readReadyListeners.clear();
     }
 
-    if (readReadyNotifierRegistrationId != null) {
+    if (messageSentMapRegistrationId != null) {
       // Stop listening for item events.
-      hazelcastInstance.getQueue(channelKey.getName()).removeItemListener(
-          readReadyNotifierRegistrationId);
-      readReadyNotifierRegistrationId = null;
+      MessageSentMapAdapter.getMapToListen(dataStructureContext).
+          removeEntryListener(messageSentMapRegistrationId);
+
+      messageSentMapRegistrationId = null;
     }
 
     synchronized (taskMutex) {
@@ -231,13 +242,12 @@ class QueueChannel implements Channel {
       }
     }
 
-    context.remove(this);
+    parent.remove(this);
   }
 
   @Override
   public void markTemporary() {
     temporary = true;
-    context.addTemporaryChannel(channelKey);
   }
 
   @Override
@@ -255,25 +265,20 @@ class QueueChannel implements Channel {
     throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
 
-  private class ReadReadyNotifier implements ItemListener<Object> {
+  private class ReadReadyNotifier extends MessageSentMapAdapter {
 
     @Override
-    public void itemAdded(ItemEvent<Object> item) {
+    public void messageSent(DataStructureKey channelKey) {
 
       synchronized (readReadyMutex) {
         // Clone the list to avoid concurrent modification exception.
         new ArrayList<>(readReadyListeners).stream().forEach(
-            l -> l.readReady(QueueChannel.this));
+            l -> l.readReady(new ReadReadyEvent(QueueChannel.this)));
       }
-    }
 
-    @Override
-    public void itemRemoved(ItemEvent<Object> item) {
-      // no op
     }
 
   }
-
 
   /**
    * The logic to send a message to the backing queue. Ideally this logic would
@@ -296,8 +301,8 @@ class QueueChannel implements Channel {
 
     @Override
     public Boolean call() throws Exception {
-      final BaseQueue<Object> queue = context.getQueue(channelKey.getName(),
-          true);
+      final BaseQueue<Object> queue = dataStructureContext.
+          getQueue(channelKey.getName(), true);
 
       // Convert to a raw message object.
       final Object rawMsg = messageConverter.fromMessage(msg);
@@ -322,6 +327,11 @@ class QueueChannel implements Channel {
 
       if (!success && interrupted) {
         throw new InterruptedException();
+      }
+      else if (success) {
+        dataStructureContext.
+            getMap(MessageSentMapAdapter.MESSAGE_SENT_MAP_NAME,
+                true).put(channelKey, clock.millis());
       }
 
       return success;
@@ -349,8 +359,8 @@ class QueueChannel implements Channel {
     @Override
     public Message<?> call() throws Exception {
 
-      final BaseQueue<Message<?>> queue = context.getQueue(channelKey.getName(),
-          true);
+      final BaseQueue<Message<?>> queue =
+          dataStructureContext.getQueue(channelKey.getName(), true);
 
       Message<?> msg = null;
       boolean interrupted;
@@ -407,10 +417,10 @@ class QueueChannel implements Channel {
 
     @Override
     public Message<?> call() throws Exception {
-      BaseQueue<Message<?>> queue = context.getQueue(channelKey.getName(), true);
+      BaseQueue<Message<?>> queue = dataStructureContext.
+          getQueue(channelKey.getName(), true);
       return queue.poll(timeout, unit);
     }
   }
-
 
 }

@@ -19,8 +19,9 @@ import com.hazelcast.transaction.TransactionalTaskContext;
  *
  * @author mpilone
  */
-public class DefaultChannelContext implements ChannelContext,
-    TrackingParent<Channel>, DataStructureResolver {
+class DefaultChannelContext implements ChannelContext,
+    TrackingParent<Channel>,
+    ManagedTransactionContextAware {
 
   /**
    * The log for this class.
@@ -28,23 +29,28 @@ public class DefaultChannelContext implements ChannelContext,
   private final static ILogger log = Logger.getLogger(
       DefaultChannelContext.class);
 
-  private final DefaultBroker broker;
+  private final TrackingParent<ChannelContext> parent;
   private final HazelcastInstance hazelcastInstance;
   private final Set<DataStructureKey> temporaryChannels;
   private final List<Channel> channels;
   private final Object channelMutex;
+  private final BrokerConfig config;
+  private final DataStructureContext dataStructureContext;
 
   private TransactionContext transactionContext;
   private TransactionalTaskContext managedTransactionalTaskContext;
   private boolean autoCommit = true;
   private volatile boolean closed = false;
 
-  public DefaultChannelContext(DefaultBroker broker) {
-    this.broker = broker;
-    this.hazelcastInstance = broker.getConfig().getHazelcastInstance();
+  public DefaultChannelContext(TrackingParent<ChannelContext> parent,
+      BrokerConfig config) {
+    this.parent = parent;
+    this.config = config;
+    this.hazelcastInstance = config.getHazelcastInstance();
     this.temporaryChannels = new HashSet<>();
     this.channels = new LinkedList<>();
     this.channelMutex = new Object();
+    this.dataStructureContext = new TransactionAwareDataStructureContext();
   }
 
   @Override
@@ -135,6 +141,7 @@ public class DefaultChannelContext implements ChannelContext,
    * task context or null to leave a managed transaction and return to
    * auto-commit
    */
+  @Override
   public void setManagedTransactionContext(
       TransactionalTaskContext transactionalTaskContext) {
     requireNotClosed();
@@ -207,13 +214,17 @@ public class DefaultChannelContext implements ChannelContext,
     temporaryChannels.clear();
 
     // Remove ourself from the broker.
-    getBroker().remove(this);
+    parent.remove(this);
   }
 
   @Override
   public void remove(Channel channel) {
     synchronized (channelMutex) {
       channels.remove(channel);
+
+      if (channel.isTemporary()) {
+        temporaryChannels.add(channel.getChannelKey());
+      }
     }
   }
 
@@ -228,53 +239,13 @@ public class DefaultChannelContext implements ChannelContext,
   }
 
   @Override
-  public <E> BaseQueue<E> getQueue(String name, boolean joinTransaction) {
-    BaseQueue<E> queue = null;
-
-    if (joinTransaction) {
-      if (managedTransactionalTaskContext != null) {
-        queue = managedTransactionalTaskContext.getQueue(name);
-      }
-      else if (transactionContext != null) {
-        queue = transactionContext.getQueue(name);
-      }
-    }
-
-    if (queue == null) {
-      queue = hazelcastInstance.getQueue(name);
-    }
-
-    return queue;
-  }
-
-  @Override
-  public <K, V> BaseMap<K, V> getMap(String name, boolean joinTransaction) {
-    BaseMap<K, V> map = null;
-
-    if (joinTransaction) {
-      if (managedTransactionalTaskContext != null) {
-        map = managedTransactionalTaskContext.getMap(name);
-      }
-      else if (transactionContext != null) {
-        map = transactionContext.getMap(name);
-      }
-    }
-
-    if (map == null) {
-      map = hazelcastInstance.getMap(name);
-    }
-
-    return map;
-  }
-
-  @Override
   public Channel createChannel(DataStructureKey key) {
     synchronized (channelMutex) {
       requireNotClosed();
 
       switch (key.getServiceName()) {
         case QueueService.SERVICE_NAME:
-          return new QueueChannel(this, key);
+          return new QueueChannel(key, this, dataStructureContext, config);
 
         default:
           throw new UnsupportedOperationException(format(
@@ -282,15 +253,6 @@ public class DefaultChannelContext implements ChannelContext,
               .getServiceName()));
       }
     }
-  }
-
-  /**
-   * Returns the broker that created this context.
-   *
-   * @return the parent broker
-   */
-  DefaultBroker getBroker() {
-    return broker;
   }
 
   /**
@@ -322,5 +284,32 @@ public class DefaultChannelContext implements ChannelContext,
     return opDistObj.isPresent();
   }
 
+  private class TransactionAwareDataStructureContext implements
+      DataStructureContext {
 
+    @Override
+    public <E> BaseQueue<E> getQueue(String name, boolean joinTransaction) {
+
+      final TransactionalTaskContext tx =
+          managedTransactionalTaskContext != null ?
+              managedTransactionalTaskContext : transactionContext;
+
+      final boolean useTx = tx != null && joinTransaction;
+
+      return useTx ? tx.getQueue(name) : hazelcastInstance.getQueue(name);
+    }
+
+    @Override
+    public <K, V> BaseMap<K, V> getMap(String name, boolean joinTransaction) {
+
+      final TransactionalTaskContext tx =
+          managedTransactionalTaskContext != null ?
+              managedTransactionalTaskContext : transactionContext;
+
+      final boolean useTx = tx != null && joinTransaction;
+
+      return useTx ? tx.getMap(name) : hazelcastInstance.getMap(name);
+    }
+
+  }
 }

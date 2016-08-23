@@ -4,17 +4,27 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.hazelcast.core.BaseMap;
+import com.hazelcast.core.BaseQueue;
+import com.hazelcast.core.HazelcastInstance;
+
 /**
  * The default and primary implementation of the broker.
  *
  * @author mpilone
  */
-public class DefaultBroker implements Broker {
+class DefaultBroker implements Broker {
+
 
   private final BrokerConfig config;
   private final Object contextMutex;
   private final List<ChannelContext> channelContexts;
   private final List<RouterContext> routerContexts;
+  private final HazelcastInstance hazelcastInstance;
+  private final String routeExecutorRegistrationId;
+  private final String entryExpirerRegistrationId;
+  private final DataStructureContext dataStructureContext;
+
   private volatile boolean closed;
 
   /**
@@ -28,6 +38,15 @@ public class DefaultBroker implements Broker {
     this.contextMutex = new Object();
     this.channelContexts = new LinkedList<>();
     this.routerContexts = new LinkedList<>();
+    this.hazelcastInstance = config.getHazelcastInstance();
+    this.dataStructureContext = new HazelcastDataStructureContext();
+
+    this.entryExpirerRegistrationId = MessageSentMapAdapter.
+        getMapToListen(dataStructureContext).addEntryListener(
+            new MessageSentMapEntryExpirer(config), false);
+    this.routeExecutorRegistrationId = MessageSentMapAdapter.getMapToListen(
+        dataStructureContext).
+        addEntryListener(new EntryProcessorRouterExecutor(config), false);
   }
 
   @Override
@@ -35,7 +54,7 @@ public class DefaultBroker implements Broker {
     requireNotClosed();
 
     synchronized (contextMutex) {
-      ChannelContext context = new DefaultChannelContext(this);
+      ChannelContext context = new DefaultChannelContext(this::remove, config);
       channelContexts.add(context);
       return context;
     }
@@ -45,7 +64,7 @@ public class DefaultBroker implements Broker {
   public RouterContext createRouterContext() {
 
     synchronized (contextMutex) {
-      RouterContext context = new DefaultRouterContext(this);
+      RouterContext context = new DefaultRouterContext(this::remove, config);
       routerContexts.add(context);
       return context;
     }
@@ -63,6 +82,12 @@ public class DefaultBroker implements Broker {
     }
 
     closed = true;
+
+    // Stop listening for message sent events.
+    MessageSentMapAdapter.getMapToListen(dataStructureContext).
+        removeEntryListener(entryExpirerRegistrationId);
+    MessageSentMapAdapter.getMapToListen(dataStructureContext).
+        removeEntryListener(routeExecutorRegistrationId);
 
     synchronized (contextMutex) {
       // Clone the list so there is no concurrent modification exception.
@@ -101,5 +126,20 @@ public class DefaultBroker implements Broker {
       throw new HazelcastMQException("Broker is closed.");
     }
   }
+
+  private class HazelcastDataStructureContext implements DataStructureContext {
+
+    @Override
+    public <E> BaseQueue<E> getQueue(String name, boolean joinTransaction) {
+      return hazelcastInstance.getQueue(name);
+    }
+
+    @Override
+    public <K, V> BaseMap<K, V> getMap(String name, boolean joinTransaction) {
+      return hazelcastInstance.getMap(name);
+    }
+  }
+
+
 
 }
