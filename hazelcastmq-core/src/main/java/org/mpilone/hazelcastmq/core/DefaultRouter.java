@@ -1,14 +1,12 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
-
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.map.AbstractEntryProcessor;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
 
 /**
  *
@@ -105,10 +103,41 @@ class DefaultRouter implements Router {
     }
   }
 
+  /**
+   * Routes all messages from the source channel to the target channels using
+   * the routing strategy configured in the router. This method will manage the
+   * lock to avoid any race conditions with modifications to the router by other
+   * instances.
+   */
   public void routeMessages() {
 
+    final IMap<DataStructureKey, RouterData> routerDataMap = getRouterDataMap();
+    routerDataMap.lock(channelKey);
+    try {
+      final RouterData routerData = routerDataMap.get(channelKey);
+      routeMessagesInLock(routerData);
+
+      if (routerData.getRoutingStrategy() instanceof StatefulRoutingStrategy) {
+      // Put the router data back in the map so the stateful strategy
+        // is properly saved/persisted.
+        routerDataMap.put(channelKey, routerData);
+      }
+    }
+    finally {
+      routerDataMap.unlock(channelKey);
+    }
+  }
+
+  /**
+   * Routes all messages from the source channel to the target channels using
+   * the routing strategy configured in the router. This method must be executed
+   * in the router lock to avoid race conditions on the router data.
+   *
+   * @param routerData the router data backing this router
+   */
+  private void routeMessagesInLock(RouterData routerData) {
+
     // Get the strategy and possible output routes.
-    final RouterData routerData = getRouterDataMap().get(channelKey);
     final RoutingStrategy strategy = routerData.getRoutingStrategy();
     final Collection<Route> routes = routerData.getRoutes();
 
@@ -138,11 +167,23 @@ class DefaultRouter implements Router {
     }
   }
 
+  /**
+   * Entry processor that adds a target route to this router.
+   */
   private static class AddRouteProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
+    private static final long serialVersionUID = 1L;
 
     private final DataStructureKey targetKey;
     private final String[] routingKeys;
 
+    /**
+     * Constructs the processor that will add the target channel key with the
+     * optional routing keys. If no routing keys are specified, the default
+     * routing key will be used.
+     *
+     * @param targetKey the target channel key
+     * @param routingKeys the routing keys or empty or null for the default
+     */
     public AddRouteProcessor(DataStructureKey targetKey, String[] routingKeys) {
       super(true);
 
@@ -178,7 +219,7 @@ class DefaultRouter implements Router {
       routeMap.put(targetKey, new Route(targetKey, newRoutingKeys));
 
       RouterData newData = new RouterData(data.getChannelKey(), data.
-          getRoutingStrategy(), routeMap.values());
+         getRoutingStrategy(), routeMap.values());
       entry.setValue(newData);
 
       return newData;
@@ -186,11 +227,24 @@ class DefaultRouter implements Router {
     }
   }
 
+  /**
+   * Entry processor that removes a target route to this router.
+   */
   private static class RemoveRouteProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
+    private static final long serialVersionUID = 1L;
 
     private final DataStructureKey targetKey;
     private final String[] routingKeys;
 
+    /**
+     * Constructs the processor that will remove the target channel key with the
+     * optional routing keys. If no routing keys are specified, the target will
+     * be completely removed.
+     *
+     * @param targetKey the target channel key
+     * @param routingKeys the routing keys or empty or null to remove the target
+     * completely
+     */
     public RemoveRouteProcessor(DataStructureKey targetKey, String[] routingKeys) {
       super(true);
 
@@ -243,6 +297,7 @@ class DefaultRouter implements Router {
 
   private static class SetRoutingStrategyProcessor extends
       AbstractEntryProcessor<DataStructureKey, RouterData> {
+    private static final long serialVersionUID = 1L;
 
     private final RoutingStrategy strategy;
 

@@ -1,13 +1,13 @@
 
 package org.mpilone.hazelcastmq.core;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 import java.io.Serializable;
 import java.util.*;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
-
 /**
+ * Default implementation of the router context.
  *
  * @author mpilone
  */
@@ -23,6 +23,12 @@ class DefaultRouterContext implements RouterContext, TrackingParent<Router> {
 
   private volatile boolean closed;
 
+  /**
+   * Constructs the context.
+   *
+   * @param parent the parent to notify when closing
+   * @param config the broker configuration
+   */
   public DefaultRouterContext(TrackingParent<RouterContext> parent,
       BrokerConfig config) {
     this.parent = parent;
@@ -76,7 +82,13 @@ class DefaultRouterContext implements RouterContext, TrackingParent<Router> {
     }
   }
 
-  IMap<DataStructureKey, RouterData> getRouterDataMap() {
+  /**
+   * Returns the map that contains the source channel key to router data for all
+   * configured routers.
+   *
+   * @return the router data map
+   */
+  private IMap<DataStructureKey, RouterData> getRouterDataMap() {
     return hazelcastInstance.getMap(ROUTER_DATA_MAP_NAME);
   }
 
@@ -106,21 +118,40 @@ class DefaultRouterContext implements RouterContext, TrackingParent<Router> {
     }
   }
 
+  /**
+   * The raw router data that is persisted in the Hazelcast cluster. The router
+   * data is used to back router instances which can modify the data safely.
+   */
   static class RouterData implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private final DataStructureKey channelKey;
     private final RoutingStrategy routingStrategy;
     private final Collection<Route> routes;
 
+    /**
+     * Constructs the router data that defaults to using a
+     * {@link FanOutRoutingStrategy} and empty list of target routes.
+     *
+     * @param channelKey the source channel key
+     */
     public RouterData(DataStructureKey channelKey) {
       this(channelKey, new FanOutRoutingStrategy(), Collections.emptyList());
     }
 
+    /**
+     * Constructs the router data.
+     *
+     * @param channelKey the source channel key
+     * @param routingStrategy the routing strategy
+     * @param routes the target routes
+     */
     public RouterData(DataStructureKey channelKey,
         RoutingStrategy routingStrategy, Collection<Route> routes) {
       this.channelKey = channelKey;
       this.routingStrategy = routingStrategy;
-      this.routes = Collections.unmodifiableCollection(routes);
+      this.routes = Collections.unmodifiableCollection(new LinkedList<>(routes));
     }
 
     public DataStructureKey getChannelKey() {

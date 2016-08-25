@@ -1,19 +1,19 @@
 package org.mpilone.hazelcastmq.core;
 
-import static java.lang.String.format;
-
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-
 import org.mpilone.hazelcastmq.core.Message;
 
-import com.hazelcast.core.*;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
+import static java.lang.String.format;
 
 /**
+ * Channel implementation backed by a {@link IQueue}. This implementation is
+ * fully transactional.
  *
  * @author mpilone
  */

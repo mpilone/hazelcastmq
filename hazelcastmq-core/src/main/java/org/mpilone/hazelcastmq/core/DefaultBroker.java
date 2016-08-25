@@ -1,12 +1,11 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-
 import com.hazelcast.core.BaseMap;
 import com.hazelcast.core.BaseQueue;
 import com.hazelcast.core.HazelcastInstance;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * The default and primary implementation of the broker.
@@ -46,7 +45,7 @@ class DefaultBroker implements Broker {
             new MessageSentMapEntryExpirer(config), false);
     this.routeExecutorRegistrationId = MessageSentMapAdapter.getMapToListen(
         dataStructureContext).
-        addEntryListener(new EntryProcessorRouterExecutor(config), false);
+        addEntryListener(new EventDispatchThreadRouterExecutor(config), false);
   }
 
   @Override

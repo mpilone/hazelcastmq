@@ -1,13 +1,17 @@
 
 package org.mpilone.hazelcastmq.core;
 
+import java.io.Serializable;
 import java.util.*;
 
 /**
  *
  * @author mpilone
  */
-public class Route {
+public class Route implements Serializable {
+
+  private static final long serialVersionUID = 1L;
+
   private final DataStructureKey channelKey;
   private final Set<String> routingKeys;
 
