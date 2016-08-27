@@ -5,8 +5,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * Utility class for quickly building {@link Message} instances or copying
+ * existing messages.
  *
  * @author mpilone
+ * @param <P> the type of the message payload
  */
 public class MessageBuilder<P> {
 

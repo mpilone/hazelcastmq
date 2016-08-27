@@ -13,7 +13,7 @@ import com.hazelcast.core.BaseQueue;
  *
  * @author mpilone
  */
-public interface DataStructureContext {
+interface DataStructureContext {
 
   /**
    * Returns the queue with the given name.

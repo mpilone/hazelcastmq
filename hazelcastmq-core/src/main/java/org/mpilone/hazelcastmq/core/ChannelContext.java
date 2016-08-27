@@ -14,6 +14,7 @@ package org.mpilone.hazelcastmq.core;
  * committed immediately (in most cases, no transaction is used at all).
  * Auto-commit can be disabled using the {@link #setAutoCommit(boolean) }
  * method.
+ * </p>
  *
  * @author mpilone
  */

@@ -12,10 +12,20 @@ import java.util.EventObject;
 public class ReadReadyEvent extends EventObject {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * Constructs the read-ready event.
+   *
+   * @param source the channel that is read-ready
+   */
   public ReadReadyEvent(Channel source) {
     super(source);
   }
 
+  /**
+   * Returns the channel that is read-ready.
+   *
+   * @return the read-ready channel
+   */
   public Channel getChannel() {
     return (Channel) getSource();
   }

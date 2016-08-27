@@ -1,15 +1,17 @@
 package org.mpilone.hazelcastmq.core;
 
-import com.hazelcast.core.*;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
+import static java.lang.String.format;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+
 import org.mpilone.hazelcastmq.core.Message;
 
-import static java.lang.String.format;
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 
 /**
  * Channel implementation backed by a {@link IQueue}. This implementation is
@@ -28,6 +30,7 @@ class QueueChannel implements Channel {
   private final Object readReadyMutex;
   private final Collection<ReadReadyListener> readReadyListeners;
   private final MessageConverter messageConverter;
+  private final LinkedList<String> inFlightIds;
 
   private String messageSentMapRegistrationId;
   private StoppableTask<Boolean> sendTask;
@@ -35,6 +38,7 @@ class QueueChannel implements Channel {
   private volatile boolean closed;
   private boolean temporary;
   private Clock clock = Clock.systemUTC();
+  private AckMode ackMode;
 
   public QueueChannel(DataStructureKey channelKey,
       TrackingParent<Channel> parent,
@@ -48,6 +52,8 @@ class QueueChannel implements Channel {
     this.readReadyMutex = new Object();
     this.readReadyListeners = new HashSet<>(2);
     this.dataStructureContext = dataStructureContext;
+    this.ackMode = AckMode.AUTO;
+    this.inFlightIds = new LinkedList<>();
   }
 
   @Override
@@ -257,12 +263,21 @@ class QueueChannel implements Channel {
 
   @Override
   public void setAckMode(AckMode ackMode) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    requireNotClosed();
+
+    if (ackMode == this.ackMode) {
+      return;
+    }
+
+    // Acknowledge any in-flight messages.
+    ackAll();
+
+    this.ackMode = ackMode;
   }
 
   @Override
   public AckMode getAckMode() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return ackMode;
   }
 
   private class ReadReadyNotifier extends MessageSentMapAdapter {

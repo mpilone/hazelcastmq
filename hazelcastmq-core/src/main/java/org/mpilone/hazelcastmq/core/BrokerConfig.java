@@ -10,6 +10,12 @@ import com.hazelcast.core.HazelcastInstance;
  */
 public class BrokerConfig {
 
+  // Possible future config options:
+  // - multiple thread router executor
+  // - nack destination channel
+  // - in-flight timeout
+  //
+  //
   private HazelcastInstance hazelcastInstance;
   private MessageConverter messageConverter = new NoOpMessageConverter();
 

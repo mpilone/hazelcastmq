@@ -28,12 +28,40 @@ import java.util.concurrent.TimeUnit;
  */
 public interface Channel extends Closeable {
 
+  /**
+   * Indicates a negative-acknowledgment (nack) of the message with the given
+   * ID. In {@link AckMode#AUTO} this method does nothing. In {@link AckMode#CLIENT},
+   * the message with the given ID and all previous
+   * messages received since the last call   * to {@link #nack(java.lang.String) } or {@link #ack(java.lang.String) } will
+   * be nacked.
+   *
+   * @param msgId the ID of the message to nack
+   */
   void nack(String msgId);
 
+  /**
+   * Indicates a negative-acknowledgment (nack) of all messages received since
+   * the last call to {@link #nack(java.lang.String) } or {@link #ack(java.lang.String)
+   * }. In {@link AckMode#AUTO} this method does nothing.
+   */
   void nackAll();
 
+  /**
+   * Indicates an acknowledgment (ack) of the message with the given ID. In
+   * {@link AckMode#AUTO} this method does nothing. In {@link AckMode#CLIENT},
+   * the message with the given ID and all previous messages received since the
+   * last call to {@link #nack(java.lang.String) } or {@link #ack(java.lang.String)
+   * } will be acked.
+   *
+   * @param msgId the ID of the message to ack
+   */
   void ack(String msgId);
 
+  /**
+   * Indicates an acknowledgment (ack) of all messages received since the last
+   * call to {@link #nack(java.lang.String) } or {@link #ack(java.lang.String)
+   * }. In {@link AckMode#AUTO} this method does nothing.
+   */
   void ackAll();
 
   /**
@@ -142,17 +170,17 @@ public interface Channel extends Closeable {
 
   /**
    * <p>
-   * Sets the acknowledgement mode of the channel. By default all channels will
+   * Sets the acknowledgment mode of the channel. By default all channels will
    * be in {@link AckMode#AUTO} which means a message returned by a {@link #receive()
    * } operation is considered automatically acknowledged and requires no
-   * further action. In any other acknowledgement mode, messages are considered
+   * further action. In any other acknowledgment mode, messages are considered
    * "in-flight" until they are explicitly {@link #ack(java.lang.String) acked}
    * or {@link #nack(java.lang.String) nacked}. Messages that are in-flight past
-   * a configured expiration period will be automatically redelivered to the
+   * a configured expiration period may be automatically redelivered to the
    * channel.
    * </p>
    * <p>
-   * It is recommended to use auto acknowledgement mode when possible as it
+   * It is recommended to use auto acknowledgment mode when possible as it
    * offers the best performance. Acks and nacks will be part of any active
    * transaction so if the transaction is rolled back, the acks and nacks are
    * also rolled back with the assumption that any message receive operations
@@ -160,6 +188,11 @@ public interface Channel extends Closeable {
    * the complexity of transactions and acks/nacks, it is recommended that they
    * not be used together but it is supported. That is, use client acks/nacks
    * with auto-commit transactions or auto ack with manual transactions.
+   * </p>
+   * <p>
+   * The behavior of in-flight messages when the acknowledgment mode is change
+   * is undefined. Therefore it is recommended to set the mode before calling
+   * receive on the channel.
    * </p>
    *
    * @param ackMode the desired ack/nack mode

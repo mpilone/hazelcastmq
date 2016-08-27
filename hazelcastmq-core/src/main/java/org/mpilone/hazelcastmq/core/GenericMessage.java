@@ -5,24 +5,26 @@ import java.io.Serializable;
 import java.util.Map;
 
 /**
+ * A generic message implementation that takes a body and headers.
  *
  * @author mpilone
+ * @param <P> the type of the message payload
  */
-public class GenericMessage<T> implements Message<T>, Serializable {
+public class GenericMessage<P> implements Message<P>, Serializable {
 
   private final MessageHeaders headers;
-  private T payload;
+  private P payload;
 
-  public GenericMessage(T payload) {
+  public GenericMessage(P payload) {
     this(payload, new MessageHeaders(null));
   }
 
-  public GenericMessage(T payload, Map<String, Object> headers) {
+  public GenericMessage(P payload, Map<String, Object> headers) {
     this.payload = payload;
     this.headers = new MessageHeaders(headers);
   }
 
-  public GenericMessage(T payload, MessageHeaders headers) {
+  public GenericMessage(P payload, MessageHeaders headers) {
     this.payload = payload;
     this.headers = headers;
   }
@@ -33,7 +35,7 @@ public class GenericMessage<T> implements Message<T>, Serializable {
   }
 
   @Override
-  public T getPayload() {
+  public P getPayload() {
     return payload;
   }
 

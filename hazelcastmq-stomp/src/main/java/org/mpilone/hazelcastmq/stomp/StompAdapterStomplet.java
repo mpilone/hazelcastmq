@@ -12,7 +12,7 @@ import org.mpilone.yeti.server.ConnectDisconnectStomplet;
 
 /**
  * A {@link Stomplet} implementation that map subscribe and send functionality
- * to a {@link HazelcastMQInstance}.
+ * to a HazelcastMQ {@link Broker}.
  *
  * @author mpilone
  */
