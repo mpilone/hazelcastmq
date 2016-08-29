@@ -1,17 +1,15 @@
 package org.mpilone.hazelcastmq.core;
 
-import static java.lang.String.format;
-
+import com.hazelcast.core.*;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-
 import org.mpilone.hazelcastmq.core.Message;
 
-import com.hazelcast.core.*;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
+import static java.lang.String.format;
 
 /**
  * Channel implementation backed by a {@link IQueue}. This implementation is
@@ -25,12 +23,12 @@ class QueueChannel implements Channel {
 
   private final TrackingParent<Channel> parent;
   private final DataStructureContext dataStructureContext;
+  private final InflightContext inflightContext;
   private final DataStructureKey channelKey;
   private final Object taskMutex;
   private final Object readReadyMutex;
   private final Collection<ReadReadyListener> readReadyListeners;
   private final MessageConverter messageConverter;
-  private final LinkedList<String> inFlightIds;
 
   private String messageSentMapRegistrationId;
   private StoppableTask<Boolean> sendTask;
@@ -38,11 +36,11 @@ class QueueChannel implements Channel {
   private volatile boolean closed;
   private boolean temporary;
   private Clock clock = Clock.systemUTC();
-  private AckMode ackMode;
 
   public QueueChannel(DataStructureKey channelKey,
       TrackingParent<Channel> parent,
       DataStructureContext dataStructureContext,
+      InflightContext inflightContext,
       BrokerConfig config) {
 
     this.parent = parent;
@@ -52,33 +50,12 @@ class QueueChannel implements Channel {
     this.readReadyMutex = new Object();
     this.readReadyListeners = new HashSet<>(2);
     this.dataStructureContext = dataStructureContext;
-    this.ackMode = AckMode.AUTO;
-    this.inFlightIds = new LinkedList<>();
+    this.inflightContext = inflightContext;
   }
 
   @Override
   public DataStructureKey getChannelKey() {
     return channelKey;
-  }
-
-  @Override
-  public void nack(String msgId) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
-
-  @Override
-  public void nackAll() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
-
-  @Override
-  public void ack(String msgId) {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-  }
-
-  @Override
-  public void ackAll() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
   }
 
   /**
@@ -261,25 +238,6 @@ class QueueChannel implements Channel {
     return temporary;
   }
 
-  @Override
-  public void setAckMode(AckMode ackMode) {
-    requireNotClosed();
-
-    if (ackMode == this.ackMode) {
-      return;
-    }
-
-    // Acknowledge any in-flight messages.
-    ackAll();
-
-    this.ackMode = ackMode;
-  }
-
-  @Override
-  public AckMode getAckMode() {
-    return ackMode;
-  }
-
   private class ReadReadyNotifier extends MessageSentMapAdapter {
 
     @Override
@@ -414,28 +372,13 @@ class QueueChannel implements Channel {
 
       if (msg == null && interrupted) {
         throw new InterruptedException();
+      } else if (msg != null) {
+
+        // Record the inflight message.
+        inflightContext.inflight(channelKey, msg);
       }
 
       return msg;
     }
   }
-
-  private class ReceiveLogicBlocking implements Callable<Message<?>> {
-
-    private final long timeout;
-    private final TimeUnit unit;
-
-    public ReceiveLogicBlocking(long timeout, TimeUnit unit) {
-      this.timeout = timeout;
-      this.unit = unit;
-    }
-
-    @Override
-    public Message<?> call() throws Exception {
-      BaseQueue<Message<?>> queue = dataStructureContext.
-          getQueue(channelKey.getName(), true);
-      return queue.poll(timeout, unit);
-    }
-  }
-
 }

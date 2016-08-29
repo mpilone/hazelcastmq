@@ -1,15 +1,17 @@
 package org.mpilone.hazelcastmq.core;
 
-import static java.lang.String.format;
-
-import java.util.*;
-
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.core.*;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionalTaskContext;
+import java.time.Clock;
+import java.util.*;
+import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageAck;
+import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageInflight;
+
+import static java.lang.String.format;
 
 /**
  * Default implementation of the channel context. The context can participate in
@@ -20,7 +22,7 @@ import com.hazelcast.transaction.TransactionalTaskContext;
  * @author mpilone
  */
 class DefaultChannelContext implements ChannelContext,
-    TrackingParent<Channel>,
+    TrackingParent<Channel>, InflightContext,
     ManagedTransactionContextAware {
 
   /**
@@ -36,14 +38,18 @@ class DefaultChannelContext implements ChannelContext,
   private final Object channelMutex;
   private final BrokerConfig config;
   private final DataStructureContext dataStructureContext;
+  private final List<String> inflightMessageIds;
 
   private TransactionContext transactionContext;
   private TransactionalTaskContext managedTransactionalTaskContext;
   private boolean autoCommit = true;
   private volatile boolean closed = false;
+  private AckMode ackMode;
+  private Clock clock = Clock.systemUTC();
 
   public DefaultChannelContext(TrackingParent<ChannelContext> parent,
       BrokerConfig config) {
+
     this.parent = parent;
     this.config = config;
     this.hazelcastInstance = config.getHazelcastInstance();
@@ -51,6 +57,8 @@ class DefaultChannelContext implements ChannelContext,
     this.channels = new LinkedList<>();
     this.channelMutex = new Object();
     this.dataStructureContext = new TransactionAwareDataStructureContext();
+    this.ackMode = AckMode.AUTO;
+    this.inflightMessageIds = new LinkedList<>();
   }
 
   @Override
@@ -245,7 +253,7 @@ class DefaultChannelContext implements ChannelContext,
 
       switch (key.getServiceName()) {
         case QueueService.SERVICE_NAME:
-          return new QueueChannel(key, this, dataStructureContext, config);
+          return new QueueChannel(key, this, dataStructureContext, this, config);
 
         default:
           throw new UnsupportedOperationException(format(
@@ -282,6 +290,88 @@ class DefaultChannelContext implements ChannelContext,
 
     // Return if it was destroyed.
     return opDistObj.isPresent();
+  }
+
+  @Override
+  public void setAckMode(AckMode ackMode) {
+    requireNotClosed();
+
+    if (ackMode == this.ackMode) {
+      return;
+    }
+
+    // Acknowledge any in-flight messages.
+    ack();
+
+    this.ackMode = ackMode;
+  }
+
+  @Override
+  public AckMode getAckMode() {
+    return ackMode;
+  }
+
+  @Override
+  public void nack(String... msgIds) {
+    ack(true, msgIds);
+  }
+
+  @Override
+  public void ack(String... msgIds) {
+    ack(false, msgIds);
+  }
+
+  private void ack(boolean negative, String... msgIds) {
+    requireNotClosed();
+
+    // If no message IDs, ack/nack all inflight messages.
+    final Set<String> msgIdsToAck = new HashSet<>(inflightMessageIds.size());
+    if (msgIds == null || msgIds.length == 0) {
+
+      // Send an ack for each inflight message.
+      msgIdsToAck.addAll(inflightMessageIds);
+
+    } else {
+
+      for (String msgId : msgIds) {
+
+        int pos = inflightMessageIds.indexOf(msgId);
+        if (pos > -1) {
+          // Add all message IDs up to and including the target ID.
+          msgIdsToAck.addAll(inflightMessageIds.subList(0, pos + 1));
+        } else {
+          // Add just the target ID. This should only happen if the user
+          // is acking a message that wasn't received through this context.
+          // While an abnormal condition, it is supported.
+          msgIdsToAck.add(msgId);
+        }
+      }
+
+    }
+
+    // Remove all the IDs that we are acking.
+    inflightMessageIds.removeAll(msgIdsToAck);
+
+    // Send the acks/nacks.
+    inflightMessageIds.forEach(msgId -> {
+      MessageAckInflightAdapter.getQueueToOffer(dataStructureContext, true)
+          .offer(new MessageAck(msgId, negative));
+    });
+  }
+
+  @Override
+  public void inflight(DataStructureKey channelKey,
+      org.mpilone.hazelcastmq.core.Message<?> message) {
+
+    if (ackMode != AckMode.AUTO) {
+      final String messageId = message.getHeaders().getId();
+      final MessageInflight inflight = new MessageInflight(message, channelKey,
+          clock.millis());
+
+      MessageAckInflightAdapter.getMapToPut(dataStructureContext, true).put(
+          messageId, inflight);
+      inflightMessageIds.add(messageId);
+    }
   }
 
   private class TransactionAwareDataStructureContext implements

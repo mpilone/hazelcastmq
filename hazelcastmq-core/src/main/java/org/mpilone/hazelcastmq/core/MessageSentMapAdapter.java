@@ -15,7 +15,7 @@ abstract class MessageSentMapAdapter implements
     EntryMergedListener<DataStructureKey, Long> {
 
   public final static String MESSAGE_SENT_MAP_NAME =
-      "hzmq.messagesentmap";
+      "hzmq.messagesent";
 
   @Override
   public void entryAdded(EntryEvent<DataStructureKey, Long> event) {
