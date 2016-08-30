@@ -14,7 +14,6 @@ import java.util.List;
  */
 class DefaultBroker implements Broker {
 
-
   private final BrokerConfig config;
   private final Object contextMutex;
   private final List<ChannelContext> channelContexts;
@@ -22,6 +21,8 @@ class DefaultBroker implements Broker {
   private final HazelcastInstance hazelcastInstance;
   private final String routeExecutorRegistrationId;
   private final String entryExpirerRegistrationId;
+  private final String inflightMapRegistrationId;
+  private final String inflightQueueRegistrationId;
   private final DataStructureContext dataStructureContext;
 
   private volatile boolean closed;
@@ -46,6 +47,14 @@ class DefaultBroker implements Broker {
     this.routeExecutorRegistrationId = MessageSentMapAdapter.getMapToListen(
         dataStructureContext).
         addEntryListener(new EventDispatchThreadRouterExecutor(config), false);
+
+    final MessageAckInflightResender resender = new MessageAckInflightResender(
+        config);
+    this.inflightMapRegistrationId = MessageAckInflightAdapter
+        .getMapToListen(dataStructureContext).addEntryListener(resender,
+            false);
+    this.inflightQueueRegistrationId = MessageAckInflightAdapter
+        .getQueueToListen(dataStructureContext).addItemListener(resender, false);
   }
 
   @Override
@@ -87,6 +96,10 @@ class DefaultBroker implements Broker {
         removeEntryListener(entryExpirerRegistrationId);
     MessageSentMapAdapter.getMapToListen(dataStructureContext).
         removeEntryListener(routeExecutorRegistrationId);
+    MessageAckInflightAdapter.getMapToListen(dataStructureContext)
+        .removeEntryListener(inflightMapRegistrationId);
+    MessageAckInflightAdapter.getQueueToListen(dataStructureContext)
+        .removeItemListener(inflightQueueRegistrationId);
 
     synchronized (contextMutex) {
       // Clone the list so there is no concurrent modification exception.

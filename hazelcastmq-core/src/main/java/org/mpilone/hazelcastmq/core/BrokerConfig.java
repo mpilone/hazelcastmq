@@ -2,6 +2,7 @@ package org.mpilone.hazelcastmq.core;
 
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The configuration for the broker.
@@ -9,6 +10,12 @@ import com.hazelcast.core.HazelcastInstance;
  * @author mpilone
  */
 public class BrokerConfig {
+
+  /**
+   * The default inflight timeout in seconds.
+   */
+  public static final int DEFAULT_INFLIGHT_TIMEOUT = (int) TimeUnit.MINUTES
+      .toSeconds(10);
 
   // Possible future config options:
   // - multiple thread router executor
@@ -18,6 +25,7 @@ public class BrokerConfig {
   //
   private HazelcastInstance hazelcastInstance;
   private MessageConverter messageConverter = new NoOpMessageConverter();
+  private int inflightTimeout = DEFAULT_INFLIGHT_TIMEOUT;
 
   /**
    * Constructs the configuration with the following defaults:
@@ -84,5 +92,27 @@ public class BrokerConfig {
     this.messageConverter = messageConverter;
   }
 
+  /**
+   * Sets the inflight message timeout in seconds. If a message's inflight time
+   * is greater than this timeout, the message will be automatically nacked
+   * which normally means the message will be resent on the original channel.
+   * This value applies to all channels of this broker. The timeout is normally
+   * only checked periodically when there is activity in the broker so the
+   * actual timeout may be slightly longer.
+   *
+   * @param inflightTimeout the inflight timeout in seconds
+   */
+  public void setInflightTimeout(int inflightTimeout) {
+    this.inflightTimeout = inflightTimeout;
+  }
+
+  /**
+   * Returns the inflight message timeout in seconds.
+   *
+   * @return the inflight timeout in seconds
+   */
+  public int getInflightTimeout() {
+    return inflightTimeout;
+  }
 
 }
