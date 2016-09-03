@@ -1,17 +1,19 @@
 package org.mpilone.hazelcastmq.core;
 
+import static java.lang.String.format;
+
+import java.time.Clock;
+import java.util.*;
+
+import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageAck;
+import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageInflight;
+
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.core.*;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionalTaskContext;
-import java.time.Clock;
-import java.util.*;
-import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageAck;
-import org.mpilone.hazelcastmq.core.MessageAckInflightAdapter.MessageInflight;
-
-import static java.lang.String.format;
 
 /**
  * Default implementation of the channel context. The context can participate in
@@ -353,7 +355,7 @@ class DefaultChannelContext implements ChannelContext,
     inflightMessageIds.removeAll(msgIdsToAck);
 
     // Send the acks/nacks.
-    inflightMessageIds.forEach(msgId -> {
+    msgIdsToAck.forEach(msgId -> {
       MessageAckInflightAdapter.getQueueToOffer(dataStructureContext, true)
           .offer(new MessageAck(msgId, negative));
     });

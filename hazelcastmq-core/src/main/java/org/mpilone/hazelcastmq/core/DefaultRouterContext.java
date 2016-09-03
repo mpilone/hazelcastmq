@@ -1,10 +1,11 @@
 
 package org.mpilone.hazelcastmq.core;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
 import java.io.Serializable;
 import java.util.*;
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 
 /**
  * Default implementation of the router context.
@@ -73,7 +74,6 @@ class DefaultRouterContext implements RouterContext, TrackingParent<Router> {
 
     synchronized (routerMutex) {
       requireNotClosed();
-
       
       DefaultRouter router = new DefaultRouter(channelKey, this, config);
       routers.add(router);

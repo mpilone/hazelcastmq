@@ -1,14 +1,18 @@
 package org.mpilone.hazelcastmq.core;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
-import com.hazelcast.map.AbstractEntryProcessor;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
 import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+import com.hazelcast.map.AbstractEntryProcessor;
+
 /**
+ * Default implementation of a router that uses a router data map to track the
+ * router's state across the cluster.
  *
  * @author mpilone
  */
@@ -29,7 +33,7 @@ class DefaultRouter implements Router {
     this.parent = parent;
 
     // Make sure the router data exists for this router in the data map.
-    getRouterDataMap().putIfAbsent(channelKey,    new RouterData(channelKey));
+    getRouterDataMap().putIfAbsent(channelKey, new RouterData(channelKey));
   }
 
   @Override
@@ -105,19 +109,28 @@ class DefaultRouter implements Router {
 
   /**
    * Routes all messages from the source channel to the target channels using
-   * the routing strategy configured in the router. This method will manage the
-   * lock to avoid any race conditions with modifications to the router by other
-   * instances.
+   * the routing strategy configured in the router.
    */
+  @Override
   public void routeMessages() {
+    requireNotClosed();
 
     final IMap<DataStructureKey, RouterData> routerDataMap = getRouterDataMap();
+
+    // Lock the channel key to avoid concurrent modification to the
+    // strategy and routes during routing.
     routerDataMap.lock(channelKey);
     try {
       final RouterData routerData = routerDataMap.get(channelKey);
-      routeMessagesInLock(routerData);
 
-      if (routerData.getRoutingStrategy() instanceof StatefulRoutingStrategy) {
+      // Get the strategy and possible output routes.
+      final RoutingStrategy strategy = routerData.getRoutingStrategy();
+      final Collection<Route> routes = routerData.getRoutes();
+      final DataStructureKey sourceChannelKey = routerData.getChannelKey();
+
+      routeMessages(sourceChannelKey, routes, strategy);
+
+      if (strategy instanceof StatefulRoutingStrategy) {
       // Put the router data back in the map so the stateful strategy
         // is properly saved/persisted.
         routerDataMap.put(channelKey, routerData);
@@ -133,13 +146,14 @@ class DefaultRouter implements Router {
    * the routing strategy configured in the router. This method must be executed
    * in the router lock to avoid race conditions on the router data.
    *
-   * @param routerData the router data backing this router
+   * @param sourceChannelKey the key for the channel that serves as the source
+   * of messages
+   * @param routes the routes that define the target channel keys and routing
+   * keys
+   * @param strategy the routing strategy to apply to each message
    */
-  private void routeMessagesInLock(RouterData routerData) {
-
-    // Get the strategy and possible output routes.
-    final RoutingStrategy strategy = routerData.getRoutingStrategy();
-    final Collection<Route> routes = routerData.getRoutes();
+  private void routeMessages(final DataStructureKey sourceChannelKey,
+      final Collection<Route> routes, final RoutingStrategy strategy) {
 
     // Create a channel context to access input and output channels.
     try (DefaultChannelContext channelContext = new DefaultChannelContext(
@@ -147,8 +161,8 @@ class DefaultRouter implements Router {
         }, config)) {
 
       // Create the input channel to read from.
-      try (Channel sourceChannel = channelContext.createChannel(routerData.
-          getChannelKey())) {
+      try (Channel sourceChannel = channelContext.
+          createChannel(sourceChannelKey)) {
 
         // As long as we have messages, keep routing.
         Message<?> msg;
@@ -159,6 +173,9 @@ class DefaultRouter implements Router {
           strategy.routeMessage(_msg, routes).stream().forEach(targetKey -> {
 
             try (Channel targetChannel = channelContext.createChannel(targetKey)) {
+              // Send to the target channel.
+              // TODO: we should probably log if a send fails or have a
+              // configuration options for sending to the DLQ.
               targetChannel.send(_msg, 0, TimeUnit.SECONDS);
             }
           });
@@ -171,6 +188,7 @@ class DefaultRouter implements Router {
    * Entry processor that adds a target route to this router.
    */
   private static class AddRouteProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
+
     private static final long serialVersionUID = 1L;
 
     private final DataStructureKey targetKey;
@@ -219,7 +237,7 @@ class DefaultRouter implements Router {
       routeMap.put(targetKey, new Route(targetKey, newRoutingKeys));
 
       RouterData newData = new RouterData(data.getChannelKey(), data.
-         getRoutingStrategy(), routeMap.values());
+          getRoutingStrategy(), routeMap.values());
       entry.setValue(newData);
 
       return newData;
@@ -231,6 +249,7 @@ class DefaultRouter implements Router {
    * Entry processor that removes a target route to this router.
    */
   private static class RemoveRouteProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
+
     private static final long serialVersionUID = 1L;
 
     private final DataStructureKey targetKey;
@@ -297,6 +316,7 @@ class DefaultRouter implements Router {
 
   private static class SetRoutingStrategyProcessor extends
       AbstractEntryProcessor<DataStructureKey, RouterData> {
+
     private static final long serialVersionUID = 1L;
 
     private final RoutingStrategy strategy;

@@ -125,7 +125,12 @@ public class TransactionAwareBrokerProxy implements Broker {
 
   @Override
   public RouterContext createRouterContext() {
-    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    return broker.createRouterContext();
+  }
+
+  @Override
+  public String getName() {
+    return broker.getName();
   }
 
   private static class ChannelContextSynchronization extends TransactionSynchronizationAdapter {

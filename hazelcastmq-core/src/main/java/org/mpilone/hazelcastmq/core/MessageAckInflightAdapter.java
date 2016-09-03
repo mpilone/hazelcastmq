@@ -4,10 +4,11 @@ import com.hazelcast.core.*;
 import com.hazelcast.map.listener.EntryAddedListener;
 import com.hazelcast.map.listener.EntryMergedListener;
 import com.hazelcast.map.listener.EntryUpdatedListener;
+
 import java.io.Serializable;
+
 import org.mpilone.hazelcastmq.core.Message;
 
-import static org.mpilone.hazelcastmq.core.MessageSentMapAdapter.MESSAGE_SENT_MAP_NAME;
 
 /**
  *
@@ -64,7 +65,7 @@ abstract class MessageAckInflightAdapter implements
       DataStructureContext context, boolean joinTransaction) {
 
     final BaseMap<String, MessageInflight> map = context.getMap(
-        MESSAGE_SENT_MAP_NAME, joinTransaction);
+        MESSAGE_INFLIGHT_MAP_NAME, joinTransaction);
     return map;
   }
 

@@ -89,13 +89,13 @@ public interface ChannelContext extends AutoCloseable {
   /**
    * <p>
    * Sets the acknowledgment mode of the channels created by this context. By
-   * default all channels will be in {@link AckMode#AUTO} which means a message
-   * returned by a {@link #receive()} operation is considered automatically
-   * acknowledged and requires no further action. In any other acknowledgment
-   * mode, messages are considered "in-flight" until they are explicitly
-   * {@link #ack(java.lang.String) acked} or
-   * {@link #nack(java.lang.String) nacked}. Messages that are in-flight past a
-   * configured expiration period may be automatically redelivered to the
+   * default the context will be in {@link AckMode#AUTO} which means a message
+   * returned by a {@link Channel#receive()} operation is considered
+   * automatically acknowledged and requires no further action. In any other
+   * acknowledgment mode, messages are considered "in-flight" until they are
+   * explicitly {@link #ack(java.lang.String...)  acked} or
+   * {@link #nack(java.lang.String...)  nacked}. Messages that are in-flight
+   * past a configured expiration period may be automatically redelivered to the
    * channel.
    * </p>
    * <p>
@@ -129,8 +129,8 @@ public interface ChannelContext extends AutoCloseable {
    * Indicates a negative-acknowledgment (nack) of the messages with the given
    * IDs. In {@link AckMode#AUTO} this method does nothing. In
    * {@link AckMode#CLIENT}, the messages with the given IDs and all previous
-   * messages received in the entire context since the last call to {@link #nack(java.lang.String)
-   * } or {@link #ack(java.lang.String) } will be nacked. Not passing any
+   * messages received in the entire context since the last call to {@link #nack(java.lang.String...)
+   * } or {@link #ack(java.lang.String...) } will be nacked. Not passing any
    * message IDs will cause all messages received in the parent context to be
    * nacked.
    *
@@ -142,9 +142,10 @@ public interface ChannelContext extends AutoCloseable {
    * Indicates an acknowledgment (ack) of the messages with the given IDs. In
    * {@link AckMode#AUTO} this method does nothing. In {@link AckMode#CLIENT},
    * the messages with the given IDs and all previous messages received in the
-   * entire context since the last call to {@link #nack(java.lang.String)
-   * } or {@link #ack(java.lang.String) } will be acked. Not passing any message
-   * IDs will cause all messages received in the parent context to be acked.
+   * entire context since the last call to {@link #nack(java.lang.String...)
+   * } or {@link #ack(java.lang.String...) } will be acked. Not passing any
+   * message IDs will cause all messages received in the parent context to be
+   * acked.
    *
    * @param msgIds the IDs of the message to nack or null
    */

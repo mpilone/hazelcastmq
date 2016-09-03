@@ -26,9 +26,17 @@ class EventDispatchThreadRouterExecutor extends MessageSentMapAdapter implements
   @Override
   void messageSent(DataStructureKey channelKey) {
 
-    try (DefaultRouter router = new DefaultRouter(channelKey, child -> {
+    try (RouterContext routerContext = new DefaultRouterContext(child -> {
     }, config)) {
-      router.routeMessages();
+
+      // Don't create a router if it doesn't already exist otherwise we'll
+      // always route messages to an empty list of targets even if the user
+      // didn't explicitly create and configure a router.
+      if (routerContext.containsRouterChannelKey(channelKey)) {
+        try (Router router = routerContext.createRouter(channelKey)) {
+          router.routeMessages();
+        }
+      }
     }
   }
 

@@ -43,6 +43,14 @@ public interface Broker extends AutoCloseable {
   BrokerConfig getConfig();
 
   /**
+   * Returns the unique name of this broker. The name can be used to look the
+   * broker up within the Hazelcast member.
+   *
+   * @return the broker name
+   */
+  String getName();
+
+  /**
    * Closes the broker which will automatically close all contexts and channels.
    * This method will block until all resources are stopped and released.
    */

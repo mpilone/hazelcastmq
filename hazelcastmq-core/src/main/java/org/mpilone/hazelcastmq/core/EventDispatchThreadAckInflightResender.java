@@ -21,13 +21,12 @@ import static java.lang.String.format;
  *
  * @author mpilone
  */
-class MessageAckInflightResender extends MessageAckInflightAdapter {
+class EventDispatchThreadAckInflightResender extends MessageAckInflightAdapter {
 
   /**
    * The log for this class.
    */
-  private final static ILogger log = Logger.getLogger(
-      MessageAckInflightResender.class);
+  private final static ILogger log = Logger.getLogger(EventDispatchThreadAckInflightResender.class);
 
   /**
    * The period between checks of the inflight map where inflight messages that
@@ -48,7 +47,7 @@ class MessageAckInflightResender extends MessageAckInflightAdapter {
    *
    * @param brokerConfig the broker configuration
    */
-  public MessageAckInflightResender(BrokerConfig brokerConfig) {
+  public EventDispatchThreadAckInflightResender(BrokerConfig brokerConfig) {
     this.brokerConfig = brokerConfig;
     this.hazelcastInstance = brokerConfig.getHazelcastInstance();
   }

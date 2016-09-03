@@ -56,6 +56,13 @@ public interface Router extends AutoCloseable {
   void removeRoute(DataStructureKey targetKey, String... routingKeys);
 
   /**
+   * Routes all messages from the source channel to the target channels using
+   * the routing strategy configured in the router. This method will block until
+   * all messages in the source channel have been drained and routed.
+   */
+  void routeMessages();
+
+  /**
    * Returns the channel key for the source channel in the route.
    *
    * @return the source channel key

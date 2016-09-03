@@ -1,11 +1,12 @@
 package org.mpilone.hazelcastmq.core;
 
-import com.hazelcast.core.BaseMap;
-import com.hazelcast.core.BaseQueue;
-import com.hazelcast.core.HazelcastInstance;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+
+import com.hazelcast.core.BaseMap;
+import com.hazelcast.core.BaseQueue;
+import com.hazelcast.core.HazelcastInstance;
 
 /**
  * The default and primary implementation of the broker.
@@ -24,6 +25,8 @@ class DefaultBroker implements Broker {
   private final String inflightMapRegistrationId;
   private final String inflightQueueRegistrationId;
   private final DataStructureContext dataStructureContext;
+  private final TrackingParent<Broker> parent;
+  private final String name;
 
   private volatile boolean closed;
 
@@ -32,8 +35,11 @@ class DefaultBroker implements Broker {
    *
    * @param config the broker configuration
    */
-  public DefaultBroker(BrokerConfig config) {
+  public DefaultBroker(TrackingParent<Broker> parent, String name,
+      BrokerConfig config) {
     this.config = config;
+    this.name = name;
+    this.parent = parent;
 
     this.contextMutex = new Object();
     this.channelContexts = new LinkedList<>();
@@ -48,8 +54,9 @@ class DefaultBroker implements Broker {
         dataStructureContext).
         addEntryListener(new EventDispatchThreadRouterExecutor(config), false);
 
-    final MessageAckInflightResender resender = new MessageAckInflightResender(
-        config);
+    final EventDispatchThreadAckInflightResender resender =
+        new EventDispatchThreadAckInflightResender(
+            config);
     this.inflightMapRegistrationId = MessageAckInflightAdapter
         .getMapToListen(dataStructureContext).addEntryListener(resender,
             false);
@@ -76,6 +83,11 @@ class DefaultBroker implements Broker {
       routerContexts.add(context);
       return context;
     }
+  }
+
+  @Override
+  public String getName() {
+    return name;
   }
 
   @Override
@@ -109,6 +121,8 @@ class DefaultBroker implements Broker {
       new ArrayList<>(routerContexts).stream().forEach(RouterContext::close);
       routerContexts.clear();
     }
+
+    parent.remove(this);
   }
 
   /**

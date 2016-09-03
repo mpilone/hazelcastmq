@@ -1,14 +1,16 @@
 package org.mpilone.hazelcastmq.example.core;
 
+import static java.lang.String.format;
+
+import java.util.concurrent.TimeUnit;
+
+import org.mpilone.hazelcastmq.core.*;
+import org.mpilone.hazelcastmq.example.ExampleApp;
+
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.*;
 import com.hazelcast.logging.*;
-import java.util.concurrent.TimeUnit;
-import org.mpilone.hazelcastmq.core.*;
-import org.mpilone.hazelcastmq.example.ExampleApp;
-
-import static java.lang.String.format;
 
 /**
  * Example of subscribing to a queue and sending a message to the queue.
@@ -54,11 +56,13 @@ public class QueueChannelSendReceive extends ExampleApp {
 
       long endTime = System.currentTimeMillis();
 
-      log.info(format("Received message '%s' in %d milliseconds.",
+      log.info(format("Send and received message '%s' in %d milliseconds.",
           msg.getPayload(), (endTime - startTime)));
     }
     finally {
       hz.shutdown();
     }
+
+    System.out.println("Shutdown!");
   }
 }
