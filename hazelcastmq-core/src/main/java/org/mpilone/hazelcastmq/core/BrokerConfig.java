@@ -17,6 +17,12 @@ public class BrokerConfig {
   public static final int DEFAULT_INFLIGHT_TIMEOUT = (int) TimeUnit.MINUTES
       .toSeconds(10);
 
+  /**
+   * The default router executor name.
+   */
+  public static final String DEFAULT_ROUTING_EXECUTOR_NAME
+      = "hzmq.routerexecutor";
+
   // Possible future config options:
   // - multiple thread router executor
   // - nack destination channel
@@ -26,6 +32,8 @@ public class BrokerConfig {
   private HazelcastInstance hazelcastInstance;
   private MessageConverter messageConverter = new NoOpMessageConverter();
   private int inflightTimeout = DEFAULT_INFLIGHT_TIMEOUT;
+  private String routerExecutorName = DEFAULT_ROUTING_EXECUTOR_NAME;
+
 
   /**
    * Constructs the configuration with the following defaults:
@@ -113,6 +121,25 @@ public class BrokerConfig {
    */
   public int getInflightTimeout() {
     return inflightTimeout;
+  }
+
+  /**
+   * Sets the name of the executor used for executing routing tasks. A task is
+   * submitted to the router whenever a message is sent that needs routing.
+   *
+   * @param routerExecutorName the name of the routing executor
+   */
+  public void setRouterExecutorName(String routerExecutorName) {
+    this.routerExecutorName = routerExecutorName;
+  }
+
+  /**
+   * Returns the name of the executor used for executing routing tasks.
+   *
+   * @return the name of the routing executor
+   */
+  public String getRouterExecutorName() {
+    return routerExecutorName;
   }
 
 }

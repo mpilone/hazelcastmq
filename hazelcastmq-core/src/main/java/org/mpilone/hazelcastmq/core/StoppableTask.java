@@ -19,7 +19,7 @@ import java.util.concurrent.*;
  *
  * @author mpilone
  */
-class StoppableTask<T> implements Callable<T> {
+class StoppableTask<T> implements Callable<T>, Stoppable {
 
   private final CountDownLatch latch;
   private final Object lifecycleMutex = new Object();

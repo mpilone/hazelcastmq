@@ -30,7 +30,8 @@ class QueueChannel implements Channel {
   private final Collection<ReadReadyListener> readReadyListeners;
   private final MessageConverter messageConverter;
 
-  private String messageSentMapRegistrationId;
+  private String messageSentRegistrationId;
+  private ReadReadyNotifier messageSentReadReadyNotifier;
   private StoppableTask<Boolean> sendTask;
   private StoppableTask<Message<?>> receiveTask;
   private volatile boolean closed;
@@ -151,10 +152,12 @@ class QueueChannel implements Channel {
     // Delay adding the item listener until we get our first read-ready
     // listener. This allows for light weight channels that just use
     // polling and therefore may never need to use an item listener at all.
-    if (messageSentMapRegistrationId == null) {
-      messageSentMapRegistrationId = MessageSentMapAdapter.getMapToListen(
-          dataStructureContext).addEntryListener(
-              new ReadReadyNotifier(), channelKey, false);
+    if (messageSentRegistrationId == null) {
+
+      messageSentReadReadyNotifier = new ReadReadyNotifier();
+      messageSentRegistrationId = MessageSentAdapter.getMapToListen(
+          dataStructureContext).addEntryListener(messageSentReadReadyNotifier,
+              channelKey, false);
     }
 
     // Synchronize because the listeners will be notified from a HZ
@@ -170,13 +173,22 @@ class QueueChannel implements Channel {
       readReadyListeners.remove(listener);
     }
 
-    if (readReadyListeners.isEmpty() && messageSentMapRegistrationId
+    if (readReadyListeners.isEmpty() && messageSentRegistrationId
         != null) {
       // Stop listening for events. This is a slight optimization to
       // avoid getting events that we'll never notify listeners of.
-      MessageSentMapAdapter.getMapToListen(dataStructureContext).
-          removeEntryListener(messageSentMapRegistrationId);
-      messageSentMapRegistrationId = null;
+      MessageSentAdapter.getMapToListen(dataStructureContext).
+          removeEntryListener(messageSentRegistrationId);
+
+      try {
+        messageSentReadReadyNotifier.stop();
+      }
+      catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+      }
+
+      messageSentReadReadyNotifier = null;
+      messageSentRegistrationId = null;
     }
   }
 
@@ -197,12 +209,12 @@ class QueueChannel implements Channel {
       readReadyListeners.clear();
     }
 
-    if (messageSentMapRegistrationId != null) {
+    if (messageSentRegistrationId != null) {
       // Stop listening for item events.
-      MessageSentMapAdapter.getMapToListen(dataStructureContext).
-          removeEntryListener(messageSentMapRegistrationId);
+      MessageSentAdapter.getMapToListen(dataStructureContext).
+          removeEntryListener(messageSentRegistrationId);
 
-      messageSentMapRegistrationId = null;
+      messageSentRegistrationId = null;
     }
 
     synchronized (taskMutex) {
@@ -238,7 +250,7 @@ class QueueChannel implements Channel {
     return temporary;
   }
 
-  private class ReadReadyNotifier extends MessageSentMapAdapter {
+  private class ReadReadyNotifier extends MessageSentAdapter {
 
     @Override
     public void messageSent(DataStructureKey channelKey) {
@@ -302,9 +314,8 @@ class QueueChannel implements Channel {
         throw new InterruptedException();
       }
       else if (success) {
-        dataStructureContext.
-            getMap(MessageSentMapAdapter.MESSAGE_SENT_MAP_NAME,
-                true).put(channelKey, clock.millis());
+        MessageSentAdapter.getMapToPut(dataStructureContext, true).put(
+            channelKey, clock.millis());
       }
 
       return success;

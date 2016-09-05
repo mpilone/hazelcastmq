@@ -1,12 +1,11 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-
 import com.hazelcast.core.BaseMap;
 import com.hazelcast.core.BaseQueue;
 import com.hazelcast.core.HazelcastInstance;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * The default and primary implementation of the broker.
@@ -27,6 +26,7 @@ class DefaultBroker implements Broker {
   private final DataStructureContext dataStructureContext;
   private final TrackingParent<Broker> parent;
   private final String name;
+  private final List<Stoppable> stoppableListeners;
 
   private volatile boolean closed;
 
@@ -46,22 +46,34 @@ class DefaultBroker implements Broker {
     this.routerContexts = new LinkedList<>();
     this.hazelcastInstance = config.getHazelcastInstance();
     this.dataStructureContext = new HazelcastDataStructureContext();
+    this.stoppableListeners = new ArrayList<>(5);
 
-    this.entryExpirerRegistrationId = MessageSentMapAdapter.
+    // Listen for message sends and cleanup sent map.
+    final MessageSentCleanupHandler cleanupHandler
+        = new MessageSentCleanupHandler(name, config);
+    this.entryExpirerRegistrationId = MessageSentAdapter.
         getMapToListen(dataStructureContext).addEntryListener(
-            new MessageSentMapEntryExpirer(config), false);
-    this.routeExecutorRegistrationId = MessageSentMapAdapter.getMapToListen(
-        dataStructureContext).
-        addEntryListener(new EventDispatchThreadRouterExecutor(config), false);
+            cleanupHandler, false);
+    stoppableListeners.add(cleanupHandler);
 
-    final EventDispatchThreadAckInflightResender resender =
-        new EventDispatchThreadAckInflightResender(
-            config);
+    // Listen for message sends and perform routing.
+    final MessageSentRoutingHandler routingHandler
+        = new MessageSentRoutingHandler(name, config);
+    this.routeExecutorRegistrationId = MessageSentAdapter.getMapToListen(
+        dataStructureContext).
+        addEntryListener(routingHandler, false);
+    stoppableListeners.add(routingHandler);
+
+    // Listen for inflight messages and ack/nacks and apply them.
+    final MessageAckInflightApplyHandler inflightHandler
+        = new MessageAckInflightApplyHandler(name, config);
     this.inflightMapRegistrationId = MessageAckInflightAdapter
-        .getMapToListen(dataStructureContext).addEntryListener(resender,
+        .getMapToListen(dataStructureContext).addEntryListener(inflightHandler,
             false);
     this.inflightQueueRegistrationId = MessageAckInflightAdapter
-        .getQueueToListen(dataStructureContext).addItemListener(resender, false);
+        .getQueueToListen(dataStructureContext).addItemListener(inflightHandler,
+            false);
+    stoppableListeners.add(inflightHandler);
   }
 
   @Override
@@ -104,14 +116,24 @@ class DefaultBroker implements Broker {
     closed = true;
 
     // Stop listening for message sent events.
-    MessageSentMapAdapter.getMapToListen(dataStructureContext).
+    MessageSentAdapter.getMapToListen(dataStructureContext).
         removeEntryListener(entryExpirerRegistrationId);
-    MessageSentMapAdapter.getMapToListen(dataStructureContext).
+    MessageSentAdapter.getMapToListen(dataStructureContext).
         removeEntryListener(routeExecutorRegistrationId);
     MessageAckInflightAdapter.getMapToListen(dataStructureContext)
         .removeEntryListener(inflightMapRegistrationId);
     MessageAckInflightAdapter.getQueueToListen(dataStructureContext)
         .removeItemListener(inflightQueueRegistrationId);
+
+    try {
+      for (Stoppable s : stoppableListeners) {
+        s.stop();
+      }
+      stoppableListeners.clear();
+    }
+    catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
 
     synchronized (contextMutex) {
       // Clone the list so there is no concurrent modification exception.
@@ -165,7 +187,5 @@ class DefaultBroker implements Broker {
       return hazelcastInstance.getMap(name);
     }
   }
-
-
 
 }
