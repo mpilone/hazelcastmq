@@ -92,6 +92,7 @@ class StoppableTask<T> implements Callable<T>, Stoppable {
    *
    * @throws InterruptedException if interrupted while awaiting termination
    */
+  @Override
   public void stop() throws InterruptedException {
     doStop();
     latch.await();
@@ -108,6 +109,7 @@ class StoppableTask<T> implements Callable<T>, Stoppable {
    * @return true if the task terminated in the given time, false otherwise
    * @throws InterruptedException if interrupted while awaiting termination
    */
+  @Override
   public boolean stop(long timeout, TimeUnit unit) throws InterruptedException {
     doStop();
     return latch.await(timeout, unit);

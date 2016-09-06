@@ -6,6 +6,7 @@ import com.hazelcast.logging.Logger;
 import java.io.Serializable;
 import java.time.Clock;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
@@ -38,9 +39,8 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
       30);
   private final Object autoAckMutex = new Object();
 
-  private final String brokerName;
   private final BrokerConfig config;
-  private final HazelcastInstance hazelcastInstance;
+  private final Executor executor;
 
   private long lastAutoNackTime;
   private Clock clock = Clock.systemUTC();
@@ -50,12 +50,10 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
    *
    * @param config the broker configuration
    */
-  public MessageAckInflightApplyHandler(String brokerName,
-      BrokerConfig config) {
+  public MessageAckInflightApplyHandler(Executor executor, BrokerConfig config) {
 
-    this.brokerName = brokerName;
+    this.executor = executor;
     this.config = config;
-    this.hazelcastInstance = config.getHazelcastInstance();
   }
 
   @Override
@@ -66,11 +64,7 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
   @Override
   protected void messageAck(MessageAck ack) {
 
-    final IExecutorService executor = hazelcastInstance.getExecutorService(
-        config.getRouterExecutorName());
-    final Member member = hazelcastInstance.getCluster().getLocalMember();
-
-    executor.executeOnMember(new ApplyAckTask(brokerName), member);
+    executor.execute(new ApplyAckTask());
 
     maybeAutoNack();
   }
@@ -90,46 +84,38 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
         // and nack them.
         lastAutoNackTime = now;
 
-        final IExecutorService executor = hazelcastInstance.getExecutorService(
-            "hzmq.ackexecutor");
-        final Member member = hazelcastInstance.getCluster().getLocalMember();
         final long timeout = TimeUnit.SECONDS.toMillis(config
             .getInflightTimeout());
 
         log.fine("Submitting auto nack task for inflight messages.");
 
-        executor.executeOnMember(new AutoNackTask(brokerName, timeout, now),
-            member);
+        executor.execute(new AutoNackTask(timeout, now));
       }
     }
   }
 
-  private static class AutoNackTask implements Runnable, Serializable {
+  private static class AutoNackTask implements Runnable, Serializable,
+      BrokerAware {
 
     private static final long serialVersionUID = 1L;
 
-    private final String brokerName;
     private final long timeout;
     private final long now;
 
-    public AutoNackTask(String brokerName, long timeout, long now) {
-      this.brokerName = brokerName;
+    private Broker broker;
+
+    public AutoNackTask(long timeout, long now) {
       this.timeout = timeout;
       this.now = now;
     }
 
     @Override
+    public void setBroker(Broker broker) {
+      this.broker = broker;
+    }
+
+    @Override
     public void run() {
-
-      final Broker broker = HazelcastMQ.getBrokerByName(brokerName);
-
-      if (broker == null) {
-        // Log and return.
-        log.warning(format("Unable to find broker %s to auto nack "
-            + "inflight messages.", brokerName));
-
-        return;
-      }
 
       final HazelcastInstance hazelcastInstance = broker.getConfig()
           .getHazelcastInstance();
@@ -161,28 +147,20 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
     }
   }
 
-  private static class ApplyAckTask implements Runnable, Serializable {
+  private static class ApplyAckTask implements Runnable, Serializable,
+      BrokerAware {
 
     private static final long serialVersionUID = 1L;
 
-    private final String brokerName;
+    private Broker broker;
 
-    public ApplyAckTask(String brokerName) {
-      this.brokerName = brokerName;
+    @Override
+    public void setBroker(Broker broker) {
+      this.broker = broker;
     }
 
     @Override
     public void run() {
-
-      final Broker broker = HazelcastMQ.getBrokerByName(brokerName);
-
-      if (broker == null) {
-        // Log and return.
-        log.warning(
-            format("Unable to find broker %s to apply acks.", brokerName));
-
-        return;
-      }
 
       final HazelcastInstance hazelcastInstance = broker.getConfig()
           .getHazelcastInstance();

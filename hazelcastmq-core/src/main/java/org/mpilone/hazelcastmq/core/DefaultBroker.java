@@ -3,9 +3,12 @@ package org.mpilone.hazelcastmq.core;
 import com.hazelcast.core.BaseMap;
 import com.hazelcast.core.BaseQueue;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The default and primary implementation of the broker.
@@ -13,6 +16,15 @@ import java.util.List;
  * @author mpilone
  */
 class DefaultBroker implements Broker {
+
+  /**
+   * The log for this class.
+   */
+  private final static ILogger log = Logger.getLogger(
+      DefaultBroker.class);
+
+  public static final String BROKER_TASK_EXECUTOR_NAME
+      = "hzmq.brokertaskexecutor";
 
   private final BrokerConfig config;
   private final Object contextMutex;
@@ -26,7 +38,7 @@ class DefaultBroker implements Broker {
   private final DataStructureContext dataStructureContext;
   private final TrackingParent<Broker> parent;
   private final String name;
-  private final List<Stoppable> stoppableListeners;
+  private final DistributedBrokerExecutor distributedBrokerExecutor;
 
   private volatile boolean closed;
 
@@ -46,34 +58,32 @@ class DefaultBroker implements Broker {
     this.routerContexts = new LinkedList<>();
     this.hazelcastInstance = config.getHazelcastInstance();
     this.dataStructureContext = new HazelcastDataStructureContext();
-    this.stoppableListeners = new ArrayList<>(5);
+    this.distributedBrokerExecutor = new DistributedBrokerExecutor(
+        hazelcastInstance, BROKER_TASK_EXECUTOR_NAME, name);
 
     // Listen for message sends and cleanup sent map.
     final MessageSentCleanupHandler cleanupHandler
-        = new MessageSentCleanupHandler(name, config);
+        = new MessageSentCleanupHandler(distributedBrokerExecutor);
     this.entryExpirerRegistrationId = MessageSentAdapter.
         getMapToListen(dataStructureContext).addEntryListener(
             cleanupHandler, false);
-    stoppableListeners.add(cleanupHandler);
 
     // Listen for message sends and perform routing.
     final MessageSentRoutingHandler routingHandler
-        = new MessageSentRoutingHandler(name, config);
+        = new MessageSentRoutingHandler(distributedBrokerExecutor);
     this.routeExecutorRegistrationId = MessageSentAdapter.getMapToListen(
         dataStructureContext).
         addEntryListener(routingHandler, false);
-    stoppableListeners.add(routingHandler);
 
     // Listen for inflight messages and ack/nacks and apply them.
     final MessageAckInflightApplyHandler inflightHandler
-        = new MessageAckInflightApplyHandler(name, config);
+        = new MessageAckInflightApplyHandler(distributedBrokerExecutor, config);
     this.inflightMapRegistrationId = MessageAckInflightAdapter
         .getMapToListen(dataStructureContext).addEntryListener(inflightHandler,
             false);
     this.inflightQueueRegistrationId = MessageAckInflightAdapter
         .getQueueToListen(dataStructureContext).addItemListener(inflightHandler,
             false);
-    stoppableListeners.add(inflightHandler);
   }
 
   @Override
@@ -125,11 +135,14 @@ class DefaultBroker implements Broker {
     MessageAckInflightAdapter.getQueueToListen(dataStructureContext)
         .removeItemListener(inflightQueueRegistrationId);
 
+//    System.out.println("Removed all broker task listeners.");
+
     try {
-      for (Stoppable s : stoppableListeners) {
-        s.stop();
+      if (!distributedBrokerExecutor.stop(1, TimeUnit.MINUTES)) {
+        log.warning("Unable to stop distributed broker executor during "
+            + "broker close. Listeners may still be executing.");
       }
-      stoppableListeners.clear();
+//      System.out.println("Stopped distributed broker executor.");
     }
     catch (InterruptedException ex) {
       Thread.currentThread().interrupt();

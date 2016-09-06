@@ -6,9 +6,9 @@ import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import java.io.Serializable;
 import java.time.Clock;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import static java.lang.String.format;
 
 /**
  *
@@ -30,17 +30,13 @@ class MessageSentCleanupHandler extends MessageSentAdapter {
   private static final long MESSAGE_SENT_EXPIRATION = TimeUnit.MINUTES.toMillis(
       2);
 
-  private final String brokerName;
-  private final BrokerConfig config;
-  private final HazelcastInstance hazelcastInstance;
+  private final Executor executor;
 
   private Clock clock = Clock.systemUTC();
   private long lastRunTime = 0;
 
-  public MessageSentCleanupHandler(String brokerName, BrokerConfig config) {
-    this.config = config;
-    this.brokerName = brokerName;
-    this.hazelcastInstance = config.getHazelcastInstance();
+  public MessageSentCleanupHandler(Executor executor) {
+    this.executor = executor;
   }
 
   @Override
@@ -50,40 +46,34 @@ class MessageSentCleanupHandler extends MessageSentAdapter {
     if (now - lastRunTime > MESSAGE_SENT_EXPIRATION) {
       lastRunTime = now;
 
-      final IExecutorService executor = hazelcastInstance.getExecutorService(
-          config.getRouterExecutorName());
-      final Member member = hazelcastInstance.getCluster().getLocalMember();
+      log.fine("Executing task to expire sent map entries.");
 
-      executor.executeOnMember(new ExpireSentMapEntryTask(brokerName, now),
-          member);
+//      System.out.println("Executing task to expire sent map entries.");
 
+      executor.execute(new ExpireSentMapEntryTask(now));
     }
   }
 
-  private static class ExpireSentMapEntryTask implements Runnable, Serializable {
+  private static class ExpireSentMapEntryTask implements Runnable, Serializable,
+      BrokerAware {
 
     private static final long serialVersionUID = 1L;
 
-    private final String brokerName;
     private final long now;
 
-    public ExpireSentMapEntryTask(String brokerName, long now) {
-      this.brokerName = brokerName;
+    private Broker broker;
+
+    public ExpireSentMapEntryTask(long now) {
       this.now = now;
     }
 
     @Override
+    public void setBroker(Broker broker) {
+      this.broker = broker;
+    }
+
+    @Override
     public void run() {
-
-      final Broker broker = HazelcastMQ.getBrokerByName(brokerName);
-
-      if (broker == null) {
-        // Log and return.
-        log.warning(format("Unable to find broker %s to auto nack "
-            + "inflight messages.", brokerName));
-
-        return;
-      }
 
       final HazelcastInstance hazelcastInstance = broker.getConfig()
           .getHazelcastInstance();

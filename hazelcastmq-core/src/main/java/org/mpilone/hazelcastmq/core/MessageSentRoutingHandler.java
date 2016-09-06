@@ -1,14 +1,9 @@
 
 package org.mpilone.hazelcastmq.core;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IExecutorService;
-import com.hazelcast.core.Member;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
 import java.io.Serializable;
+import java.util.concurrent.Executor;
 
-import static java.lang.String.format;
 
 /**
  * A router executor that uses the item event dispatch thread to perform the
@@ -21,63 +16,43 @@ import static java.lang.String.format;
 class MessageSentRoutingHandler extends MessageSentAdapter implements
     RouterExecutor {
 
-  /**
-   * The log for this class.
-   */
-  private final static ILogger log = Logger.getLogger(
-      MessageSentRoutingHandler.class);
-
-  private final String brokerName;
-  private final BrokerConfig config;
-  private final HazelcastInstance hazelcastInstance;
+  private final Executor executor;
 
   /**
    * Constructs the executor.
    *
    * @param config the broker configuration
    */
-  public MessageSentRoutingHandler(String brokerName,
-      BrokerConfig config) {
-    this.config = config;
-    this.brokerName = brokerName;
-    this.hazelcastInstance = config.getHazelcastInstance();
+  public MessageSentRoutingHandler(Executor executor) {
+    this.executor = executor;
   }
 
   @Override
   void messageSent(DataStructureKey channelKey) {
 
-    final IExecutorService executor = hazelcastInstance.getExecutorService(
-        config.getRouterExecutorName());
-    final Member member = hazelcastInstance.getCluster().getLocalMember();
-
-    executor.executeOnMember(new RouteMessagesTask(channelKey,
-        brokerName), member);
+    executor.execute(new RouteMessagesTask(channelKey));
   }
 
-  private static class RouteMessagesTask implements Runnable, Serializable {
+  private static class RouteMessagesTask implements Runnable, Serializable,
+      BrokerAware {
 
     private static final long serialVersionUID = 1L;
 
-    private final String brokerName;
     private final DataStructureKey channelKey;
 
-    public RouteMessagesTask(DataStructureKey channelKey, String brokerName) {
-      this.brokerName = brokerName;
+    private Broker broker;
+
+    public RouteMessagesTask(DataStructureKey channelKey) {
       this.channelKey = channelKey;
     }
 
     @Override
+    public void setBroker(Broker broker) {
+      this.broker = broker;
+    }
+
+    @Override
     public void run() {
-
-      Broker broker = HazelcastMQ.getBrokerByName(brokerName);
-
-      if (broker == null) {
-        // Log and return.
-        log.warning(format("Unable to find broker %s to route messages "
-            + "for channel key %s.", brokerName, channelKey));
-
-        return;
-      }
 
       try (RouterContext routerContext = broker.createRouterContext()) {
 
@@ -91,7 +66,5 @@ class MessageSentRoutingHandler extends MessageSentAdapter implements
         }
       }
     }
-
   }
-
 }

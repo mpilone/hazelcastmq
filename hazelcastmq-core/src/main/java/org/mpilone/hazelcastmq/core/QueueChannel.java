@@ -31,7 +31,6 @@ class QueueChannel implements Channel {
   private final MessageConverter messageConverter;
 
   private String messageSentRegistrationId;
-  private ReadReadyNotifier messageSentReadReadyNotifier;
   private StoppableTask<Boolean> sendTask;
   private StoppableTask<Message<?>> receiveTask;
   private volatile boolean closed;
@@ -154,9 +153,10 @@ class QueueChannel implements Channel {
     // polling and therefore may never need to use an item listener at all.
     if (messageSentRegistrationId == null) {
 
-      messageSentReadReadyNotifier = new ReadReadyNotifier();
+      final ReadReadyNotifier notifier = new ReadReadyNotifier();
+
       messageSentRegistrationId = MessageSentAdapter.getMapToListen(
-          dataStructureContext).addEntryListener(messageSentReadReadyNotifier,
+          dataStructureContext).addEntryListener(notifier,
               channelKey, false);
     }
 
@@ -180,14 +180,6 @@ class QueueChannel implements Channel {
       MessageSentAdapter.getMapToListen(dataStructureContext).
           removeEntryListener(messageSentRegistrationId);
 
-      try {
-        messageSentReadReadyNotifier.stop();
-      }
-      catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-      }
-
-      messageSentReadReadyNotifier = null;
       messageSentRegistrationId = null;
     }
   }
@@ -260,7 +252,6 @@ class QueueChannel implements Channel {
         new ArrayList<>(readReadyListeners).stream().forEach(
             l -> l.readReady(new ReadReadyEvent(QueueChannel.this)));
       }
-
     }
 
   }

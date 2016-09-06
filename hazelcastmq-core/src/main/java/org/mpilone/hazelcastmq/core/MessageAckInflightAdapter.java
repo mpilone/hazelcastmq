@@ -5,7 +5,6 @@ import com.hazelcast.map.listener.EntryAddedListener;
 import com.hazelcast.map.listener.EntryMergedListener;
 import com.hazelcast.map.listener.EntryUpdatedListener;
 import java.io.Serializable;
-import java.util.concurrent.TimeUnit;
 import org.mpilone.hazelcastmq.core.Message;
 
 /**
@@ -16,61 +15,35 @@ abstract class MessageAckInflightAdapter implements
     EntryAddedListener<String, MessageAckInflightAdapter.MessageInflight>,
     EntryUpdatedListener<String, MessageAckInflightAdapter.MessageInflight>,
     EntryMergedListener<String, MessageAckInflightAdapter.MessageInflight>,
-    ItemListener<MessageAckInflightAdapter.MessageAck>, Stoppable {
+    ItemListener<MessageAckInflightAdapter.MessageAck> {
 
   public final static String MESSAGE_INFLIGHT_MAP_NAME = "hzmq.messageinflight";
 
   public final static String MESSAGE_ACK_QUEUE_NAME = "hzmq.messageack";
 
-  private final StoppableCurrentThreadExecutor executor;
-
-  public MessageAckInflightAdapter() {
-    this.executor = new StoppableCurrentThreadExecutor();
-  }
-
-  @Override
-  public void stop() throws InterruptedException {
-    executor.stop();
-  }
-
-  @Override
-  public boolean stop(long timeout, TimeUnit unit) throws InterruptedException {
-    return executor.stop(timeout, unit);
-  }
-
   @Override
   public void entryAdded(EntryEvent<String, MessageInflight> evt) {
-    executor.execute(() -> {
       messageInflight(evt.getValue());
-    });
   }
 
   @Override
   public void entryUpdated(EntryEvent<String, MessageInflight> evt) {
-    executor.execute(() -> {
       messageInflight(evt.getValue());
-    });
   }
 
   @Override
   public void entryMerged(EntryEvent<String, MessageInflight> evt) {
-    executor.execute(() -> {
       messageInflight(evt.getValue());
-    });
   }
 
   @Override
   public void itemAdded(ItemEvent<MessageAck> evt) {
-    executor.execute(() -> {
       messageAck(evt.getItem());
-    });
   }
 
   @Override
   public void itemRemoved(ItemEvent<MessageAck> evt) {
-    executor.execute(() -> {
       messageAck(evt.getItem());
-    });
   }
 
   abstract protected void messageInflight(MessageInflight inflight);
