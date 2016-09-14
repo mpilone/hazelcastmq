@@ -1,10 +1,9 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.Objects;
-import java.util.concurrent.*;
-
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
+import java.util.Objects;
+import java.util.concurrent.*;
 
 /**
  *

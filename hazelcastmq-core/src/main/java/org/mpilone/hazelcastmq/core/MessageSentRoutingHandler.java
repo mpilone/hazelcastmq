@@ -6,15 +6,13 @@ import java.util.concurrent.Executor;
 
 
 /**
- * A router executor that uses the item event dispatch thread to perform the
- * routing. This is the most direct routing but it will block event dispatch on
- * the message sent map so it does not support parallel routing and it may block
- * channel read-ready notifications.
+ * Routes messages whenever a message is sent. The execution is performed by an
+ * {@link Executor} instance which can select the appropriate threading strategy
+ * and node.
  *
  * @author mpilone
  */
-class MessageSentRoutingHandler extends MessageSentAdapter implements
-    RouterExecutor {
+class MessageSentRoutingHandler extends MessageSentAdapter {
 
   private final Executor executor;
 
@@ -33,6 +31,11 @@ class MessageSentRoutingHandler extends MessageSentAdapter implements
     executor.execute(new RouteMessagesTask(channelKey));
   }
 
+  /**
+   * The task that executes the routing using the router for the given source
+   * channel. If there is no router configured for the channel, this method does
+   * nothing.
+   */
   private static class RouteMessagesTask implements Runnable, Serializable,
       BrokerAware {
 

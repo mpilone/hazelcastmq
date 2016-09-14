@@ -11,6 +11,7 @@ import java.util.Map;
  * @param <P> the type of the message payload
  */
 public class GenericMessage<P> implements Message<P>, Serializable {
+  private static final long serialVersionUID = 1L;
 
   private final MessageHeaders headers;
   private P payload;

@@ -14,6 +14,12 @@ import java.util.concurrent.*;
 import static java.lang.String.format;
 
 /**
+ * An {@link Executor} that delegates to a Hazelcast {@link IExecutorService} to
+ * execute the task on a node in the cluster. If the task implements
+ * {@link BrokerAware}, a broker instance will be set before the task is
+ * executed. The executor can be stopped which is a blocking operation that
+ * waits for submitted tasks to complete before returning allowing for a
+ * complete and safe shutdown.
  *
  * @author mpilone
  */
@@ -34,6 +40,14 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
 
   private boolean stopped;
 
+  /**
+   * Constructs the executor.
+   *
+   * @param hazelcastInstance the Hazelcast instance to use when looking up an
+   * executor service
+   * @param executorServiceName the name of the executor service to lookup
+   * @param brokerName the name of the broker to lookup and inject into tasks
+   */
   public DistributedBrokerExecutor(HazelcastInstance hazelcastInstance,
       String executorServiceName, String brokerName) {
     this.hazelcastInstance = hazelcastInstance;
@@ -115,6 +129,13 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
     }
   }
 
+  /**
+   * Submits the given command to the Hazelcast executor service. The current
+   * implementation always executes the task on the current (this) member.
+   *
+   * @param command the command to submit
+   * @return the future returned by the executor service
+   */
   private Future<?> submitToExecutorService(Callable<Void> command) {
 
     // Lookup the executor and the target member. In the future this might
@@ -126,6 +147,10 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
     return executor.submitToMember(command, member);
   }
 
+  /**
+   * Checks the list of submitted task futures and removes any futures that are
+   * now done.
+   */
   private void purgeDoneTasks() {
     for (Iterator<Future<?>> iter = submittedTasks.iterator(); iter.hasNext();) {
       Future<?> task = iter.next();
@@ -136,6 +161,11 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
     }
   }
 
+  /**
+   * Wraps a {@link Runnable} as a {@link Callable} that simply returns null.
+   * Similar to {@link Executors#callable(java.lang.Runnable) } but also
+   * {@link Serializable}.
+   */
   private static class RunnableWrapperTask implements Callable<Void>,
       Serializable {
 
@@ -155,6 +185,10 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
 
   }
 
+  /**
+   * Wraps a {@link Runnable} and performs the broker lookup and injection if
+   * the target task implements {@link BrokerAware}.
+   */
   private static class BrokerLocatorWrapperTask implements Runnable,
       Serializable {
     private static final long serialVersionUID = 1L;
@@ -175,8 +209,10 @@ class DistributedBrokerExecutor implements Executor, Stoppable {
 
         if (broker == null) {
           // Log and return.
-          log.warning(format("Unable to find broker %s to auto nack "
-              + "inflight messages.", brokerName));
+          log.warning(format(
+              "Unable to find broker %s to inject into target task %s. The "
+              + "task will not be executed.",
+              brokerName, task.getClass().getName()));
 
           return;
         }

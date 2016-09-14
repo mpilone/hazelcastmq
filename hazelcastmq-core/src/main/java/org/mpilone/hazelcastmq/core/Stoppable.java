@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package org.mpilone.hazelcastmq.core;
 
 import java.util.concurrent.TimeUnit;
@@ -14,18 +9,17 @@ import java.util.concurrent.TimeUnit;
 public interface Stoppable {
 
   /**
-   * Stops the target callable if it was already started and awaits the
-   * termination of this task. This method will block until the task is executed
-   * and completes.
+   * Stops the target if it was already started and awaits the
+   * termination of
+   * this task. This method will block until the target is complete.
    *
    * @throws InterruptedException if interrupted while awaiting termination
    */
   void stop() throws InterruptedException;
 
   /**
-   * Stops the target callable if it was already started and awaits the
-   * termination of this task. This method will block until the task is executed
-   * and completes.
+   * Stops the target if it was already started and awaits the
+   * termination of this task. This method will block until the task is complete.
    *
    * @param timeout the amount of time to wait for termination
    * @param unit the unit of the time value

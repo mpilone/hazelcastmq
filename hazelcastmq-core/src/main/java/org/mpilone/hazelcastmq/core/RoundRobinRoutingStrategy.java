@@ -1,9 +1,9 @@
 
 package org.mpilone.hazelcastmq.core;
 
-import static java.util.Arrays.asList;
-
 import java.util.*;
+
+import static java.util.Arrays.asList;
 
 /**
  * A routing strategy that selects a single target route using a simple
@@ -16,6 +16,7 @@ import java.util.*;
  */
 public class RoundRobinRoutingStrategy implements RoutingStrategy,
     StatefulRoutingStrategy {
+  private static final long serialVersionUID = 1L;
 
   private long counter = 1;
 

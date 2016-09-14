@@ -1,14 +1,13 @@
 package org.mpilone.hazelcastmq.core;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
-
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.map.AbstractEntryProcessor;
+import com.hazelcast.map.EntryProcessor;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.mpilone.hazelcastmq.core.DefaultRouterContext.RouterData;
 
 /**
  * Default implementation of a router that uses a router data map to track the
@@ -25,6 +24,13 @@ class DefaultRouter implements Router {
 
   private volatile boolean closed;
 
+  /**
+   * Constructs the router.
+   *
+   * @param channelKey the source channel key
+   * @param parent the parent context that created the router
+   * @param config the broker configuration for access to the Hazelcast instance
+   */
   DefaultRouter(DataStructureKey channelKey, TrackingParent<Router> parent,
       BrokerConfig config) {
     this.config = config;
@@ -56,16 +62,14 @@ class DefaultRouter implements Router {
   public void addRoute(DataStructureKey targetKey, String... routingKeys) {
     requireNotClosed();
 
-    getRouterDataMap().executeOnKey(channelKey, new AddRouteProcessor(
-        targetKey, routingKeys));
+    executeOnKeyLocally(new AddRouteProcessor(targetKey, routingKeys));
   }
 
   @Override
   public void removeRoute(DataStructureKey targetKey, String... routingKeys) {
     requireNotClosed();
 
-    getRouterDataMap().executeOnKey(channelKey,
-        new RemoveRouteProcessor(targetKey, routingKeys));
+    executeOnKeyLocally(new RemoveRouteProcessor(targetKey, routingKeys));
   }
 
   @Override
@@ -92,8 +96,7 @@ class DefaultRouter implements Router {
   public void setRoutingStrategy(RoutingStrategy strategy) {
     requireNotClosed();
 
-    getRouterDataMap().executeOnKey(channelKey,
-        new SetRoutingStrategyProcessor(strategy));
+    executeOnKeyLocally(new SetRoutingStrategyProcessor(strategy));
   }
 
   /**
@@ -108,12 +111,14 @@ class DefaultRouter implements Router {
   }
 
   /**
-   * Routes all messages from the source channel to the target channels using
-   * the routing strategy configured in the router.
+   * Executes the given processor on the router data map after locking the
+   * source channel key. This method is similar to {@link IMap#executeOnKey(java.lang.Object, com.hazelcast.map.EntryProcessor)
+   * } except that the processor is always executed in the current thread.
+   *
+   * @param processor the processor to execute
    */
-  @Override
-  public void routeMessages() {
-    requireNotClosed();
+  private void executeOnKeyLocally(
+      EntryProcessor<DataStructureKey, RouterData> processor) {
 
     final IMap<DataStructureKey, RouterData> routerDataMap = getRouterDataMap();
 
@@ -121,37 +126,51 @@ class DefaultRouter implements Router {
     // strategy and routes during routing.
     routerDataMap.lock(channelKey);
     try {
-      final RouterData routerData = routerDataMap.get(channelKey);
-
-      // Get the strategy and possible output routes.
-      final RoutingStrategy strategy = routerData.getRoutingStrategy();
-      final Collection<Route> routes = routerData.getRoutes();
-      final DataStructureKey sourceChannelKey = routerData.getChannelKey();
-
-      routeMessages(sourceChannelKey, routes, strategy);
-
-      if (strategy instanceof StatefulRoutingStrategy) {
-      // Put the router data back in the map so the stateful strategy
-        // is properly saved/persisted.
-        routerDataMap.put(channelKey, routerData);
-      }
+      Map.Entry entry = new WriteThroughEntry(channelKey, routerDataMap);
+      processor.process(entry);
     }
     finally {
       routerDataMap.unlock(channelKey);
     }
+
   }
 
   /**
    * Routes all messages from the source channel to the target channels using
-   * the routing strategy configured in the router. This method must be executed
-   * in the router lock to avoid race conditions on the router data.
-   *
-   * @param sourceChannelKey the key for the channel that serves as the source
-   * of messages
-   * @param routes the routes that define the target channel keys and routing
-   * keys
-   * @param strategy the routing strategy to apply to each message
+   * the routing strategy configured in the router.
    */
+  @Override
+  public void routeMessages() {
+    requireNotClosed();
+
+    executeOnKeyLocally(new RouteMessagesProcessor(config));
+  }
+
+  /**
+   * Routes all messages from the source channel to the target channels using
+   * the routing strategy configured in the router. This processor must be
+   * executed   * in the router lock to avoid race conditions on the router data.
+   */
+  private static class RouteMessagesProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
+    private static final long serialVersionUID = 1L;
+
+    private final BrokerConfig config;
+
+    public RouteMessagesProcessor(BrokerConfig config) {
+      super(false);
+      this.config = config;
+    }
+
+    /**
+     * Routes all messages from the source channel to the target channels using
+     * the routing strategy configured in the router.
+     *
+     * @param sourceChannelKey the key for the channel that serves as the source
+     * of messages
+     * @param routes the routes that define the target channel keys and routing
+     * keys
+     * @param strategy the routing strategy to apply to each message
+     */
   private void routeMessages(final DataStructureKey sourceChannelKey,
       final Collection<Route> routes, final RoutingStrategy strategy) {
 
@@ -180,6 +199,30 @@ class DefaultRouter implements Router {
             }
           });
         }
+      }
+    }
+    }
+
+    @Override
+    public Object process(Map.Entry<DataStructureKey, RouterData> entry) {
+
+      final RouterData routerData = entry.getValue();
+
+      // Get the strategy and possible output routes.
+      final RoutingStrategy strategy = routerData.getRoutingStrategy();
+      final Collection<Route> routes = routerData.getRoutes();
+      final DataStructureKey sourceChannelKey = routerData.getChannelKey();
+
+      routeMessages(sourceChannelKey, routes, strategy);
+
+      if (strategy instanceof StatefulRoutingStrategy) {
+        // Put the router data back in the map so the stateful strategy
+        // is properly saved/persisted.
+        entry.setValue(routerData);
+
+        return routerData;
+      } else {
+        return null;
       }
     }
   }
@@ -309,13 +352,13 @@ class DefaultRouter implements Router {
       entry.setValue(newData);
 
       return newData;
-
     }
-
   }
 
-  private static class SetRoutingStrategyProcessor extends
-      AbstractEntryProcessor<DataStructureKey, RouterData> {
+  /**
+   * Entry processor that sets the routing strategy on an entry.
+   */
+  private static class SetRoutingStrategyProcessor extends AbstractEntryProcessor<DataStructureKey, RouterData> {
 
     private static final long serialVersionUID = 1L;
 
@@ -341,7 +384,47 @@ class DefaultRouter implements Router {
 
       return newData;
     }
+  }
 
+  /**
+   * A map entry that reads and writes to a backing map implementation. That is,
+   * the get and set value operations delegate to the backing map and do not
+   * store the value locally.
+   *
+   * @param <K> the type of the entry key
+   * @param <V> the type of the entry value
+   */
+  private static class WriteThroughEntry<K, V> implements Map.Entry<K, V> {
+
+    private final K key;
+    private final Map<K, V> target;
+
+    /**
+     * Constructs the entry that will read and write to the given key in the
+     * given map.
+     *
+     * @param key the entry key
+     * @param target the backing target map to read from and write to
+     */
+    public WriteThroughEntry(K key, Map<K, V> target) {
+      this.key = key;
+      this.target = target;
+    }
+
+    @Override
+    public K getKey() {
+      return key;
+    }
+
+    @Override
+    public V getValue() {
+      return target.get(key);
+    }
+
+    @Override
+    public V setValue(V value) {
+      return target.put(key, value);
+    }
   }
 
 }

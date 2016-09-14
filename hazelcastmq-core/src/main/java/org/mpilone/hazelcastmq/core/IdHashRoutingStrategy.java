@@ -1,9 +1,9 @@
 
 package org.mpilone.hazelcastmq.core;
 
-import static java.util.Arrays.asList;
-
 import java.util.*;
+
+import static java.util.Arrays.asList;
 
 /**
  * A routing strategy that selects a single target route using the hash code of
@@ -14,6 +14,7 @@ import java.util.*;
  * @author mpilone
  */
 public class IdHashRoutingStrategy implements RoutingStrategy {
+  private static final long serialVersionUID = 1L;
 
   @Override
   public Collection<DataStructureKey> routeMessage(

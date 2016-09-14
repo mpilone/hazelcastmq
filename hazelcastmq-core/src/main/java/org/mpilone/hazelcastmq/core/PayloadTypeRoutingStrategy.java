@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
  * @author mpilone
  */
 public class PayloadTypeRoutingStrategy implements RoutingStrategy {
+  private static final long serialVersionUID = 1L;
 
   @Override
   public Collection<DataStructureKey> routeMessage(

@@ -94,6 +94,11 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
     }
   }
 
+  /**
+   * A runnable task that automatically generates nacks for inflight messages
+   * that have been in the inflight status for too long and therefore should be
+   * redelivered or dropped.
+   */
   private static class AutoNackTask implements Runnable, Serializable,
       BrokerAware {
 
@@ -147,6 +152,10 @@ class MessageAckInflightApplyHandler extends MessageAckInflightAdapter {
     }
   }
 
+  /**
+   * A runnable task that applies all the acks/nacks that are queued for
+   * processing.
+   */
   private static class ApplyAckTask implements Runnable, Serializable,
       BrokerAware {
 

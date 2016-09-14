@@ -3,6 +3,8 @@ package org.mpilone.hazelcastmq.core;
 import com.hazelcast.transaction.TransactionalTaskContext;
 
 /**
+ * A interface that indicates the implementor supports setting an
+ * externally managed transaction context.
  *
  * @author mpilone
  */
