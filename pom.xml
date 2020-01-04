@@ -8,11 +8,11 @@
   <packaging>pom</packaging>
 
   <modules>
-<!--    <module>hazelcastmq-examples</module>-->
+    <module>hazelcastmq-examples</module>
     <module>hazelcastmq-core</module>
     <module>hazelcastmq-jms</module>
-<!--    <module>hazelcastmq-stomp</module>-->
-<!--    <module>hazelcastmq-camel</module>-->
+    <module>hazelcastmq-stomp</module>
+    <module>hazelcastmq-camel</module>
     <module>hazelcastmq-spring</module>
     <module>yeti</module>
   </modules>
@@ -28,10 +28,10 @@
     <maven.compiler.target>${java.version}</maven.compiler.target>
     
     <hazelcast.version>3.12.5</hazelcast.version>
-    <slf4j.version>1.7.2</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
     <junit.version>4.12</junit.version>
     <spring.version>5.2.2.RELEASE</spring.version>
-    <mockito.version>1.9.5</mockito.version>
+    <mockito.version>3.2.4</mockito.version>
     <geronimo-jms_1.1.version>1.1.1</geronimo-jms_1.1.version>
 
   </properties>
