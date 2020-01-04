@@ -20,8 +20,7 @@ public class FrameDebugHandler extends ChannelDuplexHandler {
   /**
    * The log for this class.
    */
-  private final static Logger log = LoggerFactory.getLogger(
-      FrameDebugHandler.class);
+  private final static Logger log = LoggerFactory.getLogger(FrameDebugHandler.class);
 
   private boolean debugInbound;
   private boolean debugOutbound;

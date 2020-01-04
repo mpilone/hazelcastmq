@@ -1,2 +1,6 @@
 pom.xml.versionsBackup
 /hazelcastmq-spring/target/
+
+*.iml
+.idea/
+target/

@@ -5,9 +5,10 @@ import org.mpilone.hazelcastmq.example.ExampleApp;
 import org.mpilone.hazelcastmq.example.spring.tx.support.hz.BusinessService;
 import org.mpilone.hazelcastmq.example.spring.tx.support.hz.TransactionManagerConfig;
 import org.mpilone.hazelcastmq.spring.tx.HazelcastTransactionManager;
-import org.springframework.context.annotation.*;
+
 
 import com.hazelcast.core.HazelcastInstance;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 
 /**
@@ -32,9 +33,7 @@ public class HzTransactionManager extends ExampleApp {
         new AnnotationConfigApplicationContext(TransactionManagerConfig.class)) {
 
       // Run the business methods.
-      BusinessService businessService =
-          (BusinessService) springContext.getBean(
-              "businessService");
+      BusinessService businessService = (BusinessService) springContext.getBean("businessService");
       businessService.processWithTransaction();
       businessService.processWithoutTransaction();
       try {
@@ -43,10 +42,7 @@ public class HzTransactionManager extends ExampleApp {
       catch (RuntimeException ex) {
         // expected.
       }
-
     }
   }
-
-
 
 }

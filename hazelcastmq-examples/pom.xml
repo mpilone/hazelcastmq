@@ -7,7 +7,7 @@
   <parent>
     <artifactId>hazelcastmq-parent</artifactId>
     <groupId>org.mpilone.hazelcastmq</groupId>
-    <version>1.4.0</version>
+    <version>2.0.0</version>
   </parent>
 
   <artifactId>hazelcastmq-examples</artifactId>
@@ -50,6 +50,11 @@
       <artifactId>spring-jms</artifactId>
       <version>${spring.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+      <version>${spring.version}</version>
+    </dependency>
      <dependency>
       <groupId>org.apache.geronimo.specs</groupId>
       <artifactId>geronimo-jms_1.1_spec</artifactId>
@@ -58,7 +63,7 @@
     <dependency>
       <groupId>com.atomikos</groupId>
       <artifactId>transactions-jta</artifactId>
-      <version>3.9.3</version>
+      <version>5.0.6</version>
     </dependency>
     <dependency>
       <groupId>javax.transaction</groupId>
